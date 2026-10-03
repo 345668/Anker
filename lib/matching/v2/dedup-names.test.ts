@@ -35,3 +35,13 @@ describe("firm names written differently", () => {
     expect(ranked[0].score).toBe(9)
   })
 })
+
+describe("imported names", () => {
+  it("double-encoded umlauts meet the clean spelling, and a bracketed acronym is an alias", () => {
+    expect(same("Nordwerk GrÃ¼nderfonds (NGF)", "Nordwerk Gründerfonds Management GmbH")).toBe(true)
+    expect(same("Nordwerk GrÃ¼nderfonds (NGF)", "NGF")).toBe(true)
+  })
+  it("a bracket with words is not an alias", () => {
+    expect(same("Alpha Fund (Jane Roe)", "Jane Roe")).toBe(false)
+  })
+})

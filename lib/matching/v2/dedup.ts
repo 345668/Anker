@@ -26,13 +26,23 @@ const COMPANY_SUFFIXES = [
  * Normalize a firm name: lowercase, strip suffixes, collapse whitespace.
  * "GROVE STREET ADVISORS LLC" → "grove street"
  */
+/** UTF-8 read as Windows-1252 ("GrÃ¼nderfonds" for "Gründerfonds"): how some imported names were stored. */
+const MOJIBAKE: [RegExp, string][] = [
+  [/Ã¤/g, "ä"], [/Ã¶/g, "ö"], [/Ã¼/g, "ü"], [/ÃŸ/g, "ß"], [/Ã„/g, "Ä"], [/Ã–/g, "Ö"], [/Ãœ/g, "Ü"],
+  [/Ã©/g, "é"], [/Ã¨/g, "è"], [/Ã¡/g, "á"], [/Ã³/g, "ó"], [/Ã­/g, "í"], [/Ãº/g, "ú"], [/Ã±/g, "ñ"], [/Ã§/g, "ç"], [/Ã¥/g, "å"], [/Ã¸/g, "ø"],
+]
+export function repairMojibake(s: string): string {
+  if (!/Ã/.test(s)) return s
+  return MOJIBAKE.reduce((acc, [re, to]) => acc.replace(re, to), s)
+}
+
 /**
  * Spell accented letters the way a keyboard without them does: "Gründerfonds" and "Gruenderfonds" are
  * one word, "Société" and "Societe" too. German umlauts and ß take their two-letter forms; every
  * other accent is simply dropped. Without this "ü" became a space and the two spellings never met.
  */
 export function foldAccents(s: string): string {
-  return s
+  return repairMojibake(s)
     .replace(/ä/gi, (m) => (m === "Ä" ? "Ae" : "ae")).replace(/ö/gi, (m) => (m === "Ö" ? "Oe" : "oe"))
     .replace(/ü/gi, (m) => (m === "Ü" ? "Ue" : "ue")).replace(/ß/g, "ss")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -233,7 +243,10 @@ export function firmNameParts(name: string | null | undefined): { main: string; 
     return { main: inner.main, aliases: [...inner.aliases, ...rest] }
   }
   const found: string[] = []
-  let main = name.replace(PAREN_RENAME, (_m, alias: string) => { found.push(alias); return " " })
+  // "Full Name (ACR)": a bracketed bare acronym is the firm's short name. A bracket with words in it
+  // ("AAF Management (AAF VC)", "Cashmere Fund (Josh Allen)") is a brand or a person and is left alone.
+  let main = name.replace(/\(\s*([A-Z0-9]{3,8})\s*\)/g, (_m, acr: string) => { found.push(acr); return " " })
+  main = main.replace(PAREN_RENAME, (_m, alias: string) => { found.push(alias); return " " })
   const trail = TRAIL_RENAME.exec(main)
   if (trail) { found.push(trail[1]); main = main.slice(0, trail.index) }
   const aliases = found.flatMap((a) => a.split(/\s*(?:\/|,|;|\band\b|\bor\b)\s*/i)).map((a) => a.trim()).filter(Boolean)

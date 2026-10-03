@@ -36,6 +36,7 @@ import { generateBatch } from "@/lib/ai/provider";
 import { generateOutreachSequencesBatch, type FounderContext, type PartnerContext } from "@/lib/ai/dm-personalizer";
 import { enrichFirm } from "@/lib/admin/enrichment";
 import { resolveGeo } from "@/lib/matching/normalize/geo";
+import { repairMojibake } from "@/lib/matching/v2/dedup";
 import { firmFacts } from "@/lib/matching/v2/founder-scoring";
 
 // ── shared: normalized firm-type matching + bounded firm fetch ────────────────
@@ -61,7 +62,7 @@ async function fetchFirms(opts: { type?: string; keyword?: string; ids?: string[
   // free text ("Berlin", "Munich, Germany"), so it is read the way the matching engine reads it.
   const iso = opts.country ? countryIso(opts.country) : null;
   if (iso) {
-    const rows = await fetchFirmsRaw({ ...opts, limit: 50 * 4 });
+    const rows = await fetchFirmsRaw({ ...opts, limit: 1000 });
     return rows.filter((r) => resolveGeo(r.hq_location, r.location).countries.includes(iso)).slice(0, want);
   }
   return fetchFirmsRaw({ ...opts, limit: want });
@@ -80,7 +81,7 @@ function checkText(r: FirmRow): string {
   return c.min && c.max && c.min !== c.max ? `${fmt(c.min)}–${fmt(c.max)}` : fmt((c.max ?? c.min) as number);
 }
 async function fetchFirmsRaw(opts: { type?: string; keyword?: string; ids?: string[]; limit: number }): Promise<FirmRow[]> {
-  const limit = Math.max(1, Math.min(200, opts.limit));
+  const limit = Math.max(1, Math.min(1000, opts.limit));
   if (Array.isArray(opts.ids) && opts.ids.length) {
     return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails,check_size_min,check_size_max,check_min,check_max
       FROM investment_firms WHERE id = ANY(${opts.ids}) LIMIT ${limit}`) as unknown as FirmRow[];
@@ -366,7 +367,7 @@ export const TOOLS: Record<string, ToolDef> = {
         let { score, reason } = verdicts.get(f.id) ?? { score: 0, reason: "" };
         // Deterministic fallback when AI is unavailable (quota): keyword overlap.
         if (!score) { const blob = `${f.name} ${f.type ?? ""} ${sectorsText(f.sectors)} ${f.description ?? ""}`.toLowerCase(); const hits = thesis.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3 && blob.includes(w)).length; score = Math.min(8, 3 + hits); reason = reason || `${hits} thesis-term overlaps (heuristic)`; }
-        return { name: f.name, type: f.type ?? "", location: f.hq_location ?? f.location ?? "", website: f.website ?? "", score, tier: tierFor(score), reason, check: checkText(f) };
+        return { name: repairMojibake(f.name), type: f.type ?? "", location: repairMojibake(f.hq_location ?? f.location ?? ""), website: f.website ?? "", score, tier: tierFor(score), reason, check: checkText(f) };
       });
       // Every call in this run that used the same thesis lands in ONE ranking and ONE workbook.
       const ctx = currentAiContext();
@@ -389,7 +390,7 @@ export const TOOLS: Record<string, ToolDef> = {
         `Full ranked list: ${artifact.name}`;
       return {
         report,
-        observation: `Scored ${batch.length} firms this call${batches > 1 ? `; the workbook now ranks ${scored.length} firms across ${batches} batches (${added} new)` : ""}. One workbook holds them all, ranked together. A verified results list (with each firm's real check size, or "not in database") is appended to your answer automatically; do not retype it, do not build your own table, and never state a check size that is not in it.\nTop:\n${top.join("\n")}\n\nXLSX → ${artifact.url}`,
+        observation: `${batch.length < limit ? `Only ${batch.length} firms in the database matched these filters (you asked for up to ${limit}); report exactly ${batch.length}, not ${limit}. ` : ""}Scored ${batch.length} firms this call${batches > 1 ? `; the workbook now ranks ${scored.length} firms across ${batches} batches (${added} new)` : ""}. One workbook holds them all, ranked together. A verified results list (with each firm's real check size, or "not in database") is appended to your answer automatically; do not retype it, do not build your own table, and never state a check size that is not in it.\nTop:\n${top.join("\n")}\n\nXLSX → ${artifact.url}`,
         artifact,
       };
     },
