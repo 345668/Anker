@@ -173,7 +173,7 @@ persona and workspace isolation.
 | Early-access form might not write | **Closed** (2 rows) |
 | LP onboarding absent, LP persona 3 pages | **Open** |
 | Run one full cross-persona loop with real data | **Open** (0 portfolio companies, 0 IC memos) |
-| Instrument activation | **Open** (no analytics table found) |
+| Instrument activation | **Done 2026-10-03, derived not tracked**: SAIL `/activation` reads the funnel (profile, match, draft, send, reply), loop completion, time to first match and WAU/MAU from tables the product already writes; retroactive. Limit: active = AI, outreach or CRM activity, not page views |
 | Invented performance statistics on the site | **Closed on the live site** (none on any crawled page) |
 | *New:* the Terms name Supabase, Vercel, Anthropic, OpenAI, Google, Alibaba, Resend and Blob but not **Mistral** (a live key) or **Stripe**; the privacy policy names Anthropic and Google, for which no key exists | **Open**: make the public sub-processor list match the register (§8.4) |
 | *New:* there is no `/pricing` page (404) | Consistent with unvalidated pricing (§7.2) |
