@@ -411,3 +411,18 @@ against 98.8, which they cannot see. And inside a shown score the firms whose ch
 (`leadTier` = 1, check fit at least `LEAD_FIT_MIN` = 0.45) come before those that cannot: a $25K-$250K angel,
 whose range touches a $250K-$1M lead band at one point, no longer outranks $250K-$2M funds. A firm with no
 check size on record is tier 0, below confirmed leads. Scores, tiers and gates are unchanged.
+
+## Addendum 2026-10-03: headroom — the top of the list no longer ties
+
+A production run for a pre-seed healthcare company returned 75 Champions, every one "100". Four components are exactly 1.0 for any firm that clears a bar (stage on the list, check range overlaps the ideal, country matches, a check could lead), so for a founder whose thesis fits a whole class of funds the total saturated and the tie-break alone ordered the list.
+
+Each of those four is now graded between a floor and 1.0 by how strongly the firm meets its bar (`HEADROOM`, `founder-scoring.ts`):
+
+| Component | Floor | Graded by |
+| --- | --- | --- |
+| Stage (20) | 0.80 | commitment: one stage = 1.0, a firm listing every stage = the floor |
+| Check size (15) | 0.75 | how much of the lead band the range covers and how centred it is (`checkFit`) |
+| Geography (12) | 0.85 | inside the right country only, nearness to the founder's city and state; neutral when the founder gave only a country |
+| Lead (5) | 0.70 | how much of the round the firm's largest check could carry |
+
+Only the points change. The raw component, every gate, the tier thresholds and the explanations are untouched, and a component already below 1.0 is never altered, so headroom splits the top without lifting anything above it or demoting a strong match. A 100 now means all four at their best. The tie-break still orders firms that land on the same score. Scores are shown to one decimal in the assistant report so near neighbours can be told apart.

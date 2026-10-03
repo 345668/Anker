@@ -92,11 +92,11 @@ describe("check fit", () => {
 })
 
 describe("tie-break inside a score band", () => {
-  it("separates two firms that score the same, by the founder's city", () => {
+  it("puts the firm in the founder's city above one elsewhere in the country, in the score and in the tie value", () => {
     const local = firm({ hq_location: "Atlanta, Georgia, USA" })
     const away = firm({ hq_location: "New York, United States" })
     const a = scoreInvestor(local, ctx, 0), b = scoreInvestor(away, ctx, 0)
-    expect(a.score).toBe(b.score)
+    expect(a.score).toBeGreaterThan(b.score)     // headroom: nearness is in the score now, not only the tie-break
     expect(a.tie).toBeGreaterThan(b.tie)
     expect(a.why).toContain("based in Atlanta")
     expect(b.why).not.toContain("based in")

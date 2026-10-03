@@ -217,7 +217,7 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
 
   const label = new Map(TIER_DEFINITIONS.map((t) => [t.id, t.label]))
   const lines = groups.slice(0, SHOWN).map((g, i) =>
-    `${i + 1}. ${g.firm.name} — ${Math.round(g.firm.score)} (${label.get(g.firm.tier) ?? g.firm.tier}) | ${g.firm.type || "?"} | ${g.firm.location || "?"} | ${g.firm.whyMatch}`)
+    `${i + 1}. ${g.firm.name} — ${g.firm.score.toFixed(1)} (${label.get(g.firm.tier) ?? g.firm.tier}) | ${g.firm.type || "?"} | ${g.firm.location || "?"} | ${g.firm.whyMatch}`)
   const tiers = result.tierCounts.firms
   const tierText = TIER_DEFINITIONS.map((t) => `${t.label} ${tiers[t.id] ?? 0}`).join(", ")
   const qualified = result.qualifiedBeforeCap?.groups ?? result.totals.qualifiedFirms
@@ -236,7 +236,7 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
     (groups.length < count ? `You asked for ${count}; only ${groups.length} cleared the minimum score, so that is the number.\n` : "") +
     `\nTop ${Math.min(SHOWN, groups.length)}\n` +
     groups.slice(0, SHOWN).map((g, i) =>
-      `${i + 1}. ${g.firm.name} — ${Math.round(g.firm.score)} · ${g.firm.type || "?"} · ${g.firm.location || "?"} · ${checkRange(g.firm.checkSizeMin, g.firm.checkSizeMax)}`).join("\n") +
+      `${i + 1}. ${g.firm.name} — ${g.firm.score.toFixed(1)} · ${g.firm.type || "?"} · ${g.firm.location || "?"} · ${checkRange(g.firm.checkSizeMin, g.firm.checkSizeMax)}`).join("\n") +
     `\n\nFull ranked list: ${artifact.name} (also saved on the Founder Matching page).`
 
   return {

@@ -215,6 +215,48 @@ export function qualityScore(f: InvestorFacts): number {
   return email + (f.hasLinkedIn ? 0.2 : 0) + (f.hasBio ? 0.2 : 0)
 }
 
+// ─── Headroom: telling apart firms that all "fit" ──────────────────────────
+
+/**
+ * Four components are 1.0 for any firm that clears a bar: the stage is on the list, the check range
+ * overlaps the ideal, the country matches, a check could lead. For a founder whose thesis fits a whole class
+ * of funds that made most of the top of the list sum to ~100 and tie (75 Champions, all "100", in a
+ * production run). Each of those four is now graded BETWEEN its floor and 1.0 by how strongly the firm
+ * meets the bar, so a perfect 100 means all of them at their best, not "no disqualifying fact".
+ *
+ * Only the points change. The raw component (and so every gate, tier rule and explanation) still reads
+ * the same 1.0, and a component that is below 1.0 is never touched: this only splits the top.
+ */
+export const HEADROOM = {
+  /** Share of a component's points kept by a firm that only just meets its bar. */
+  stage: 0.8, check: 0.75, place: 0.85, lead: 0.7,
+} as const
+
+/** A firm that invests at one or two stages is committed to this one; one that lists seven is not. */
+export function stageCommitment(stages: Stage[]): number {
+  const n = Math.max(1, stages.length)
+  return HEADROOM.stage + (1 - HEADROOM.stage) / (1 + 0.6 * (n - 1))   // 1 stage = 1.0, 2 = .875, 4 = .857..., many -> .8
+}
+
+/** How strongly a range that overlaps the ideal also reaches the lead band and sits near its middle. */
+export function checkDepth(check: InvestorFacts["check"], ctx: StartupContext): number {
+  return HEADROOM.check + (1 - HEADROOM.check) * checkFit(check, ctx.checkSweet)
+}
+
+/** Inside the right country: the founder's own city and state score higher than the other end of it. Neutral when the founder gave only a country. */
+export function placeDepth(place: string | undefined, ctx: StartupContext): number {
+  if (!ctx.place.city) return 1
+  return HEADROOM.place + (1 - HEADROOM.place) * proximity(place, ctx)
+}
+
+/** How much of the round a lead-capable firm's check could carry. */
+export function leadDepth(f: InvestorFacts, ask: number): number {
+  const hi = f.check?.max ?? f.check?.min ?? null
+  if ((f.leadInvestments ?? 0) > 0 && (hi == null || !(ask > 0))) return 1
+  if (hi == null || !(ask > 0)) return 1
+  return HEADROOM.lead + (1 - HEADROOM.lead) * Math.min(1, hi / ask)
+}
+
 // ─── Composite ─────────────────────────────────────────────────────────────
 
 export interface V3Score {
@@ -354,9 +396,14 @@ export function scoreInvestor(f: InvestorFacts, ctx: StartupContext, sSem: numbe
   // A secured lead moves lead capacity's weight onto check-size fit (doc 11 §4.6).
   const wCheck = w.checkSize + (ctx.leadSecured ? w.lead : 0)
   const wLead = ctx.leadSecured ? 0 : w.lead
+  // Headroom (above): a component at 1.0 is split by how strongly the firm meets its bar; below 1.0 it is untouched.
+  const Sp = S === 1 ? stageCommitment(f.stages) : S
+  const Cp = C === 1 ? checkDepth(f.check, ctx) : C
+  const Gp = G === 1 && f.country && f.country === ctx.country ? placeDepth(f.place, ctx) : G
+  const Lp = L === 1 ? leadDepth(f, ctx.ask) : L
   const pts = {
-    thesis: w.thesis * T, stage: w.stage * S, checkSize: wCheck * C, geography: w.geography * G,
-    lead: wLead * L, investorType: w.investorType * Y, quality: w.quality * Q,
+    thesis: w.thesis * T, stage: w.stage * Sp, checkSize: wCheck * Cp, geography: w.geography * Gp,
+    lead: wLead * Lp, investorType: w.investorType * Y, quality: w.quality * Q,
   }
   // Gates compare the score as shown (one decimal): 79.96 displays as 80.0, so it must pass the Champion gate to keep it.
   let score = round1(Object.values(pts).reduce((a, b) => a + b, 0))
