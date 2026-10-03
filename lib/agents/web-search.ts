@@ -177,7 +177,7 @@ const qwenSearch: Provider = {
         }
         return { json: (await res.json()) as any }
       }).catch((e: any) => ({ error: `${model}: ${e?.name === "AbortError" ? "timed out" : e?.message ?? "failed"}`, retry: false }))
-      if ("error" in outcome) { last = outcome.error; if (outcome.retry) continue; throw new Error(last) }
+      if ("error" in outcome) { last = String(outcome.error); if (outcome.retry) continue; throw new Error(last) }
       const json = outcome.json
       const answer = clipText(json?.choices?.[0]?.message?.content, 1500)
       if (!answer) { last = `${model}: empty answer`; continue }
