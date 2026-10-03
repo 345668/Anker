@@ -106,12 +106,15 @@ export default function PrivacyPage() {
 <section id="ai-processing" aria-labelledby="ai-processing-heading"><h2 id="ai-processing-heading"><span aria-hidden="true">04</span>AI processing</h2>
 
         <p>
-          Some features use AI providers (Anthropic, OpenAI, Google, Alibaba
-          Cloud, and local models). When you use one of those features, the
-          relevant content is sent to the configured provider for processing. We
-          choose providers that contractually agree not to train models on
-          customer prompts. You can see and override the active provider in
-          Settings → API Keys.
+          Some features use AI providers. Today these are Alibaba Cloud (Qwen
+          models, international region, Singapore), OpenAI and Mistral AI, and
+          local models where configured. When you use one of those features,
+          the relevant content is sent to the provider that handles the request
+          for processing. We configure providers so that your content is not
+          used to train their models where the provider offers that setting,
+          and we keep a register of each provider, its region and its terms; ask
+          privacy@an-ker.de for the current register. If we add a provider, we
+          update this list first.
         </p>
 </section>
 <section id="sharing" aria-labelledby="sharing-heading"><h2 id="sharing-heading"><span aria-hidden="true">05</span>Sharing</h2>

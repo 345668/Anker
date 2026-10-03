@@ -130,8 +130,8 @@ export default function TermsPage() {
         <h2>8. Third-party integrations</h2>
         <p>
           Anker integrates with third-party services (Supabase, Vercel,
-          Anthropic, OpenAI, Google, Alibaba, Resend, Vercel Blob, news APIs,
-          others). Their terms apply to your use of those services. We're not
+          Neon, Alibaba Cloud, OpenAI, Mistral AI, Resend, Stripe, Vercel Blob,
+          news APIs, others). Their terms apply to your use of those services. We're not
           responsible for their availability, behaviour, or data practices.
         </p>
 
