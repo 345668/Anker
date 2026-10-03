@@ -24,6 +24,9 @@ const XLSX = require("xlsx")
 const { neon } = require("@neondatabase/serverless")
 
 import { pathToFileURL } from "node:url"
+// The platform's own firm-name rules (accent spellings, acronyms beside a name, initials): the same ones the
+// scorer and the assistant use, so the importer and the app agree on what "the same firm" means.
+import { firmDedupKeys, acronymKey, initialsKey, repairMojibake } from "../lib/matching/v2/dedup.ts"
 
 const args = process.argv.slice(2)
 const APPLY = args.includes("--apply")
@@ -237,7 +240,12 @@ async function loadDirectory() {
   }
 
   const firmByHost = new Map(), firmByName = new Map(), firmByLoose = new Map()
+  const firmByKeys = new Map(), firmByAcronym = new Map(), firmByInitials = new Map()
   for (const f of firms) {
+    for (const k of firmDedupKeys(f.name)) if (k.length >= 3 && !firmByKeys.has(k)) firmByKeys.set(k, f)
+    const ak = acronymKey(f.name), ik = initialsKey(f.name)
+    if (ak && !firmByAcronym.has(ak)) firmByAcronym.set(ak, f)
+    if (ik && !firmByInitials.has(ik)) firmByInitials.set(ik, f)
     const host = hostOf(f.website)
     if (host && !firmByHost.has(host)) firmByHost.set(host, f)
     const exact = normPhrase(f.name)
@@ -250,7 +258,19 @@ async function loadDirectory() {
     }
   }
   console.log(`  ${people.length} people, ${firms.length} firms indexed`)
-  return { people, firms, byEmail, bySlug, byNameFirm, firmByHost, firmByName, firmByLoose }
+  return { people, firms, byEmail, bySlug, byNameFirm, firmByHost, firmByName, firmByLoose, firmByKeys, firmByAcronym, firmByInitials }
+}
+
+/**
+ * The firm a name belongs to under the platform's name rules, or null. Accent spellings ("Gründerfonds" and
+ * "Gruenderfonds"), an acronym beside the name ("HTGF | High-Tech Gründerfonds"), a stated former name, and a
+ * firm written as its initials ("DvH Ventures" for "Dieter von Holtzbrinck Ventures") all find the existing row.
+ */
+export function sameFirmByName(dir, name) {
+  const fixed = repairMojibake(String(name ?? ""))
+  for (const k of firmDedupKeys(fixed)) { const hit = dir.firmByKeys.get(k); if (hit) return hit }
+  const ak = acronymKey(fixed), ik = initialsKey(fixed)
+  return (ak && dir.firmByInitials.get(ak)) || (ik && dir.firmByAcronym.get(ik)) || null
 }
 
 // ─── Merge decisions ────────────────────────────────────────────────────────
@@ -345,6 +365,7 @@ async function main() {
           const hit = (host && dir.firmByHost.get(host))
             || dir.firmByName.get(normPhrase(firmName))
             || (country ? dir.firmByLoose.get(`${normFirm(firmName)}|${country}`) : null)
+            || sameFirmByName(dir, firmName)
           const incoming = {
             website: row.website, hq_location: row.location,
             // Only a firm sheet states a firm's type. On a contact sheet the
@@ -379,6 +400,7 @@ async function main() {
                        JSON.stringify({ imports: [{ batch: BATCH, file: f.file, at: new Date().toISOString() }] })])
             }
             dir.firmByName.set(normPhrase(firmName), { id: firmId, name: firmName })
+            for (const k of firmDedupKeys(firmName)) if (k.length >= 3 && !dir.firmByKeys.has(k)) dir.firmByKeys.set(k, { id: firmId, name: firmName })
             if (host) dir.firmByHost.set(host, { id: firmId, name: firmName })
           }
           if (key) seenFirm.set(key, firmId)

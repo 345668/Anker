@@ -328,15 +328,27 @@ function initialsParts(name: string | null | undefined): { raw: string; words: s
  *  - both say the same kind of firm ("Ventures" with "Ventures"; none with none).
  * Two long names are never joined this way, so "Dieter von Holtzbrinck" and "Dana Vega Hill" stay apart.
  */
-export function initialsMatch(short: string | null | undefined, long: string | null | undefined): boolean {
-  const a = initialsParts(short), b = initialsParts(long)
-  if (a.words.length !== 1 || b.words.length < 3) return false
+/** The key an acronym-style name answers to ("dvh|ventures"), or null when the name is not one. */
+export function acronymKey(name: string | null | undefined): string | null {
+  const a = initialsParts(name)
+  if (a.words.length !== 1) return null
   const token = a.words[0]
-  if (token.length < 3 || token.length > 6) return false
+  if (token.length < 3 || token.length > 6) return null
   const rawWord = foldAccents(a.raw).split(/\s+/)[0].replace(/[^A-Za-z0-9]/g, "")
-  if (rawWord === rawWord.toLowerCase() || /^[A-Z][a-z]+$/.test(rawWord)) return false   // a plain word, not an acronym
-  if (a.kind !== b.kind) return false
-  return b.words.map((w) => w[0]).join("") === token
+  if (rawWord === rawWord.toLowerCase() || /^[A-Z][a-z]+$/.test(rawWord)) return null   // a plain word, not an acronym
+  return `${token}|${a.kind}`
+}
+
+/** The key a full name's initials spell ("dvh|ventures"), or null with fewer than three words. */
+export function initialsKey(name: string | null | undefined): string | null {
+  const b = initialsParts(name)
+  if (b.words.length < 3) return null
+  return `${b.words.map((w) => w[0]).join("")}|${b.kind}`
+}
+
+export function initialsMatch(short: string | null | undefined, long: string | null | undefined): boolean {
+  const k = acronymKey(short)
+  return !!k && k === initialsKey(long)
 }
 
 /** True when either of the two names is the initials of the other. */
