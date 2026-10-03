@@ -88,3 +88,12 @@ and OCR could not render a page, so every image-heavy PDF read as empty. `lib/ai
 imports the worker by a literal specifier (so it is traced into the bundle) and gives it to
 pdfjs as `globalThis.pdfjsWorker`. (Also listing the file in `outputFileTracingIncludes` was tried and
 rejected by Vercel: the path runs through pnpm's symlinks and the function package was refused.)
+
+## Addendum 2026-10-03: score_investors honesty, speed and display
+
+Found by running the Assistant and Anker AI through a browser on production:
+- **Names.** Firm keys now fold accents ("ü" and "ue" are one spelling), drop a trailing "& Co. KG", and read an acronym beside the full name ("ACR | Full Name", "ACR – Full Name") as two names of one firm. A dash that is not next to an acronym stays part of the name.
+- **Check size.** The tool returns the database's stated range, or "not in database". The agent is told never to state one that the tool did not return.
+- **Country.** `score_investors` accepts `country`, applied to the record's location the way the matching engine reads it. A country it cannot read stops the run instead of being ignored.
+- **Speed.** Eight firms per model call instead of one; a firm the model skips uses the keyword heuristic as before.
+- **Display.** Both chats render Markdown (tables, bold, links) from one component; the file chip no longer prints the extension twice.

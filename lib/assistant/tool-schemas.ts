@@ -56,7 +56,7 @@ export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
     }),
   }, ["startup", "count"]),
   score_investors: obj({
-    thesis: str(), type: str({ enum: INVESTOR_TYPE }), keyword: str(),
+    thesis: str(), type: str({ enum: INVESTOR_TYPE }), keyword: str(), country: str(),
     ids: arr(str()), limit: num({ minimum: 1, maximum: 40 }),
   }, ["thesis"]),
   enrich_firms: obj({

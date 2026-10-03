@@ -35,6 +35,8 @@ import { buildInvestorProfile } from "@/lib/agents/profile-builder";
 import { generateBatch } from "@/lib/ai/provider";
 import { generateOutreachSequencesBatch, type FounderContext, type PartnerContext } from "@/lib/ai/dm-personalizer";
 import { enrichFirm } from "@/lib/admin/enrichment";
+import { resolveGeo } from "@/lib/matching/normalize/geo";
+import { firmFacts } from "@/lib/matching/v2/founder-scoring";
 
 // ── shared: normalized firm-type matching + bounded firm fetch ────────────────
 // One place for the investment_firms type/keyword query reused by the
@@ -52,33 +54,57 @@ function typePatterns(type?: string): string[] | null {
   const k = String(type).toLowerCase().trim();
   return (FIRM_TYPE_PATTERNS[k] ?? [k.replace(/[^a-z0-9]/g, "")]).map((p) => `%${p}%`);
 }
-interface FirmRow { id: string; name: string; type: string | null; description: string | null; sectors: any; hq_location: string | null; location: string | null; website: string | null; emails: any }
-async function fetchFirms(opts: { type?: string; keyword?: string; ids?: string[]; limit: number }): Promise<FirmRow[]> {
-  const limit = Math.max(1, Math.min(50, opts.limit));
+interface FirmRow { id: string; name: string; type: string | null; description: string | null; sectors: any; hq_location: string | null; location: string | null; website: string | null; emails: any; check_size_min?: any; check_size_max?: any; check_min?: any; check_max?: any }
+async function fetchFirms(opts: { type?: string; keyword?: string; ids?: string[]; limit: number; country?: string }): Promise<FirmRow[]> {
+  const want = Math.max(1, Math.min(50, opts.limit));
+  // A stated country is applied to the record's own location, after the query: the location column is
+  // free text ("Berlin", "Munich, Germany"), so it is read the way the matching engine reads it.
+  const iso = opts.country ? countryIso(opts.country) : null;
+  if (iso) {
+    const rows = await fetchFirmsRaw({ ...opts, limit: 50 * 4 });
+    return rows.filter((r) => resolveGeo(r.hq_location, r.location).countries.includes(iso)).slice(0, want);
+  }
+  return fetchFirmsRaw({ ...opts, limit: want });
+}
+/** ISO code for a country a person wrote ("Germany", "DE", "United States"), or null when not recognised. */
+function countryIso(text: string): string | null {
+  const t = String(text ?? "").trim();
+  if (/^[A-Za-z]{2}$/.test(t)) return t.toUpperCase();
+  return resolveGeo(t).country;
+}
+/** The firm's stated cheque range as "$250K–$2M", or "" when the database holds none. Never estimated. */
+function checkText(r: FirmRow): string {
+  const c = firmFacts(r).check;
+  if (!c || (!c.min && !c.max)) return "";
+  const fmt = (n: number) => (n >= 1_000_000 ? `$${+(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}K`);
+  return c.min && c.max && c.min !== c.max ? `${fmt(c.min)}–${fmt(c.max)}` : fmt((c.max ?? c.min) as number);
+}
+async function fetchFirmsRaw(opts: { type?: string; keyword?: string; ids?: string[]; limit: number }): Promise<FirmRow[]> {
+  const limit = Math.max(1, Math.min(200, opts.limit));
   if (Array.isArray(opts.ids) && opts.ids.length) {
-    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails
+    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails,check_size_min,check_size_max,check_min,check_max
       FROM investment_firms WHERE id = ANY(${opts.ids}) LIMIT ${limit}`) as unknown as FirmRow[];
   }
   const patterns = typePatterns(opts.type);
   const kwRaw = opts.keyword ? String(opts.keyword).toLowerCase().trim() : "";
   const kw = kwRaw ? `%${kwRaw}%` : null;
   if (patterns && kw) {
-    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails FROM investment_firms
+    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails,check_size_min,check_size_max,check_min,check_max FROM investment_firms
       WHERE regexp_replace(lower(coalesce(type,'')),'[^a-z0-9]','','g') LIKE ANY(${patterns})
         AND (lower(coalesce(name,'')) LIKE ${kw} OR lower(coalesce(description,'')) LIKE ${kw} OR lower(coalesce(sectors::text,'')) LIKE ${kw} OR lower(coalesce(industry,'')) LIKE ${kw})
       ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`) as unknown as FirmRow[];
   }
   if (patterns) {
-    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails FROM investment_firms
+    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails,check_size_min,check_size_max,check_min,check_max FROM investment_firms
       WHERE regexp_replace(lower(coalesce(type,'')),'[^a-z0-9]','','g') LIKE ANY(${patterns})
       ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`) as unknown as FirmRow[];
   }
   if (kw) {
-    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails FROM investment_firms
+    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails,check_size_min,check_size_max,check_min,check_max FROM investment_firms
       WHERE (lower(coalesce(name,'')) LIKE ${kw} OR lower(coalesce(description,'')) LIKE ${kw} OR lower(coalesce(sectors::text,'')) LIKE ${kw} OR lower(coalesce(industry,'')) LIKE ${kw})
       ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`) as unknown as FirmRow[];
   }
-  return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails FROM investment_firms
+  return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails,check_size_min,check_size_max,check_min,check_max FROM investment_firms
     ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`) as unknown as FirmRow[];
 }
 function tierFor(score: number): string {
@@ -300,50 +326,70 @@ export const TOOLS: Record<string, ToolDef> = {
   score_investors: {
     name: "score_investors",
     description: "Thesis-score a BATCH of firms/LPs (1-10 + tier + reason) against a fund thesis, ranked, with an XLSX. In-house alternative to Clay scoring. Batched + rate-limited — prefer this over scoring rows one by one.",
-    params: `{ "thesis": string, "type"?: "family-office"|"vc"|"accelerator"|"corporate"|"angel"|"private-equity", "keyword"?: string, "ids"?: string[], "limit"?: number(<=40) }`,
+    params: `{ "thesis": string, "type"?: "family-office"|"vc"|"accelerator"|"corporate"|"angel"|"private-equity", "keyword"?: string, "country"?: string (e.g. "Germany", only when the user named one), "ids"?: string[], "limit"?: number(<=40) }`,
     async run(inp) {
       const thesis = String(inp.thesis ?? "").trim();
       if (!thesis) return { observation: "Provide a 'thesis' to score against." };
       const limit = Math.min(Number(inp.limit) || 25, 40); // hard cap: bound the batch
-      const firms = await fetchFirms({ type: inp.type, keyword: inp.keyword, ids: inp.ids, limit });
-      if (!firms.length) return { observation: "No firms matched those filters in investment_firms." };
+      const country = inp.country ? String(inp.country).trim() : "";
+      if (country && !countryIso(country)) return { observation: `I could not read "${country}" as a country, so nothing was scored. Ask the user which country they mean, or leave it out.` };
+      const firms = await fetchFirms({ type: inp.type, keyword: inp.keyword, ids: inp.ids, limit, country: country || undefined });
+      if (!firms.length) return { observation: `No firms matched those filters in investment_firms${country ? ` in ${country}` : ""}.` };
 
-      const prompts = firms.map((f) =>
-        `Score this firm's fit (integer 1-10) for the fund thesis. Reply ONLY JSON {"score":<1-10>,"reason":"<<=18 words>"}.\n` +
-        `THESIS: ${thesis}\nFIRM: ${f.name} | type: ${f.type ?? "?"} | sectors: ${sectorsText(f.sectors) || "?"} | location: ${f.hq_location ?? f.location ?? "?"}\n` +
-        `DESC: ${clip(f.description ?? "", 300)}`);
-      // Batched, rate-limited generation. Provider-aware concurrency + global
-      // rateGate keep this under the per-minute ceiling.
-      const outs = await generateBatch(prompts, { json: true, maxTokens: 80, temperature: 0.2, task: "matchmaking" as any }, 4);
+      // Several firms per model call: one prompt per firm made a 40-firm batch 40 calls, which on a
+      // busy model took minutes and risked the request's time limit. Eight to a prompt is a fifth of
+      // the calls; a firm the model skips or garbles falls back to the keyword heuristic below.
+      const PER_PROMPT = 8;
+      const chunks: FirmRow[][] = [];
+      for (let i = 0; i < firms.length; i += PER_PROMPT) chunks.push(firms.slice(i, i + PER_PROMPT));
+      const prompts = chunks.map((chunk) =>
+        `Score each firm's fit (integer 1-10) for the fund thesis. Reply ONLY a JSON array, one item per firm, in order: [{"n":<firm number>,"score":<1-10>,"reason":"<<=18 words>"}].\n` +
+        `THESIS: ${thesis}\n` +
+        chunk.map((f, k) => `FIRM ${k + 1}: ${f.name} | type: ${f.type ?? "?"} | sectors: ${sectorsText(f.sectors) || "?"} | location: ${f.hq_location ?? f.location ?? "?"}\nDESC: ${clip(f.description ?? "", 220)}`).join("\n"));
+      const outs = await generateBatch(prompts, { json: true, maxTokens: 700, temperature: 0.2, task: "matchmaking" as any }, 6);
 
-      const batch: ScoredRow[] = firms.map((f, i) => {
-        let score = 0, reason = "";
-        try { const j = JSON.parse((outs[i] || "{}").replace(/^```(?:json)?|```$/g, "").trim()); score = Math.max(0, Math.min(10, Number(j.score) || 0)); reason = String(j.reason ?? ""); } catch { /* AI empty/garbled */ }
+      const verdicts = new Map<string, { score: number; reason: string }>();
+      chunks.forEach((chunk, ci) => {
+        try {
+          const raw = (outs[ci] || "[]").replace(/^```(?:json)?|```$/g, "").trim();
+          const parsed = JSON.parse(raw);
+          const list: any[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.items) ? parsed.items : Array.isArray(parsed?.results) ? parsed.results : [];
+          for (const j of list) {
+            const f = chunk[Number(j?.n) - 1];
+            const score = Math.max(0, Math.min(10, Math.round(Number(j?.score) || 0)));
+            if (f && score) verdicts.set(f.id, { score, reason: String(j?.reason ?? "") });
+          }
+        } catch { /* AI empty/garbled: those firms use the heuristic */ }
+      });
+
+      const batch: ScoredRow[] = firms.map((f) => {
+        let { score, reason } = verdicts.get(f.id) ?? { score: 0, reason: "" };
         // Deterministic fallback when AI is unavailable (quota): keyword overlap.
         if (!score) { const blob = `${f.name} ${f.type ?? ""} ${sectorsText(f.sectors)} ${f.description ?? ""}`.toLowerCase(); const hits = thesis.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3 && blob.includes(w)).length; score = Math.min(8, 3 + hits); reason = reason || `${hits} thesis-term overlaps (heuristic)`; }
-        return { name: f.name, type: f.type ?? "", location: f.hq_location ?? f.location ?? "", website: f.website ?? "", score, tier: tierFor(score), reason };
+        return { name: f.name, type: f.type ?? "", location: f.hq_location ?? f.location ?? "", website: f.website ?? "", score, tier: tierFor(score), reason, check: checkText(f) };
       });
       // Every call in this run that used the same thesis lands in ONE ranking and ONE workbook.
       const ctx = currentAiContext();
       const acc = ctx ? (ctx.scoredBatches ??= new ScoredBatches()) : new ScoredBatches();
       const { ranked: scored, batches, added } = acc.add(thesis, batch);
 
-      const ws = XLSX.utils.aoa_to_sheet([["Firm", "Type", "Location", "Score", "Tier", "Reason", "Website"], ...scored.map((s) => [s.name, s.type, s.location, s.score, s.tier, s.reason, s.website])]);
-      ws["!cols"] = [{ wch: 30 }, { wch: 18 }, { wch: 20 }, { wch: 7 }, { wch: 8 }, { wch: 50 }, { wch: 28 }];
+      const ws = XLSX.utils.aoa_to_sheet([["Firm", "Type", "Location", "Check size", "Score", "Tier", "Reason", "Website"], ...scored.map((s) => [s.name, s.type, s.location, s.check || "not in database", s.score, s.tier, s.reason, s.website])]);
+      ws["!cols"] = [{ wch: 30 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 7 }, { wch: 8 }, { wch: 50 }, { wch: 28 }];
       const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Scored");
       const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
       const artifact = await saveArtifact(buf, "Scored_Investors", "xlsx");
       const top = scored.slice(0, 12).map((s, i) => `${i + 1}. ${s.name} — ${s.score} (${s.tier}) | ${s.reason}`);
-      const label = (s: ScoredRow, i: number) => `${i + 1}. ${s.name} — ${s.score}/10 (${s.tier}) · ${s.type || "?"} · ${s.location || "?"}`;
+      const label = (s: ScoredRow, i: number) => `${i + 1}. ${s.name} — ${s.score}/10 (${s.tier}) · ${s.type || "?"} · ${s.location || "?"} · check ${s.check || "not in database"}`;
       // The verified block for the answer: counts that cover the whole run, not just this call.
       const report =
         `Scored investors: ${scored.length} firms ranked together${batches > 1 ? ` (${batches} batches merged, ${added} new in the latest)` : ""}\n` +
-        `Scored 1 to 10 against: ${thesis.slice(0, 160)}${thesis.length > 160 ? "…" : ""}\n\n` +
+        `Scored 1 to 10 against: ${thesis.slice(0, 160)}${thesis.length > 160 ? "…" : ""}\n` +
+        (country ? `Limited to firms located in ${country}.\n` : "") + `\n` +
         `Top ${Math.min(25, scored.length)}\n${scored.slice(0, 25).map(label).join("\n")}\n\n` +
         `Full ranked list: ${artifact.name}`;
       return {
         report,
-        observation: `Scored ${batch.length} firms this call${batches > 1 ? `; the workbook now ranks ${scored.length} firms across ${batches} batches (${added} new)` : ""}. One workbook holds them all, ranked together. A verified results list is appended to your answer automatically; do not retype it.\nTop:\n${top.join("\n")}\n\nXLSX → ${artifact.url}`,
+        observation: `Scored ${batch.length} firms this call${batches > 1 ? `; the workbook now ranks ${scored.length} firms across ${batches} batches (${added} new)` : ""}. One workbook holds them all, ranked together. A verified results list (with each firm's real check size, or "not in database") is appended to your answer automatically; do not retype it, do not build your own table, and never state a check size that is not in it.\nTop:\n${top.join("\n")}\n\nXLSX → ${artifact.url}`,
         artifact,
       };
     },

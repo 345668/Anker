@@ -26,6 +26,7 @@ import {
   Image as ImageIcon, X, ChevronDown, ChevronRight, Sparkles, Cpu,
   Globe, Users, Waypoints, Inbox, TrendingUp, Presentation, Database,
 } from "lucide-react"
+import { Markdown } from "@/components/ui/markdown-lite"
 import { swrFetcher } from "@/lib/http/client"
 import { prepareAttachments, requestFailure } from "@/lib/assistant/upload-client"
 import { ATTACHMENT_ACCEPT, attachmentError } from "@/lib/assistant/attachment-limits"
@@ -351,9 +352,9 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
                     </div>
                   )}
 
-                  <div className={`rounded-2xl rounded-bl-sm px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed ${
+                  <div className={`rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed ${
                     t.error ? "border border-destructive/30 bg-destructive/5 text-destructive" : "border border-foreground/10"}`}>
-                    {t.text}
+                    {t.error ? <span className="whitespace-pre-wrap">{t.text}</span> : <Markdown text={t.text} />}
                   </div>
 
                   {!!t.artifacts?.length && (

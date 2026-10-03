@@ -26,9 +26,21 @@ const COMPANY_SUFFIXES = [
  * Normalize a firm name: lowercase, strip suffixes, collapse whitespace.
  * "GROVE STREET ADVISORS LLC" → "grove street"
  */
+/**
+ * Spell accented letters the way a keyboard without them does: "Gründerfonds" and "Gruenderfonds" are
+ * one word, "Société" and "Societe" too. German umlauts and ß take their two-letter forms; every
+ * other accent is simply dropped. Without this "ü" became a space and the two spellings never met.
+ */
+export function foldAccents(s: string): string {
+  return s
+    .replace(/ä/gi, (m) => (m === "Ä" ? "Ae" : "ae")).replace(/ö/gi, (m) => (m === "Ö" ? "Oe" : "oe"))
+    .replace(/ü/gi, (m) => (m === "Ü" ? "Ue" : "ue")).replace(/ß/g, "ss")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+}
+
 export function normalizeFirmName(name: string | null | undefined): string {
   if (!name || typeof name !== "string") return ""
-  let s = name
+  let s = foldAccents(name)
     .toLowerCase()
     .replace(/[^a-z0-9\s&]/g, " ")
     .replace(/\s+/g, " ")
@@ -38,6 +50,8 @@ export function normalizeFirmName(name: string | null | undefined): string {
   let changed = true
   while (changed) {
     changed = false
+    // "… Management GmbH & Co. KG": once "KG" and "Co" are gone a dangling "&" is left.
+    if (s.endsWith(" &")) { s = s.slice(0, -2).trim(); changed = true; continue }
     for (const suf of COMPANY_SUFFIXES) {
       if (s.endsWith(" " + suf)) {
         s = s.slice(0, -suf.length - 1).trim()
@@ -191,8 +205,33 @@ const TRAIL_RENAME = new RegExp(`(?:,|;|\\s[-–—])\\s*(?:formerly|previously|
  * "/" in "Innovate Mississippi / MS Angel Network" joins programmes of one record, so neither is
  * read as an alias.
  */
+/** "HTGF", "TGFS": a short all-capitals token, how a firm's acronym sits next to its full name. */
+const isAcronym = (t: string) => /^[A-Z0-9]{2,8}$/.test(t.trim())
+
+/**
+ * "HTGF | High-Tech Gründerfonds" and "TGFS – Technologiegründerfonds Sachsen" write the acronym and the
+ * full name side by side. A pipe always separates two names; a spaced dash does only when one side is a
+ * bare acronym ("Acme - Berlin" is one name). The longer, non-acronym side is the firm's name; the
+ * others are what it is also called.
+ */
+function splitBrand(name: string): string[] {
+  const bar = name.split(/\s*\|\s*/).map((x) => x.trim()).filter(Boolean)
+  const parts = bar.flatMap((p) => {
+    const d = p.split(/\s+[-–—]\s+/).map((x) => x.trim()).filter(Boolean)
+    return d.length === 2 && d.some(isAcronym) ? d : [p]
+  })
+  return parts.length > 1 ? parts : [name]
+}
+
 export function firmNameParts(name: string | null | undefined): { main: string; aliases: string[] } {
   if (!name || typeof name !== "string") return { main: "", aliases: [] }
+  const brand = splitBrand(name)
+  if (brand.length > 1) {
+    const sorted = [...brand].sort((a, b) => Number(isAcronym(a)) - Number(isAcronym(b)) || b.length - a.length)
+    const [lead, ...rest] = sorted
+    const inner = firmNameParts(lead)
+    return { main: inner.main, aliases: [...inner.aliases, ...rest] }
+  }
   const found: string[] = []
   let main = name.replace(PAREN_RENAME, (_m, alias: string) => { found.push(alias); return " " })
   const trail = TRAIL_RENAME.exec(main)

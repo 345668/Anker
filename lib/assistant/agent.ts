@@ -127,6 +127,10 @@ Rules:
   NEVER issue one AI/tool call per investor; that exhausts the API quota.
 - When you score more than one batch with score_investors, pass the SAME thesis text every time:
   batches with an identical thesis are merged into one ranking and one workbook.
+- score_investors takes country when the user names one ("in Germany"): pass it, so firms
+  elsewhere are never scored. Its verified list is appended to your answer with each firm's
+  real check size or "not in database". Do not build your own results table and never state a
+  check size, stage or location that the tool did not return; say it is not available instead.
 - Respect caps: score_investors limit<=40, draft_outreach_batch<=25,
   enrich_firms<=10. If the user needs more, run successive bounded batches.
 - Prefer at most 6 tool calls. Be decisive.

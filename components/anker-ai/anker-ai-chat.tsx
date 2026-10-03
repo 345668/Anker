@@ -7,6 +7,7 @@
  * this is a plain text stream, not SSE. Event framing arrives with doc 28 phase 4.
  */
 
+import { Markdown } from "@/components/ui/markdown-lite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Send, Square, Plus, ChevronDown, Sparkles, Bot, User as UserIcon, Loader2, Check,
@@ -477,7 +478,7 @@ function Bubble({ msg, streaming }: { msg: Msg; streaming: boolean }) {
               <div className="mt-2 flex flex-wrap gap-2">
                 {msg.artifacts.map((a, i) => (
                   <a key={i} href={a.url} target="_blank" rel="noreferrer" download className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
-                    <Download className="h-3.5 w-3.5" /> {a.name}{a.kind ? <span className="text-muted-foreground">.{a.kind}</span> : null}
+                    <Download className="h-3.5 w-3.5" /> {a.name}{a.kind && !a.name.toLowerCase().endsWith(`.${a.kind.toLowerCase()}`) ? <span className="text-muted-foreground">.{a.kind}</span> : null}
                   </a>
                 ))}
               </div>
@@ -487,55 +488,4 @@ function Bubble({ msg, streaming }: { msg: Msg; streaming: boolean }) {
       </div>
     </div>
   );
-}
-
-// ─── Lightweight, dependency-free Markdown ────────────────────────────────────
-function Markdown({ text }: { text: string }) {
-  const blocks: React.ReactNode[] = [];
-  const parts = text.split(/```/);
-  parts.forEach((part, i) => {
-    if (i % 2 === 1) {
-      const nl = part.indexOf("\n");
-      const code = nl >= 0 ? part.slice(nl + 1) : part;
-      blocks.push(
-        <pre key={`c${i}`} className="my-2 overflow-x-auto rounded-lg bg-muted/70 p-3 text-[13px] leading-relaxed"><code>{code.replace(/\n$/, "")}</code></pre>,
-      );
-    } else {
-      part.split(/\n{2,}/).forEach((para, j) => {
-        const t = para.trim();
-        if (!t) return;
-        const lines = t.split("\n");
-        if (lines.every((l) => /^\s*[-*]\s+/.test(l))) {
-          blocks.push(<ul key={`u${i}-${j}`} className="my-2 list-disc space-y-1 pl-5">{lines.map((l, k) => <li key={k}>{inline(l.replace(/^\s*[-*]\s+/, ""))}</li>)}</ul>);
-        } else if (lines.every((l) => /^\s*\d+\.\s+/.test(l))) {
-          blocks.push(<ol key={`o${i}-${j}`} className="my-2 list-decimal space-y-1 pl-5">{lines.map((l, k) => <li key={k}>{inline(l.replace(/^\s*\d+\.\s+/, ""))}</li>)}</ol>);
-        } else if (/^#{1,3}\s/.test(t)) {
-          const level = t.match(/^#+/)![0].length;
-          const content = inline(t.replace(/^#+\s/, ""));
-          blocks.push(level === 1 ? <h3 key={`h${i}-${j}`} className="mb-1 mt-3 text-lg font-semibold">{content}</h3> : <h4 key={`h${i}-${j}`} className="mb-1 mt-2 font-semibold">{content}</h4>);
-        } else {
-          blocks.push(<p key={`p${i}-${j}`} className="my-1.5 whitespace-pre-wrap">{lines.map((l, k) => <span key={k}>{inline(l)}{k < lines.length - 1 && <br />}</span>)}</p>);
-        }
-      });
-    }
-  });
-  return <>{blocks}</>;
-}
-
-/** Inline: **bold**, *italic*, `code`, [text](url). */
-function inline(s: string): React.ReactNode {
-  const nodes: React.ReactNode[] = [];
-  const re = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
-  let last = 0; let m: RegExpExecArray | null; let key = 0;
-  while ((m = re.exec(s))) {
-    if (m.index > last) nodes.push(s.slice(last, m.index));
-    const tok = m[0];
-    if (tok.startsWith("**")) nodes.push(<strong key={key++}>{tok.slice(2, -2)}</strong>);
-    else if (tok.startsWith("`")) nodes.push(<code key={key++} className="rounded bg-muted px-1 py-0.5 text-[0.85em]">{tok.slice(1, -1)}</code>);
-    else if (tok.startsWith("[")) { const mm = tok.match(/\[([^\]]+)\]\(([^)]+)\)/)!; nodes.push(<a key={key++} href={mm[2]} target="_blank" rel="noreferrer" className="text-primary underline">{mm[1]}</a>); }
-    else nodes.push(<em key={key++}>{tok.slice(1, -1)}</em>);
-    last = m.index + tok.length;
-  }
-  if (last < s.length) nodes.push(s.slice(last));
-  return nodes;
 }

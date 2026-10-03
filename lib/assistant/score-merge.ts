@@ -11,6 +11,8 @@ import { firmDedupKeys } from "@/lib/matching/v2/dedup"
  */
 export interface ScoredRow {
   name: string; type: string; location: string; website: string; score: number; tier: string; reason: string
+  /** The firm's stated cheque range from the database, or "" when it has none. Never estimated. */
+  check?: string
 }
 
 const thesisKey = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim()
