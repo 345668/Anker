@@ -114,6 +114,17 @@ export function cleanFirmName(value) {
 /** A person's role, mistaken for a firm's classification. */
 export const PERSON_ROLE = /^(vc |gp |lp )?(partner|angel|investor|founder|co-?founder|ceo|cto|principal|associate|director|manager|limited partner|general partner|advisor)s?$/i
 
+/**
+ * A banner, footer or advert that sits in a name column ("Need allocators beyond this list? … at 8raise.com").
+ * A real name is a few words with no sentence punctuation, no link and no marketing; a row like this is
+ * not a record and must not become one.
+ */
+export function looksLikeNote(value) {
+  const v = String(value ?? "").trim()
+  if (!v) return false
+  return v.split(/\s+/).length > 7 || v.length > 70 || /\?|https?:|www\.|\.(com|io|co|vc)\b|8raise|8fundrais|giveaway|start free|pulled from|qualified leads/i.test(v)
+}
+
 // ─── Reading the sheets ─────────────────────────────────────────────────────
 
 const HEADERISH = /(name|firm|company|email|website|url|linkedin|location|country|sector|stage|type|cheque|check|aum|title|role|institution|office)/i
@@ -226,13 +237,16 @@ async function loadDirectory() {
                                 aum, linkedin_url, sectors, source
                            FROM investment_firms`)
 
-  const byEmail = new Map(), bySlug = new Map(), byNameFirm = new Map()
+  const byEmail = new Map(), bySlug = new Map(), byNameFirm = new Map(), byNamePlace = new Map()
   for (const p of people) {
     const email = normEmail(p.email)
     if (email && !byEmail.has(email)) byEmail.set(email, p)
     const slug = linkedinSlug(p.linkedin_url) || linkedinSlug(p.person_linkedin_url)
     if (slug && !bySlug.has(slug)) bySlug.set(slug, p)
     const full = normPhrase(`${p.first_name ?? ""} ${p.last_name ?? ""}`)
+    // A person known only by name and place: the only way to recognise them again.
+    const place = normPhrase(p.location)
+    if (full.includes(" ") && place && !byNamePlace.has(`${full}|${place}`)) byNamePlace.set(`${full}|${place}`, p)
     if (full) {
       const key = `${full}|${p.firm_id ?? ""}`
       if (!byNameFirm.has(key)) byNameFirm.set(key, p)
@@ -258,7 +272,7 @@ async function loadDirectory() {
     }
   }
   console.log(`  ${people.length} people, ${firms.length} firms indexed`)
-  return { people, firms, byEmail, bySlug, byNameFirm, firmByHost, firmByName, firmByLoose, firmByKeys, firmByAcronym, firmByInitials }
+  return { people, firms, byEmail, bySlug, byNameFirm, byNamePlace, firmByHost, firmByName, firmByLoose, firmByKeys, firmByAcronym, firmByInitials }
 }
 
 /**
@@ -349,6 +363,7 @@ async function main() {
 
     for (const row of rows) {
       stats.rows++
+      if (looksLikeNote(row.name) || looksLikeNote(row.firm)) { stats.notes = (stats.notes ?? 0) + 1; continue }
       const person = isPerson(row)
 
       // ── the firm the row names, matched or created ──
@@ -415,6 +430,9 @@ async function main() {
       const email = row.email
       const slug = linkedinSlug(row.linkedin)
       const full = normPhrase(row.name)
+      // Nothing to recognise this person by next time (no email, LinkedIn or firm, and not a full name with a
+      // place) means every re-run would add them again, so such a row is left out and counted instead.
+      if (!email && !slug && !row.firm && !(full.includes(" ") && normPhrase(row.location))) { stats.unidentifiable = (stats.unidentifiable ?? 0) + 1; continue }
       const batchKey = email || (slug ? `li:${slug}` : `${full}|${normFirm(row.firm ?? "")}`)
       if (seenPerson.has(batchKey)) { stats.personDupInBatch++; f.dup++; continue }
       seenPerson.set(batchKey, true)
@@ -422,6 +440,11 @@ async function main() {
       const hit = (email && dir.byEmail.get(email))
         || (slug && dir.bySlug.get(slug))
         || (full && row.firm && firmId ? dir.byNameFirm.get(`${full}|${firmId}`) : null)
+        // No email, no LinkedIn, no firm: a full name AND the same place is the only identity there is. A bare
+        // name never matches ("James Smith" is forty people), and a row with any other identifier never takes
+        // this path, so it cannot loosen the stronger rules above.
+        || (!email && !slug && !row.firm && full.includes(" ") && normPhrase(row.location)
+            ? dir.byNamePlace.get(`${full}|${normPhrase(row.location)}`) : null)
 
       const incoming = {
         email, title: row.title, linkedin_url: row.linkedin,
@@ -453,6 +476,7 @@ async function main() {
                    row.type, firmId, row.website, BATCH,
                    JSON.stringify({ imports: [{ batch: BATCH, file: f.file, at: new Date().toISOString() }] })])
         }
+        if (!email && !slug && !row.firm && full.includes(" ") && normPhrase(row.location)) dir.byNamePlace.set(`${full}|${normPhrase(row.location)}`, { id })
         if (email) dir.byEmail.set(email, { id })
         if (slug) dir.bySlug.set(slug, { id })
       }
@@ -469,7 +493,7 @@ async function main() {
   console.log(`
 people   matched ${stats.personMatched}   new ${stats.personNew}   filled ${stats.personFilled}   duplicate-in-batch ${stats.personDupInBatch}   conflicts ${stats.personConflicts}
 firms    matched ${stats.firmMatched}   new ${stats.firmNew}   filled ${stats.firmFilled}   duplicate-in-batch ${stats.firmDupInBatch}   conflicts ${stats.firmConflicts}
-rows read ${stats.rows} from ${stats.files} files`)
+rows read ${stats.rows} from ${stats.files} files` + `${stats.notes ? `\nleft out: ${stats.notes} banner/footer row(s)` : ""}${stats.unidentifiable ? `\nleft out: ${stats.unidentifiable} person row(s) with nothing to recognise them by (no email, LinkedIn, firm, or name with place)` : ""}`)
 
   if (conflictLog.length) {
     // Outside the repository: the report quotes directory records.

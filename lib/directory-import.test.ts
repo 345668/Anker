@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest"
 import {
-  classifySheet, countryTail, findHeaderRow, hostOf, linkedinSlug,
+  classifySheet, countryTail, findHeaderRow, hostOf, linkedinSlug, looksLikeNote,
 } from "../scripts/import-directory-drop.mjs"
 
 describe("findHeaderRow", () => {
@@ -94,5 +94,16 @@ describe("countryTail", () => {
 
   it("keeps genuinely different countries apart", () => {
     expect(countryTail("London, UK")).not.toBe(countryTail("Stockholm, Sweden"))
+  })
+})
+
+describe("looksLikeNote", () => {
+  it("rejects a footer or advert in a name column", () => {
+    expect(looksLikeNote("Need allocators beyond this list? Find partners at any fund, start free")).toBe(true)
+    expect(looksLikeNote("Pulled from the base database. Find any investor at example.com")).toBe(true)
+  })
+  it("keeps real names", () => {
+    expect(looksLikeNote("Nina von Kessel")).toBe(false)
+    expect(looksLikeNote("Nordwerk Gründerfonds Management GmbH")).toBe(false)
   })
 })

@@ -161,3 +161,11 @@ inside the directory — distinct from duplicates within the batch — are still
 there, because `investors.id` and `investment_firms.id` are referenced by CRM
 entries, match rows and outcome events, and collapsing two records is a
 migration of its own (§5).
+
+## Addendum 2026-10-03: what the second real drop taught
+
+Applied to production: 548 people and 309 firms added, 121 empty firm fields filled, nothing overwritten, nothing deleted.
+- **Firms** are now matched with the platform's own name rules (accent spellings, "ACR | Full Name", stated former names, a firm written as its initials), on top of host and name. This found 18 existing firms the first pass would have duplicated.
+- **People with no email, LinkedIn or firm** are matched on full name plus place; a bare name never matches. A person with none of these identifiers is left out, because every re-run would add them again.
+- **Banners and adverts** in a name column ("Need allocators beyond this list? … at 8raise.com") are recognised and skipped. Two such rows were inserted by the first apply and removed by id.
+- Re-running the same eight files now finds 0 new people and 0 new firms.
