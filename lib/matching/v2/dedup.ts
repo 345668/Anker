@@ -99,9 +99,7 @@ export function dedupFirms(firms: ScoredFirmV2[]): { merged: ScoredFirmV2[]; mer
       else { const a = find(i), b = find(j); if (a !== b) parent[Math.max(a, b)] = Math.min(a, b) }
     }
   })
-  for (let a = 0; a < firms.length; a++) for (let b = a + 1; b < firms.length; b++) {
-    if (initialsEitherWay(firms[a].name, firms[b].name)) { const x = find(a), y = find(b); if (x !== y) parent[Math.max(x, y)] = Math.min(x, y) }
-  }
+  linkByInitials(firms.map((f) => f.name), (a, b) => { const x = find(a), y = find(b); if (x !== y) parent[Math.max(x, y)] = Math.min(x, y) })
   const groups = new Map<number, ScoredFirmV2[]>()
   firms.forEach((f, i) => {
     const root = find(i)
@@ -351,6 +349,28 @@ export function initialsMatch(short: string | null | undefined, long: string | n
   return !!k && k === initialsKey(long)
 }
 
+/**
+ * Join every acronym-style name to the full names whose initials spell it, in ONE pass.
+ *
+ * Each name is read once into a key; full names are bucketed by their initials key, and an acronym name
+ * looks up its own bucket. Comparing every pair of names instead (what this replaced) is quadratic: 4,000
+ * firms took 24s and the real directory (21,000) took minutes, blocking the server until the platform killed
+ * the request. `union(a, b)` is called for each acronym/full-name pair found.
+ */
+export function linkByInitials(names: (string | null | undefined)[], union: (a: number, b: number) => void): void {
+  const longBy = new Map<string, number[]>()
+  names.forEach((n, i) => {
+    const k = initialsKey(n)
+    if (k) { const l = longBy.get(k); if (l) l.push(i); else longBy.set(k, [i]) }
+  })
+  if (!longBy.size) return
+  names.forEach((n, i) => {
+    const k = acronymKey(n)
+    const hits = k ? longBy.get(k) : undefined
+    if (hits) for (const j of hits) if (j !== i) union(i, j)
+  })
+}
+
 /** True when either of the two names is the initials of the other. */
 export const initialsEitherWay = (x: string | null | undefined, y: string | null | undefined) => initialsMatch(x, y) || initialsMatch(y, x)
 
@@ -374,9 +394,7 @@ export function clusterFirms(records: { name: string | null | undefined; website
     for (const key of allKeys[i]) { const j = byKey.get(key); if (j === undefined) byKey.set(key, i); else union(i, j) }
     if (hosts[i]) { const l = byHost.get(hosts[i]) ?? []; l.push(i); byHost.set(hosts[i], l) }
   })
-  for (let a = 0; a < records.length; a++) for (let b = a + 1; b < records.length; b++) {
-    if (initialsEitherWay(records[a].name, records[b].name)) union(a, b)
-  }
+  linkByInitials(records.map((r) => r.name), union)
   for (const idx of byHost.values()) {
     for (let a = 0; a < idx.length; a++) for (let b = a + 1; b < idx.length; b++) {
       const ka = keys[idx[a]], kb = keys[idx[b]]

@@ -82,3 +82,21 @@ describe("initials", () => {
     expect(r[0].score).toBe(9)
   })
 })
+
+describe("initials linking stays linear", () => {
+  it("clusters a directory-sized list in well under a second", () => {
+    const recs = Array.from({ length: 21000 }, (_, i) => ({ name: `Firm Number ${i} Capital Partners` }))
+    recs.push({ name: "FNB Capital" })      // an acronym that spells nothing here
+    const t = Date.now()
+    const c = clusterFirms(recs)
+    expect(Date.now() - t).toBeLessThan(2500)
+    expect(new Set(c).size).toBe(recs.length)
+  })
+  it("still joins a single acronym to its full name inside a big list", () => {
+    const recs = Array.from({ length: 5000 }, (_, i) => ({ name: `Plain Name ${i} Ventures` }))
+    recs.push({ name: "Dieter von Holtzbrinck Ventures" }, { name: "DvH Ventures" })
+    const c = clusterFirms(recs)
+    expect(c[recs.length - 1]).toBe(c[recs.length - 2])
+    expect(new Set(c).size).toBe(recs.length - 1)
+  })
+})
