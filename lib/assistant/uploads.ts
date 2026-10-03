@@ -22,7 +22,7 @@ async function readBlob(ref:BlobRef,scopeKey:string):Promise<{name:string;type:s
   return {name,type:(blob as any).blob?.contentType??"",bytes:Buffer.concat(chunks)}
 }
 
-export async function assistantUploads(files:File[],blobs:BlobRef[]=[],scopeKey="") {
+export async function assistantUploads(files:File[],blobs:BlobRef[]=[],scopeKey="",deadlineAt?:number) {
   if(files.length+blobs.length>MAX_ATTACHMENTS)throw new WorkspaceError(`Attach at most ${MAX_ATTACHMENTS} files.`,413)
   if(files.reduce((n,f)=>n+f.size,0)>INLINE_MAX_BYTES+1024*1024)throw new WorkspaceError("These files are too large to send directly. Reload and try again.",413)
   const items:Array<{name:string;type:string;bytes:Buffer}>=[]
@@ -54,10 +54,10 @@ export async function assistantUploads(files:File[],blobs:BlobRef[]=[],scopeKey=
       let body=extracted.text
       if(!body.trim()) {
         // A scan: no text layer. Read the first pages with Qwen-VL-OCR (docs/architecture/36).
-        const ocr=await ocrPdfBuffer(bytes,{maxPages:10,tag:"assistant-upload"}).catch(()=>null)
+        const ocr=await ocrPdfBuffer(bytes,{maxPages:10,tag:"assistant-upload",deadlineAt}).catch(()=>null)
         if(!ocr?.text.trim())throw new WorkspaceError("This PDF is a scan and its text could not be read. Try a clearer copy, or attach its pages as images.",400)
         kind="pdf-scan"
-        body=ocr.text+(ocr.truncated?"\n\n[Only the first 10 pages were read.]":"")
+        body=ocr.text+(ocr.timedOut?`\n\n[Reading this scan took too long: only the first ${ocr.pagesSucceeded} of ${ocr.pageCount} pages were read.]`:ocr.truncated?"\n\n[Only the first 10 pages were read.]":"")
       }
       text.push(`Document ${JSON.stringify(file.name)}: ${body.slice(0,24000)}`)
     } else if(["image/png","image/jpeg","image/webp"].includes(file.type)||/\.(png|jpe?g|webp)$/i.test(file.name)||/\.xlsx$/i.test(file.name)) {

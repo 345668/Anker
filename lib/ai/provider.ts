@@ -32,6 +32,18 @@ import {
   type SurfaceName,
 } from "./runtime-config"
 
+/**
+ * The abort signal for one model call: the caller's, plus a timeout of 120s OR the time the request has left,
+ * whichever is shorter. A fixed 120s let a call that began late in a run (or the second of a failover chain)
+ * outlive the platform's 300s limit, which surfaced as a bare 504 instead of an answer.
+ */
+function callSignal(): AbortSignal {
+  const ctx = currentAiContext()
+  const left = ctx ? Math.max(3_000, ctx.deadline - Date.now()) : Infinity
+  const timeout = AbortSignal.timeout(Math.min(120_000, left))
+  return ctx?.signal ? AbortSignal.any([ctx.signal, timeout]) : timeout
+}
+
 export type AiProvider = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "qwen" | "none"
 
 export interface GenerateOpts {
@@ -749,7 +761,7 @@ async function runOpenAICompatible(
           temperature: temp,
           ...(opts.json ? { response_format: { type: "json_object" } } : {}),
         }),
-        signal: currentAiContext()?.signal ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
+        signal: callSignal(),
       })
     } catch (e) {
       lastErr = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
@@ -814,7 +826,7 @@ async function runGemini(
             ...(opts.json ? { responseMimeType: "application/json" } : {}),
           },
         }),
-        signal: currentAiContext()?.signal ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
+        signal: callSignal(),
       })
     } catch (e) {
       lastErr = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
@@ -915,7 +927,7 @@ async function runOllama(
         ...(opts.json ? { format: "json" } : {}),
         options: { num_predict: max, temperature: temp },
       }),
-      signal: currentAiContext()?.signal ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
+      signal: callSignal(),
     })
     if (!res.ok) {
       if (res.status === 404) {
@@ -931,7 +943,7 @@ async function runOllama(
               ...(opts.json ? { format: "json" } : {}),
               options: { num_predict: max, temperature: temp },
             }),
-            signal: currentAiContext()?.signal ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
+            signal: callSignal(),
           })
           if (r2.ok) {
             const j2 = (await r2.json()) as { response?: string }
@@ -1521,9 +1533,7 @@ export async function* generateStream(
         model, messages: [{ role: "user", content: prompt }],
         max_tokens: max, temperature: temp, stream: true,
       }),
-      signal: currentAiContext()?.signal
-        ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)])
-        : AbortSignal.timeout(120_000),
+      signal: callSignal(),
     })
   } catch (e) {
     // Never leave the caller with nothing because the stream would not open.

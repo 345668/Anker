@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 vi.mock("server-only", () => ({}))
-import { withAiContext, checkAiBudget, runBatch, MAX_MODEL_CALLS } from "./context"
+import { withAiContext, checkAiBudget, runBatch, remainingMs, MAX_MODEL_CALLS } from "./context"
 
 const principal = { userId: "u", orgId: "o", scopeKey: "org:o", persona: "founder" } as any
 const run = <T,>(fn: () => Promise<T>) => withAiContext(principal, fn)
@@ -38,4 +38,19 @@ describe("run model-call budget", () => {
   it("is a no-op outside a run", async () => {
     await expect(runBatch(40, async () => 7)).resolves.toBe(7)
   })
+})
+
+describe("one clock per request", () => {
+  it("an explicit deadline governs the run and the time left is readable", async () => {
+    await withAiContext(principal, async () => {
+      expect(remainingMs()).toBeGreaterThan(50_000)
+      expect(remainingMs()).toBeLessThanOrEqual(60_000)
+    }, undefined, null, Date.now() + 60_000)
+  })
+  it("a call after the deadline is refused with the time-limit message", async () => {
+    await withAiContext(principal, async () => {
+      expect(() => checkAiBudget(true)).toThrow(/time limit/)
+    }, undefined, null, Date.now() - 1)
+  })
+  it("outside a run there is no limit", () => { expect(remainingMs()).toBe(Infinity) })
 })

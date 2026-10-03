@@ -33,7 +33,9 @@ export interface OcrPdfResult {
   pagesAttempted: number
   pagesSucceeded: number
   totalChars: number
-  truncated: boolean          // true when we stopped at maxPages
+  truncated: boolean          // true when we stopped at maxPages or at the deadline
+  /** True when the deadline, not the page cap, ended the read. */
+  timedOut?: boolean
   /** Why nothing was read, when that is the outcome (never provider text or keys). */
   failure?: "no_key" | "render_failed" | "all_pages_failed"
 }
@@ -47,6 +49,8 @@ export interface OcrOpts {
   model?: string
   /** Tag for log lines. */
   tag?: string
+  /** Epoch ms after which no new page is started and a running page is cut short. Pages read so far are returned. */
+  deadlineAt?: number
 }
 
 /** Render every page of a PDF buffer to a PNG buffer.  Caps at maxPages. */
@@ -76,7 +80,7 @@ async function renderPdfPagesToPng(buf: Buffer, maxPages: number, scale: number)
 }
 
 /** OCR a single page PNG via Qwen-VL-OCR. */
-async function ocrPagePng(png: Buffer, apiKey: string, baseUrl: string, model: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+async function ocrPagePng(png: Buffer, apiKey: string, baseUrl: string, model: string, deadlineAt?: number): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   const url = baseUrl + "/chat/completions"
   const body = {
     model,
@@ -103,18 +107,21 @@ async function ocrPagePng(png: Buffer, apiKey: string, baseUrl: string, model: s
   let res: Response | undefined
   let txt = ""
   for (let attempt = 0; attempt < 3; attempt++) {
+    // Never wait past the request's deadline: the page times out with what time is left, and a retry is skipped.
+    const left = deadlineAt ? deadlineAt - Date.now() : Infinity
+    if (left < 4_000) return { ok: false, error: "deadline reached" }
     try {
       res = await fetch(url, {
         method: "POST",
         headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(Math.min(60_000, left)),
       })
       txt = await res.text()
     } catch (e: any) {
       res = undefined
       txt = e?.name === "TimeoutError" ? "timed out" : String(e?.message ?? e)
-      if (attempt < 2) { await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt)); continue }
+      if (attempt < 2 && (!deadlineAt || deadlineAt - Date.now() > 12_000)) { await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt)); continue }
       return { ok: false, error: `request failed: ${txt}` }
     }
     const transient = res.status === 429 || res.status >= 500
@@ -163,13 +170,15 @@ export async function ocrPdfBuffer(buf: Buffer, opts: OcrOpts = {}): Promise<Ocr
   }
   const total = pngs.length
   const pages: OcrPageResult[] = []
+  let timedOut = false
   // Sequential — Qwen-VL-OCR free tier has rate caps; parallelism would 429.
   for (let i = 0; i < pngs.length; i++) {
+    if (opts.deadlineAt && Date.now() > opts.deadlineAt - 4_000) { timedOut = true; break }
     const start = Date.now()
     let r: Awaited<ReturnType<typeof ocrPagePng>> = { ok: false, error: "no model available" }
     for (const model of models) {
       if (isQwenExhausted("free", `ocr:${model}`)) continue
-      r = await ocrPagePng(pngs[i], apiKey, baseUrl, model)
+      r = await ocrPagePng(pngs[i], apiKey, baseUrl, model, opts.deadlineAt)
       if (r.ok) break
       if (!r.ok && isFreeAllowanceExhausted(undefined, r.error)) { markQwenExhausted("free", `ocr:${model}`); continue }
       break
@@ -193,7 +202,8 @@ export async function ocrPdfBuffer(buf: Buffer, opts: OcrOpts = {}): Promise<Ocr
     pagesAttempted: pages.length,
     pagesSucceeded: pages.filter((p) => p.ok && p.text).length,
     totalChars: joined.length,
-    truncated: total >= maxPages,
+    truncated: total >= maxPages || timedOut,
+    timedOut: timedOut || undefined,
     failure: pages.some((p) => p.ok && p.text) ? undefined : "all_pages_failed",
   }
 }

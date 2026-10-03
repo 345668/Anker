@@ -385,3 +385,10 @@ describe("Qwen lanes: free allowance first, then the plan", () => {
     clearQwenExhausted()
   })
 })
+
+import { classifyFailure as classifyTimeLimit } from "./failure"
+describe("the run's own time limit", () => {
+  it("is a timeout, not a provider fault", () => {
+    expect(classifyTimeLimit({ error: "AI request time limit reached." })).toBe("timeout")
+  })
+})

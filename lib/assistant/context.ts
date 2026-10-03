@@ -36,14 +36,19 @@ export type AiRunFailure = import("@/lib/ai/failure").AiFailure
 const context = new AsyncLocalStorage<{principal: AiPrincipal; signal?: AbortSignal; deadline: number; modelCalls: number; batch?: boolean; sourceText?: string; scoredBatches?: import("./score-merge").ScoredBatches; budget: AiRunBudget; lastFailure?: AiRunFailure}>()
 export const currentAiContext = () => context.getStore()
 
+/** Milliseconds this request has left (Infinity outside a run). */
+export const remainingMs = (): number => { const c = context.getStore(); return c ? c.deadline - Date.now() : Infinity }
+
 export function withAiContext<T>(
   principal: AiPrincipal,
   run: () => Promise<T>,
   signal?: AbortSignal,
   maxSpendUsd: number | null = null,
+  /** Epoch ms the whole request must end by. Defaults to 240s from now; the route passes one clock for upload reading and the run together. */
+  deadlineAt?: number,
 ) {
   return context.run({
-    principal, signal, deadline: Date.now()+240_000, modelCalls: 0,
+    principal, signal, deadline: deadlineAt ?? Date.now()+240_000, modelCalls: 0,
     // Null by default so an unconfigured caller behaves exactly as before: the
     // deadline and the call cap, and no money ceiling (doc 33 acceptance 6).
     budget: { maxSpendUsd, spendUsd: 0, pricedCalls: 0, unpricedCalls: 0 },

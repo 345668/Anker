@@ -85,7 +85,7 @@ export function classifyFailure(input: { status?: number | null; error?: string 
   if (/could not be decrypted|cannot be decrypted|config_enc_key|configuration (is )?unreadable/.test(e)) return "config_unreadable"
   if (/no ai provider|no .*api key (configured|saved)|key is missing|key missing|not configured|no key saved|is selected .* no .* key is saved/.test(e)) return "no_provider"
   if (/abort|cancel/.test(e) && !/timeout/.test(e)) return "cancelled"
-  if (/timed out|timeout/.test(e)) return "timeout"
+  if (/timed out|timeout|time limit/.test(e)) return "timeout"
 
   // A spent free allowance is a quota problem whatever the status: DashScope sends
   // 403 AllocationQuota.FreeTierOnly, which the 401/403 branch would call a bad key.
