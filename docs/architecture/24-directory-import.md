@@ -169,3 +169,16 @@ Applied to production: 548 people and 309 firms added, 121 empty firm fields fil
 - **People with no email, LinkedIn or firm** are matched on full name plus place; a bare name never matches. A person with none of these identifiers is left out, because every re-run would add them again.
 - **Banners and adverts** in a name column ("Need allocators beyond this list? … at 8raise.com") are recognised and skipped. Two such rows were inserted by the first apply and removed by id.
 - Re-running the same eight files now finds 0 new people and 0 new firms.
+
+## Addendum 2026-10-03 (later): settling the conflicts
+
+773 conflicts were reported. `scripts/resolve-import-conflicts.mjs` settles them by rule, dry run by default; a change is written only if the field still holds what the report saw, and the old value is kept in `metadata.conflict_resolutions`.
+
+| Outcome | Count | Rule |
+| --- | --- | --- |
+| Same thing written two ways | 104 | "New York, NY" = "New York, United States"; same site with or without `www`/path |
+| Applied | 37 | a placeholder ("View LinkedIn Profile", "US" as a website, a LinkedIn search URL) replaced; a tracking tail removed; a country refined to a city in that country; a person's own profile replacing a company page; an uninformative type ("Private") replaced |
+| Ignored | 35 | a person's LinkedIn profile offered for a firm's company page |
+| Left for review | 772 | real disagreements: a different place, site, class or AUM. A sheet never overrides a real value. Written to `~/Downloads/import-conflicts-for-review-<date>.csv` |
+
+Most "different place" cases are one firm with several offices (Invesco in Atlanta and Zurich), so they are not corrected. A few are two firms with the same name. The importer now keeps those apart when BOTH the website and the country differ (`samePlausibly`); 35 sheet firms and 2 people were folded into a same-name firm by the first apply and are not yet added.

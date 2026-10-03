@@ -276,6 +276,18 @@ async function loadDirectory() {
 }
 
 /**
+ * Two records that matched on name only: could they be one firm? A shared website settles it. Otherwise a
+ * different website AND a different country is the signature of two unrelated firms with the same name
+ * ("Better Ventures" in Oakland and in Munich); one disagreement alone is just an office or a new site.
+ */
+export function samePlausibly(existing, incoming) {
+  const a = hostOf(existing.website), b = hostOf(incoming.website)
+  if (a && b && a === b) return true
+  const ca = countryTail(existing.hq_location || existing.location), cb = countryTail(incoming.place)
+  return !(a && b && ca && cb && ca !== cb)
+}
+
+/**
  * The firm a name belongs to under the platform's name rules, or null. Accent spellings ("Gründerfonds" and
  * "Gruenderfonds"), an acronym beside the name ("HTGF | High-Tech Gründerfonds"), a stated former name, and a
  * firm written as its initials ("DvH Ventures" for "Dieter von Holtzbrinck Ventures") all find the existing row.
@@ -377,7 +389,7 @@ async function main() {
         else if (seenFirm.has(key)) { firmId = seenFirm.get(key); stats.firmDupInBatch++; f.dup++ }
         else {
           const country = countryTail(row.location || row.country)
-          const hit = (host && dir.firmByHost.get(host))
+          let hit = (host && dir.firmByHost.get(host))
             || dir.firmByName.get(normPhrase(firmName))
             || (country ? dir.firmByLoose.get(`${normFirm(firmName)}|${country}`) : null)
             || sameFirmByName(dir, firmName)
@@ -388,6 +400,11 @@ async function main() {
             // kind of firm this is.
             type: person ? null : row.type,
             aum: row.aum, linkedin_url: person ? null : row.linkedin,
+          }
+          if (hit && !samePlausibly(hit, { website: row.website, place: row.location || row.country })) {
+            // A name in common is all these two share: the site and the country both differ. Not the same firm.
+            stats.firmNameCollision = (stats.firmNameCollision ?? 0) + 1
+            hit = null
           }
           if (hit) {
             stats.firmMatched++
@@ -493,7 +510,7 @@ async function main() {
   console.log(`
 people   matched ${stats.personMatched}   new ${stats.personNew}   filled ${stats.personFilled}   duplicate-in-batch ${stats.personDupInBatch}   conflicts ${stats.personConflicts}
 firms    matched ${stats.firmMatched}   new ${stats.firmNew}   filled ${stats.firmFilled}   duplicate-in-batch ${stats.firmDupInBatch}   conflicts ${stats.firmConflicts}
-rows read ${stats.rows} from ${stats.files} files` + `${stats.notes ? `\nleft out: ${stats.notes} banner/footer row(s)` : ""}${stats.unidentifiable ? `\nleft out: ${stats.unidentifiable} person row(s) with nothing to recognise them by (no email, LinkedIn, firm, or name with place)` : ""}`)
+rows read ${stats.rows} from ${stats.files} files` + `${stats.firmNameCollision ? `\nname collisions kept apart: ${stats.firmNameCollision} (same name, different site and country)` : ""}` + `${stats.notes ? `\nleft out: ${stats.notes} banner/footer row(s)` : ""}${stats.unidentifiable ? `\nleft out: ${stats.unidentifiable} person row(s) with nothing to recognise them by (no email, LinkedIn, firm, or name with place)` : ""}`)
 
   if (conflictLog.length) {
     // Outside the repository: the report quotes directory records.

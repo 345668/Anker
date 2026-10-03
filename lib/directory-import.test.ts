@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest"
 import {
-  classifySheet, countryTail, findHeaderRow, hostOf, linkedinSlug, looksLikeNote,
+  classifySheet, countryTail, findHeaderRow, hostOf, linkedinSlug, looksLikeNote, samePlausibly,
 } from "../scripts/import-directory-drop.mjs"
 
 describe("findHeaderRow", () => {
@@ -105,5 +105,18 @@ describe("looksLikeNote", () => {
   it("keeps real names", () => {
     expect(looksLikeNote("Nina von Kessel")).toBe(false)
     expect(looksLikeNote("Nordwerk Gründerfonds Management GmbH")).toBe(false)
+  })
+})
+
+describe("samePlausibly", () => {
+  it("a shared site settles it", () => {
+    expect(samePlausibly({ website: "https://www.acme.vc/", hq_location: "Paris, France" }, { website: "acme.vc", place: "New York" })).toBe(true)
+  })
+  it("a different site and a different country is a different firm", () => {
+    expect(samePlausibly({ website: "https://www.better.vc/", hq_location: "Oakland, California, United States" }, { website: "betterventures.io", place: "Munich, Germany" })).toBe(false)
+  })
+  it("one disagreement alone is just an office or a new site", () => {
+    expect(samePlausibly({ website: "https://acme.vc", hq_location: "Paris, France" }, { website: "", place: "New York, USA" })).toBe(true)
+    expect(samePlausibly({ website: "https://acme.vc", hq_location: "Paris, France" }, { website: "acme.io", place: "Lyon, France" })).toBe(true)
   })
 })
