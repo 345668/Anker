@@ -51,3 +51,20 @@ describe("keepLatestArtifacts", () => {
     expect(keepLatestArtifacts([art("/only")], [run("match_investors", "/only")])).toHaveLength(1)
   })
 })
+
+describe("tool notices", () => {
+  it("puts a notice above the answer once, from the latest run only", () => {
+    const steps: any[] = [
+      { tool: "t", report: "Heading A\nrows", notice: "Only 3 found, not 8." },
+      { tool: "t", report: "Heading B\nrows", notice: "Only 5 found, not 8." },
+    ]
+    const out = appendReports("I found 8 firms.", steps)
+    expect(out.startsWith("**Only 5 found, not 8.**")).toBe(true)
+    expect(out).not.toContain("Only 3")
+    expect(out).toContain("Heading B")
+  })
+  it("a later run without a notice clears an earlier one", () => {
+    const out = appendReports("ok", [{ tool: "t", report: "A\nx", notice: "short" }, { tool: "t", report: "B\nx" }] as any)
+    expect(out).not.toContain("short")
+  })
+})

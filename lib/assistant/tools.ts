@@ -149,6 +149,8 @@ export interface ToolResult {
   observation: string; artifact?: ToolArtifact; artifacts?: ToolArtifact[]
   /** A verified block shown to the user after the model's answer, verbatim (lib/assistant/reports.ts). */
   report?: string
+  /** A short correction shown above the model's text when the model may have overstated a fact (reports.ts). */
+  notice?: string
 }
 /** Per-request context threaded from the API route through the agent loop. */
 export interface ToolCtx { userId?: string }
@@ -389,8 +391,10 @@ export const TOOLS: Record<string, ToolDef> = {
         (Number(inp.limit) > scored.length ? `Found ${scored.length} matching firms, fewer than the ${Number(inp.limit)} asked for: that is all the database holds for these filters.\n` : "") + `\n` +
         `Top ${Math.min(25, scored.length)}\n${scored.slice(0, 25).map(label).join("\n")}\n\n` +
         `Full ranked list: ${artifact.name}`;
+      const asked = Number(inp.limit);
       return {
         report,
+        notice: asked > scored.length ? `Only ${scored.length} matching firms were found, not the ${asked} asked for. Counts in the text below that say otherwise are wrong; the verified list is at the end.` : undefined,
         observation: `${batch.length < limit ? `Only ${batch.length} firms in the database matched these filters (you asked for up to ${limit}); report exactly ${batch.length}, not ${limit}. ` : ""}Scored ${batch.length} firms this call${batches > 1 ? `; the workbook now ranks ${scored.length} firms across ${batches} batches (${added} new)` : ""}. One workbook holds them all, ranked together. A verified results list (with each firm's real check size, or "not in database") is appended to your answer automatically; do not retype it, do not build your own table, and never state a check size that is not in it.\nTop:\n${top.join("\n")}\n\nXLSX → ${artifact.url}`,
         artifact,
       };

@@ -45,3 +45,13 @@ describe("imported names", () => {
     expect(same("Alpha Fund (Jane Roe)", "Jane Roe")).toBe(false)
   })
 })
+
+describe("acronyms must belong to the name", () => {
+  it("an unrelated capital word beside a name is not an alias", () => {
+    expect(same("Alpha Growth | QXZ", "QXZ")).toBe(false)
+    expect(same("Alpha Growth (QXZ)", "QXZ Partners")).toBe(false)
+  })
+  it("a real acronym still joins", () => {
+    expect(same("Nordwerk Gründerfonds (NGF)", "NGF")).toBe(true)
+  })
+})

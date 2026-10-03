@@ -224,6 +224,21 @@ const isAcronym = (t: string) => /^[A-Z0-9]{2,8}$/.test(t.trim())
  * bare acronym ("Acme - Berlin" is one name). The longer, non-acronym side is the firm's name; the
  * others are what it is also called.
  */
+/**
+ * Could `acr` be this firm's acronym? Its letters must start the name's first word and then appear, in
+ * order, in the name ("HTGF" in "High-Tech Gründerfonds"). An unrelated short capital word is not an
+ * acronym of the firm and must not make two firms one.
+ */
+export function plausibleAcronym(acr: string, full: string): boolean {
+  const a = foldAccents(acr).toLowerCase().replace(/[^a-z0-9]/g, "")
+  const words = foldAccents(full).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+  if (a.length < 2 || !words.length || a[0] !== words[0][0]) return false
+  const letters = words.join("")
+  let at = 0
+  for (const ch of a) { at = letters.indexOf(ch, at); if (at < 0) return false; at++ }
+  return true
+}
+
 function splitBrand(name: string): string[] {
   const bar = name.split(/\s*\|\s*/).map((x) => x.trim()).filter(Boolean)
   const parts = bar.flatMap((p) => {
@@ -240,12 +255,15 @@ export function firmNameParts(name: string | null | undefined): { main: string; 
     const sorted = [...brand].sort((a, b) => Number(isAcronym(a)) - Number(isAcronym(b)) || b.length - a.length)
     const [lead, ...rest] = sorted
     const inner = firmNameParts(lead)
-    return { main: inner.main, aliases: [...inner.aliases, ...rest] }
+    // An acronym beside the name counts only when it is plausibly that name's acronym.
+    const kept = rest.filter((r) => !isAcronym(r) || isAcronym(lead) || plausibleAcronym(r, inner.main))
+    return { main: inner.main, aliases: [...inner.aliases, ...kept] }
   }
   const found: string[] = []
   // "Full Name (ACR)": a bracketed bare acronym is the firm's short name. A bracket with words in it
   // ("AAF Management (AAF VC)", "Cashmere Fund (Josh Allen)") is a brand or a person and is left alone.
-  let main = name.replace(/\(\s*([A-Z0-9]{3,8})\s*\)/g, (_m, acr: string) => { found.push(acr); return " " })
+  const outer = name.replace(/\(\s*[A-Z0-9]{3,8}\s*\)/g, " ")
+  let main = name.replace(/\(\s*([A-Z0-9]{3,8})\s*\)/g, (_m, acr: string) => { if (plausibleAcronym(acr, outer)) found.push(acr); return " " })
   main = main.replace(PAREN_RENAME, (_m, alias: string) => { found.push(alias); return " " })
   const trail = TRAIL_RENAME.exec(main)
   if (trail) { found.push(trail[1]); main = main.slice(0, trail.index) }

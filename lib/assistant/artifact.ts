@@ -7,6 +7,8 @@ export interface ToolResult {
   observation: string; artifact?: ToolArtifact; artifacts?: ToolArtifact[]
   /** A verified block shown to the user after the model's answer, verbatim (lib/assistant/reports.ts). */
   report?: string
+  /** A short correction shown above the model's text when it may have overstated a fact (reports.ts). */
+  notice?: string
 }
 export interface ToolDef {
   name: string;

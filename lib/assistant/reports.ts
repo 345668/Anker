@@ -17,13 +17,19 @@ export function appendReports(answer: string, steps: AssistantStep[]): string {
     const r = s.report?.trim()
     if (r && !s.error) latest.set(s.tool ?? `step-${i}`, r)
   })
+  // A tool's notice is a fact the model may have got wrong in its own words (how many firms there really
+  // were), so it goes ABOVE the model's text where it is read first, once per tool, latest run only.
+  const notices = new Map<string, string>()
+  steps.forEach((s, i) => { const n = s.notice?.trim(); if (!s.error) { if (n) notices.set(s.tool ?? `step-${i}`, n); else if (s.tool && s.report) notices.delete(s.tool) } })
   const blocks: string[] = []
   for (const r of latest.values()) {
     // The model sometimes retypes the heading; do not print it twice.
     if (answer.includes(r.split("\n", 1)[0])) continue
     blocks.push(r)
   }
-  return blocks.length ? `${answer.trimEnd()}\n\n${blocks.join("\n\n")}` : answer
+  const top = [...notices.values()].filter((n) => !answer.includes(n))
+  const body = blocks.length ? `${answer.trimEnd()}\n\n${blocks.join("\n\n")}` : answer
+  return top.length ? `${top.map((n) => `**${n}**`).join("\n")}\n\n${body}` : body
 }
 
 /**
