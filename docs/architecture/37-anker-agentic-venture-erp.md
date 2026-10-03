@@ -1,31 +1,32 @@
 # 37 — Anker as the agentic ERP for venture capital: status, gaps and spec
 
-**Date:** 2026-10-03 · **Status:** assessment and spec, nothing built · **Companion:** [38](38-sail-monitoring-and-admin.md)
-(SAIL, the monitoring and admin plane) · **Builds on:** [00](00-persona-isolation.md) persona isolation,
-[28](28-assistant-system-design.md) assistant runtime, [29](29-agentic-core.md) agentic core,
-[30](30-ai-observability.md), [33](33-cost-ceiling.md), [35](35-ai-availability-qwen-first.md)
+**Date:** 2026-10-03 (second edition, same day, after a scrutiny pass; §17 lists what changed) · **Status:** assessment
+and spec, nothing built · **Companion:** [38](38-sail-monitoring-and-admin.md) (SAIL, the monitoring and admin plane) ·
+**Builds on:** [00](00-persona-isolation.md) persona isolation, [28](28-assistant-system-design.md) assistant runtime,
+[29](29-agentic-core.md) agentic core, [30](30-ai-observability.md), [33](33-cost-ceiling.md),
+[35](35-ai-availability-qwen-first.md) · **Prior work this spec must not contradict:**
+[`docs/platform-audit-2026-09.md`](../platform-audit-2026-09.md), [`docs/assessments/`](../assessments/),
+[`docs/anker-agent-tooling-expansion.md`](../anker-agent-tooling-expansion.md),
+[`docs/anker-agentic-deepseek-plan.md`](../anker-agentic-deepseek-plan.md),
+[`docs/metal-feature-gap.md`](../metal-feature-gap.md), [`docs/carta-parity-plan.md`](../carta-parity-plan.md)
 
-**Rule for this document:** every claim in §2 was read from the repository or observed on production on
-2026-10-03, and says which. Anything not verified is marked *(unverified)*. Every proposal in §5 onward closes a
-gap named in §3.
+**Rule for this document:** every claim in §2 was read from the repository, the production database (read-only
+counts) or production behaviour on 2026-10-03, and says which. Anything not verified is marked *(unverified)*. Every
+proposal from §5 on closes a gap named in §3.
 
 ---
 
 ## 0. The goal, stated so it can be tested
 
-> Anker is the **system of record** and the **operator** for a venture firm and for the companies and
-> investors around it: it holds the facts, and software agents do the routine work on them, under rules the
-> humans set, with every action explained and reversible.
+> Anker is the **system of record** and the **operator** for a venture firm and for the companies and investors around
+> it: it holds the facts, and software agents do the routine work on them, under rules the humans set, with every
+> action explained and reversible.
 
-"ERP" is the system-of-record half: one place where funds, LPs, deals, portfolio companies, investors,
-documents, compliance and communications live, and where a change in one is visible in the others. "Agentic" is
-the operator half: agents that **read** all of it, **propose** work, and **commit** the work a human has
-authorised, instead of a chat window that writes answers.
+"ERP" is the system-of-record half. "Agentic" is the operator half: agents that **read** all of it, **propose** work, and
+**commit** the work a human has authorised, instead of a chat window that writes answers.
 
-The test of success is not "has an assistant". It is: **a week of a firm's routine work is done by agents, and
-the partner reviews exceptions instead of doing the work.** §7 turns that into numbers.
-
-Three users, three jobs (existing personas, [00](00-persona-isolation.md)):
+The test is not "has an assistant". It is: **a week of a firm's routine work is done by agents, and the partner reviews
+exceptions instead of doing the work.** §12 turns that into numbers.
 
 | Persona | The firm's job Anker takes on |
 | --- | --- |
@@ -33,16 +34,33 @@ Three users, three jobs (existing personas, [00](00-persona-isolation.md)):
 | **VC fund manager (GP)** | Run the fund: deal flow to IC, portfolio monitoring, LP reporting and capital calls, compliance and KYC |
 | **LP** | Watch the capital: positions, distributions, documents, questions answered from the fund's own records |
 
+### 0.1 What "ERP" has to mean here (the completeness checklist)
+
+An ERP is judged by its primitives, not its screens. For a venture firm the checklist is below; "status" is from §2.
+
+| Primitive | What it requires | Status |
+| --- | --- | --- |
+| Ledger of record | Double-entry, event-sourced, reproducible, period close | **Built** (event-sourced fund GL, idempotent rebuild, trial balance nets to zero; 46 journal entries in production). Capital-account reconciliation exists in `capital-account.ts`; period close and a lock on closed periods: not found |
+| Maker–checker | A second person approves consequential changes; segregation of duties | One approval step exists (legal-document fields, `legal/fields/approve`); **none found for capital calls or distributions** (the R3 two-person rule is a requirement here, §5.1) |
+| Roles and permissions | Per-module, per-action, per-entity | Workspace roles and persona guards: **built**. Per-action matrix: partial |
+| Document control | Versioned, access-logged, watermarked, retained | Data room with grants and view logs: built; **0 files in production** |
+| Audit trail | Every change, who, what, before/after | Wired in fund modules, **0 rows** (§2.4); not wired for CRM, outreach or agent actions |
+| Workflow engine | States, approvals, SLAs, reminders | Per-module ad hoc; no shared engine |
+| Integration layer | Bank, e-signature, KYC screening, accounting, email, calendar | DocuSign, OpenSanctions, Companies House, Stripe, Resend, IMAP/Gmail, Twenty CRM wired in code; which are live in production is *(unverified)* (§11) |
+| Reporting | LP reports, tear sheets, regulatory exports | Built (portfolio reporting, quarterly reports); depends on data being present |
+| Single customer record | One identity across modules | **Absent** (§5.3) |
+| Multi-entity | Funds, SPVs, management company | Funds and SPVs modelled; **0 SPVs in production** |
+| Data import/export | Bulk in, portable out | Imports built (directory drop importer); customer data export/portability: not found |
+
 ---
 
 ## 1. What this document is not
 
-- Not a rewrite. The loop, the router, the matching engine and the persona isolation work; §5 adds a layer
-  around them ([28](28-assistant-system-design.md)'s rule, restated).
-- Not a feature list per module. Modules are judged by one question: can an agent read it, propose against it,
-  and be stopped by a policy? A module that cannot answer yes is not part of the ERP yet.
-- Not about SAIL. The operator console is [38](38-sail-monitoring-and-admin.md); §6.4 here lists only what
-  Anker must expose to it.
+- Not a rewrite. The loop, the router, the matching engine and persona isolation work; §5 adds layers around them.
+- Not a feature list. A module is judged by one question: can an agent read it, propose against it, and be stopped by a
+  policy? If not, it is not yet part of the ERP.
+- Not a marketing document. Where a public claim is not true, this spec says so (§8.1).
+- Not about SAIL. That is [38](38-sail-monitoring-and-admin.md); §6.4 lists only what Anker must expose to it.
 
 ---
 
@@ -54,78 +72,132 @@ Three users, three jobs (existing personas, [00](00-persona-isolation.md)):
 | --- | --- |
 | ~2,040 tracked files; 207 pages, 407 API routes | `git ls-files` |
 | 3 personas; ~45 dashboard modules | `app/dashboard/*`, `lib/nav/work-areas.ts` |
-| About 170 `CREATE TABLE` statements across 118 migrations and setup scripts (a few are legacy or backup tables), one shared Neon database | `scripts/migrations/*.sql`, `scripts/*.sql` |
+| 118 migration files plus setup scripts (about 170 `CREATE TABLE` statements); the September audit counted 236 tables in the live database | `scripts/`, audit §1 |
 | 15 scheduled jobs (outreach, campaigns, deliverability, signals, verification, directory, ranker, uploads sweep) | `vercel.json` |
-| 109 test files, ~1,070 tests; CI runs typecheck, a redaction scan, vitest and a production build; a push to `main` deploys | `.github/workflows`, `pnpm test` |
-| Directory: ~21,000 firms and ~50,000 people | production, 2026-10-03 |
-| 37 design documents; 10 of them (27–36) written since 2026-09-26 | `docs/architecture/` |
+| 109 test files, ~1,070 tests, including in-process Postgres integration tests for authorization; **unit and integration tests run only from `lib/**`** — no component, route-handler or end-to-end test exists | `vitest.config.ts`, `*.integration.test.ts` |
+| CI: typecheck, redaction scan, vitest, production build; a push to `main` deploys | `.github/workflows` |
+| Directory: 20,998 firms, 50,000 people | production |
+| 37 design documents; 10 of them (27–36) written since 2026-09-26; plus the audits listed above | `docs/` |
 
-### 2.2 What is real, by area
+### 2.2 Production reality (read-only counts, 2026-10-03)
 
-**Strong (works end to end, used, tested):**
+This is the most important table in the document, and the first draft left it out.
 
-- **Founder raise.** Deck → profile extraction → matching engine v3 (seven weighted components, gates, tiers,
-  headroom grading) → ranked workbook, with mandate filters, dedup and verified answer blocks. Exercised live
-  on production with two real decks on 2026-10-02/03.
-- **Outreach engine.** Sequences, scheduler, deliverability, re-engagement, suppression, LinkedIn action queue
-  (senders, approvals, extension). Cron-driven.
-- **Founder application campaign.** Public `/apply` → assessment → matching → send waves, with operator controls.
-- **AI platform.** Qwen-first routing with free then plan lanes, typed failures, a per-run cost ceiling, a call
-  log, attachments straight to private blob storage, OCR, web search. Persona-scoped tool allowlists.
-- **Identity and isolation.** Persona and workspace scope keys, an owner tier firewalled from tenant records,
-  audit events.
+| Measure | Value | Reading |
+| --- | --- | --- |
+| Organizations / memberships | 12 / 12 (11 founder, 1 VC, **0 LP**) | A pilot-scale install |
+| Active users, last 30 days (distinct users with chat activity) | **2** | Mostly the owner and tests |
+| Paying: `billing_subscriptions`, `billing_customers` | **0, 0** | No revenue; Stripe is wired in test mode |
+| Credit ledger | grants only; **nothing debits credits** | Plans and credits are not enforced (§7.3) |
+| `crm_entries` / `outreach_messages` / `outreach_campaigns` | 12,584 / 2,153 / 11 | The outreach loop has been run at volume, largely by the owner's own campaigns |
+| `founder_submissions` / `founder_match_runs` / `match_outcome_events` | 13 / 27 / 2,092 | Founder matching has real exercise |
+| `ai_calls` | 3,115 total; last 7 days 584 calls, **565 ok (96.7%)**, 19 failed | The failures are exactly what SAIL should surface |
+| `anker_chats` / `anker_chat_events` | 73 / 298 | Light assistant use |
+| `funds`, `fund_lps`, `capital_calls` (+ line items), `distributions` (+ line items), `journal_entries`, `kyc_cases` | 2, 8, 4 (32), 3 (24), 46, 9 | Fund OS has been exercised on an early fund (8 LPs); the September audit's empty line items are now backfilled |
+| `portfolio_companies`, `deals`, `spvs`, `ic_memos`, `valuations_409a`, `data_room_files`, `decks`, `investor_calls`, `investor_updates`, `lp_entities` | **0 each** | The VC deal-to-IC loop, the data room, decks, calls, updates and LP entities have never run with data |
+| `agent_runs` | **0** | See §2.4 |
+| `audit_events` | **0** | See §2.4 |
+| `email_suppressions`, `notifications` | 0, 0 | No suppression has ever been recorded; no one is notified of anything |
+| `early_access_requests` | 2 | The form writes (an audit worry now closed) |
 
-**Present but thin (a page and a table, little behind it):**
+**Reading.** Anker has built roughly three products' worth of engine and has roughly one product's worth of use, which is
+the September audit's conclusion and is still true. An agentic ERP cannot be designed in a vacuum on a system with no
+real fund data in it: the first requirement of this spec is that **real firms use it** (§7.1, Phase A).
 
-- Most "ERP" modules: cap table, 409A, share plans, compensation, equity compliance, term sheet (founder);
-  KYC/AML, fund tax, SPVs, loan operations, contracts, valuations, forecasting (VC). Their pages are 10–80 lines
-  over a component and a table. They are screens, not workflows. *(Depth beyond the page was not audited
-  module by module; §8 makes that the first task of each module's phase.)*
-- Portfolio (VC) is the one deep module: ~1,700 lines of pages, the fund/deals/performance/reports views.
-- LP persona: three work areas (assistant, distributions, documents) and two tools.
+### 2.3 Depth by area (measured by library code, not by page size)
+
+The first draft judged depth by page line counts, which is wrong: pages are thin wrappers and the work lives in `lib/`.
+Non-test TypeScript lines by area:
+
+| Area | Lines | Reading |
+| --- | --- | --- |
+| `lib/portfolio` (Fund OS: ledger, calls, distributions, capital accounts, reporting, fund performance) | **16,900** | The deepest module by far |
+| `lib/matching` (founder and LP engines, extraction, dedup) | 10,100 | Strong and exercised |
+| `lib/ai` (router, lanes, OCR, failures) | 8,200 | Strong |
+| `lib/outreach` + `lib/linkedin` + `lib/campaign` | 6,400 + 2,100 + 800 | Strong, the revenue-shaped loop |
+| `lib/assistant` (loop, tools, policy, events) | 4,700 | Strong |
+| `lib/modules` (409A OPM, waterfall, vesting, SPV economics, KYC, loans) | 2,000 | Real engines, small |
+| `lib/decks`, `lib/dataroom`, `lib/crm`, `lib/contracts` | 900, 650, 860, 330 | Modest |
+| `lib/calls`, `lib/network`, `lib/updates`, `lib/signals`, `lib/planning`, `lib/compliance`, `lib/compensation`, `lib/forecasting` | 300, 180, 90, 90, 70, 120, 100, 60 | **Genuinely thin**: these are the "ERP" areas that are screens over little logic |
+
+So the corrected picture is: **Fund OS is deep; founder fundraising is deep; compliance, forecasting, compensation,
+signals, updates, calls and planning are thin.** The ERP claim is strongest on the fund ledger side and weakest on
+compliance and forecasting.
+
+### 2.4 What is real, and what is wired but empty
+
+**Live and used:** founder matching (deck → profile → engine v3 → workbook, with mandate filters, dedup, headroom
+grading, verified answer blocks), the outreach and LinkedIn engine (caps by warmed-up sender, suppression, approval
+gate that never auto-sends), the founder application campaign (`/apply` → assessment → matching → waves), the AI platform
+(Qwen-first lanes, typed failures, per-run cost ceiling, call log, attachments to private blob storage, OCR, web search),
+persona and workspace isolation.
+
+**Wired but empty (and so unproven):**
+
+- **`audit_events` has 0 rows.** Writers exist in fund modules (capital calls, distributions, KYC, 409A, share plans,
+  listings, information sharing) through `recordChange`, and no such change has happened. **Nothing audits assistant,
+  CRM, outreach or agent actions.** The audit trail exists on paper for the modules nobody has used.
+- **`agent_runs` has 0 rows.** It is written only by `outreach-agent.ts`'s `tick`, which no cron calls (the scheduled
+  jobs are `outreach-scheduler` and friends). The "agent runtime" the first draft proposed to extend is a table nothing
+  currently fills.
+- **No `/api/impersonate/accept` exists in Anker.** SAIL mints view-as grants (1 minted, 0 used) and builds a link to a
+  tenant endpoint that is not there. View-as is not functional (§38).
 
 **Absent:**
 
-- **No governed write path for agents.** `crm_update_stage`, `crm_add_task`, `enrich_firms` and
-  `build_investor_profile` are on a `BLOCKED` list in `lib/assistant/policy.ts`, with the comment that they
-  "require a separate human-reviewed administrative/action workflow". That workflow does not exist: there is
-  no proposals table, no approval inbox. Doc 28 G4 (a gated tool parks a pending intent) is design only.
-  So today agents **read, research, draft and rank**, and the only commits are `send_outreach` (gated by
-  write permission) and `match_investors` (saves a run).
-- **No general agent runtime.** Two purpose-built background agents exist (the outreach tick, the campaign
-  engine). A third agent requires a new route, a new cron and new code. There is no trigger/schedule/run model
-  an agent definition plugs into.
-- **No entity memory.** What the assistant "knows" about a workspace is whatever its tools query on that turn
-  plus a transcript. No durable, provenance-tagged facts ("this LP prefers email on Tuesdays", "this founder's
-  round is $1.5M, stated on slide 13").
-- **No evaluation harness.** Quality is checked by hand: the two decks and the Germany search were run in a
-  browser by a person. There is no golden set, no scheduled canary, no score over time.
-- **No cross-entity graph.** A firm, a person, a deal, an LP and a portfolio company are separate tables joined
-  ad hoc. There is no single identity per real-world entity that all modules share.
+- **No governed write path for agents.** `crm_update_stage`, `crm_add_task`, `enrich_firms`, `build_investor_profile`
+  are on the `BLOCKED` list in `lib/assistant/policy.ts` "pending a separate human-reviewed workflow" that does not
+  exist: no proposals table, no approval inbox. Doc 28 G4 is design only. Agents read, research, draft and rank; the only
+  commits are `send_outreach` (write-permission gated) and `match_investors` (saves a run).
+- **No general agent runtime;** two bespoke background agents exist (outreach tick, campaign engine).
+- **No entity memory;** what the assistant knows is what its tools return that turn plus a transcript.
+- **No evaluation harness.** Docs [`anker-agentic-deepseek-plan`](../anker-agentic-deepseek-plan.md) §6 planned one for
+  its Phase 3; it was not built. Quality is checked by hand in a browser.
+- **No cross-entity identity;** firm, person, deal, LP and portfolio company are separate tables joined ad hoc.
+- **No MFA or SSO** in Anker (the audit's finding stands; the false claims were removed from the site, §8.1).
+- **No entitlement enforcement** (§7.3) and **no data-subject-request tooling** (§8).
+- **`ai_calls` has tokens, workspace, duration and provider but no cost column and no run id** (verified from the
+  migration). Per-run spend exists only in memory during a run; historical cost per tenant and a call-to-run link do not
+  exist. The trace the spec asks for needs both.
 
-### 2.3 What broke in production this week (and what each says)
+### 2.5 What the September audit found, and its status today
+
+| Audit finding (`platform-audit-2026-09.md`) | Status 2026-10-03 |
+| --- | --- |
+| Landing page claimed SOC 2 Type II "Certified", 2FA, SSO | **Removed** (verified in `security-section.tsx`, `product-mockups.tsx`) |
+| 11 of 12 "data integrations" logos decorative | Section still present *(unverified whether relabelled)* |
+| 60,000 investors / 40,000 LPs overstated | Directory is now 50,000 people; the public figure was not re-checked *(unverified)* |
+| Signals, calls, updates unreachable in the app nav | **Fixed** (in `work-areas.ts`) |
+| Fund GL never materialised; capital-call line items empty | **Fixed** (46 entries; 32 and 24 line items) |
+| `deals` and `pipeline` legacy duplicates | Redirects in place |
+| Early-access form might not write | **Closed** (2 rows) |
+| LP onboarding absent, LP persona 3 pages | **Open** |
+| Run one full cross-persona loop with real data | **Open** (0 portfolio companies, 0 IC memos) |
+| Instrument activation | **Open** (no analytics table found) |
+| Invented performance statistics on the site | *(unverified whether replaced)* |
+
+### 2.6 What broke in production this week
 
 | Event | Root cause | What it shows |
 | --- | --- | --- |
-| Founder matching returned a bare 504 for two runs | An all-pairs name comparison in firm clustering: 24 s at 4,000 firms, minutes at 21,000 | No test at directory scale; the unit tests used a handful of names |
-| The 504 left one log line ("Task timed out") | No structured application logging inside a run | A hung run cannot be diagnosed from outside; the cause was found by reasoning, not by looking |
-| Deck reading ran before the run's clock started | Two budgets, not one | Time limits must be one budget per request |
-| `web_search` never worked in production | Pointed at a localhost search engine no serverless function can reach | Production dependencies were never checked against a real deploy |
-| 75 firms all scored "100" | Four components saturate at 1.0 for any firm that clears a bar | Ranking quality was judged by eye on one case |
-| A model said "scored 40" when 37 existed | The model's prose was trusted over the tool's count | Free text is not a source of truth; the verified-block pattern is the fix and must be general |
-| 773 import conflicts, 35 same-name firms wrongly folded into others | Name-only identity matching; no merge/review workflow | Directory identity needs a service, not scripts |
+| Founder matching returned a bare 504 for two runs | An all-pairs name comparison in firm clustering: 24 s at 4,000 firms, minutes at 21,000 | No test at directory scale |
+| The 504 left one log line | No structured application logging inside a run | A hung run could not be diagnosed from outside |
+| Deck reading ran before the run's clock started | Two budgets, not one | One time budget per request |
+| `web_search` never worked in production | Pointed at a localhost search engine | Production dependencies never checked from a real deploy |
+| 75 firms all scored "100" | Four components saturated at 1.0 | Ranking quality judged by eye on one case |
+| A model said "scored 40" when 37 existed | Model prose trusted over the tool's count | Free text is not a source of truth |
+| 772 import conflicts; 35 same-name firms folded into others | Name-only identity matching; no review workflow | Directory identity needs a service |
 
-None of these were model failures. They were **missing platform properties**: scale tests, one clock,
-structured traces, dependency checks, quality evals, source-of-truth discipline, identity resolution. Those are
-the foundation §5 builds, because an agent that operates the firm's records cannot sit on them.
+None were model failures. They are **missing platform properties**.
 
-### 2.4 Verdict
+### 2.7 Verdict
 
-Anker is a strong **founder-fundraising product with an AI research and matching core**, and the *skeleton* of a
-venture ERP: many entities and screens, one deep module, no governed way for an agent to change anything. The
-distance to the goal in §0 is not more modules. It is four platform pieces (§5): a **governed action layer**,
-an **agent runtime**, **entity memory and identity**, and **evals plus traces**. After those, each module becomes
-a set of agent jobs (§6) instead of a screen.
+Anker is a strong **founder-fundraising product with an AI research and matching core**, a **deep fund-ledger engine
+that has never run on real fund data**, and thin compliance/forecasting/compensation layers. It has no paying
+customers, about two active users, no governed way for an agent to change a record, and no enforcement of plans. The
+distance to §0 is therefore two kinds of work in a fixed order: **(1) make it used and true** (customers, honest claims,
+metering, compliance), and **(2) add the platform layers** (§5) that turn the assistant into an operator. Doing (2)
+without (1) builds an operator for a firm that does not exist.
 
 ---
 
@@ -133,38 +205,51 @@ a set of agent jobs (§6) instead of a screen.
 
 | # | Gap | Why it blocks the goal | Closed by |
 | --- | --- | --- | --- |
-| G1 | Agents cannot change records through any governed path | Without it Anker is a research tool; "agentic ERP" is false | §5.1 action layer |
-| G2 | No approval inbox, no autonomy policy | Humans cannot safely say "do this kind of thing without asking" | §5.1, §5.2 |
-| G3 | No agent runtime (triggers, schedules, durable runs, resume) | Each new agent is bespoke; background work does not scale | §5.2 |
-| G4 | No traces or structured run logs | Cannot debug, cost, or audit a run; hangs are invisible | §5.4 |
-| G5 | No evals or canaries | Every release risks silent quality loss; regressions found by users | §5.4 |
-| G6 | No entity identity or memory | Modules cannot share facts; agents re-derive them every turn | §5.3 |
-| G7 | Directory data quality (dupes, conflicts, freshness) is a script and a CSV | Matching quality is capped by data quality | §5.3, §6.5 |
-| G8 | ERP modules are screens, not workflows | A VC cannot run a fund week on them | §6 |
-| G9 | No scale/perf budget in CI | The 504 class of bug returns | §5.4 |
-| G10 | Two operator consoles (in-app `/dashboard/admin` and SAIL) | Duplicated effort, unclear owner | [38](38-sail-monitoring-and-admin.md) §4 |
+| G0 | No design partners; no real fund or paying customer | Nothing can be proven; the spec would be fiction | §7.1, Phase A |
+| G1 | Agents cannot change records through any governed path | Without it Anker is a research tool | §5.1 |
+| G2 | No approval inbox, no autonomy policy | Humans cannot safely delegate | §5.1, §5.2 |
+| G3 | No agent runtime (triggers, durable runs, resume); `agent_runs` unused | Each agent is bespoke | §5.2 |
+| G4 | No traces: no run id on calls, no cost column, no structured logs | Cannot debug, cost or audit a run | §5.4 |
+| G5 | No evals or canaries | Silent quality loss; regressions found by users | §5.4, §10 |
+| G6 | No entity identity or memory | Modules cannot share facts | §5.3 |
+| G7 | Directory data quality (dupes, conflicts, freshness, provenance, licence) | Matching quality is capped by data quality; legal exposure | §5.3, §8.2 |
+| G8 | Thin areas (compliance, forecasting, compensation, signals, updates, calls, planning) are screens | A VC cannot run a fund week on them | §6 |
+| G9 | No scale/perf budget in CI | The 504 class returns | §10.1 |
+| G10 | Two operator consoles | Duplicated effort | [38](38-sail-monitoring-and-admin.md) §4 |
+| G11 | Entitlements and metering not enforced; credits never debited | No revenue path | §7.3 |
+| G12 | No data-subject-request, retention or erasure tooling; the privacy policy does not cover the 50,000 third-party person records | Legal exposure as controller | §8.2 |
+| G13 | Outreach carries no `List-Unsubscribe` header; legal basis for cold B2B email per jurisdiction unreviewed | Deliverability and legal exposure | §8.3 |
+| G14 | AI processing sends confidential deal documents to third-country providers by default; no per-tenant provider policy | Blocks confidential VC use | §8.4 |
+| G15 | No MFA/SSO; no SOC 2 | Blocks enterprise and institutional LPs | §8.5 |
+| G16 | Agent-specific threat model absent (prompt injection via crawled pages, uploads, inbound mail) | A write-capable agent multiplies the impact | §9 |
+| G17 | Testing stops at the library boundary; migration ledger drifts; no restore drill | Releases are riskier than they look | §10 |
+| G18 | LP persona is 3 pages with no onboarding | The three-persona thesis has a missing leg | §6.3 |
+| G19 | Activation is not instrumented | Cannot decide what to cut or build | §12 |
 
 ---
 
 ## 4. Principles (the rules every phase obeys)
 
-1. **The tool decides facts; the model decides words.** Counts, scores, names and amounts in an answer come from
-   a tool result and are rendered from it (the verified-block pattern, generalised). Where the model's prose
-   states a number that a tool contradicts, the tool's number replaces it. *(Already true for matching and
-   scoring; becomes true for every tool.)*
-2. **Read freely, propose by default, commit under policy.** Every capability is one of three kinds (§5.1), and
-   the kind, not the model, decides what happens.
-3. **Every action is explainable and reversible.** What was done, by which agent, on whose authority, from which
-   inputs, and how to undo it. Irreversible actions (sending money, sending email to a third party, filing) are
-   never autonomous by default.
-4. **Humans own autonomy.** A workspace owner sets, per action class, how much runs unattended. Defaults are
-   conservative and the platform can only lower a ceiling, never raise it past what the owner allowed.
-5. **One budget per request, one trace per run.** Time, calls and money are bounded together; every run leaves a
-   trace a person can read.
-6. **Scale is a test, not a hope.** Anything that touches the directory is tested at directory size.
+1. **The tool decides facts; the model decides words.** Counts, scores, names and amounts in an answer come from a tool
+   result and are rendered from it. *(True for matching and scoring today; becomes true for every tool.)* This is the
+   "sealed engine computes, a person approves only what doesn't tie" principle of
+   [`anker-agent-tooling-expansion`](../anker-agent-tooling-expansion.md), generalised.
+2. **Read freely, propose by default, commit under policy.** Every capability is read, propose or commit (§5.1).
+3. **Every action is explainable and reversible.** What, by which agent, on whose authority, from which inputs, and how to
+   undo it. Irreversible actions are never autonomous by default.
+4. **Humans own autonomy.** Owners set it per action class; the platform can only lower a ceiling.
+5. **One budget per request, one trace per run.** Time, calls and money bounded together; every run leaves a trace.
+6. **Scale is a test, not a hope.** Anything touching the directory is tested at directory size.
 7. **A module is part of the ERP when an agent can read it, propose against it, and a policy can stop it.**
-8. **Tenant isolation is never traded for convenience.** Persona and workspace scope keys, the owner firewall and
-   redaction rules ([00](00-persona-isolation.md), [23](23-redaction-check.md)) are preconditions, not features.
+8. **Isolation is a precondition.** Persona and workspace scope keys, the owner firewall and redaction rules
+   ([00](00-persona-isolation.md), [23](23-redaction-check.md)) are never traded for convenience.
+9. **Claims integrity.** Nothing public (site, deck, docs, in-app) states a capability, certification, integration or
+   number the platform cannot show. A claims register with an owner and a measured source is part of release (§8.1).
+10. **Disclose side effects before they happen.** An action that emails or messages real people states how many and who
+    before it runs, and a safe mode exists. (A founder-application "re-assess" emails the applicant every time; testing
+    must never do that to a real applicant.)
+11. **Treat every external input as hostile.** Web pages, uploaded files, inbound email and LinkedIn messages are data,
+    never instructions, and can never by themselves authorise an R1–R3 action (§9).
 
 ---
 
@@ -173,274 +258,489 @@ a set of agent jobs (§6) instead of a screen.
 ```
  Surfaces   web app · assistant · Anker AI · MCP · email · browser extension
  ─────────────────────────────────────────────────────────────────────────────
- Governance   policy (autonomy levels) · approvals · audit · cost ceiling · evals
+ Governance   policy (autonomy levels) · approvals · audit · cost ceiling · evals · claims register
  Agent runtime   definitions · triggers · durable runs · memory · scheduling
  Action layer   typed capabilities: READ · PROPOSE · COMMIT, idempotent, reversible
- System of record   entity graph · event log · documents · directory   (existing tables)
+ System of record   entity graph · event log · documents · directory · ledger   (existing tables)
 ```
 
-### 5.1 The action layer: capabilities and proposals (closes G1, G2)
+### 5.1 The action layer: capabilities and proposals (G1, G2)
 
-Every operation an agent can perform is a **capability** with a typed input schema (the schema machinery in
-`lib/assistant/tool-schemas.ts` already enforces bounds), declared once:
+Every operation an agent can perform is a **capability** with a typed input schema (the bounds in
+`lib/assistant/tool-schemas.ts` already enforce this), declared once:
 
 | Kind | Meaning | Example |
 | --- | --- | --- |
 | `read` | No side effect | `crm_search`, `fund_performance`, `query_investors` |
 | `propose` | Produces a **proposal**: the exact change, its evidence and its diff, stored, not applied | "move 14 contacts to *Contacted*", "draft capital call #7", "merge these two firms" |
-| `commit` | Applies a proposal that is approved (by a human or by standing policy), idempotently, with an undo record | the same three, after approval |
+| `commit` | Applies an approved proposal (by a human or by standing policy), idempotently, with an undo record | the same, after approval |
 
-**The proposals table** (new, `action_proposals`): `id`, `workspace`, `persona`, `capability`, `input`, `diff`
-(before/after, human-readable and machine-applicable), `evidence` (tool results, document refs), `risk_class`,
-`agent_run_id`, `status` (`pending | approved | rejected | applied | undone | expired`), `decided_by`,
-`decided_at`, `applied_at`, `undo` (what reverses it), `idempotency_key`.
+**`action_proposals`** (new): `id`, `workspace`, `persona`, `capability`, `input`, `diff` (human-readable and
+machine-applicable), `evidence` (references to tool results and records, not copies), `risk_class`, `agent_run_id`,
+`status` (`pending | approved | rejected | applied | undone | expired`), `decided_by`, `decided_at`, `applied_at`,
+`undo`, `idempotency_key`, `source_trust` (whether any input came from untrusted content, §9).
 
-**Risk classes** decide the default path; owners can only tighten them or loosen within a ceiling:
+**Risk classes** set the default; owners can only tighten, or loosen within a ceiling:
 
 | Class | Examples | Default |
 | --- | --- | --- |
-| R0 internal, reversible, own data | tag a contact, create a task, move a CRM stage, attach a note | auto-commit after the owner enables it for the class; always logged |
-| R1 internal, bulk or structural | merge firms, bulk stage move, import into the directory, rebuild a profile | propose, one-click approve |
-| R2 external, reversible-ish | send an email or LinkedIn message to a third party, publish an update | propose; approve per batch; rate-limited; suppression enforced |
-| R3 money, legal, regulatory | capital call, distribution, KYC decision, filing, signature | propose only; two-person rule where the fund requires it; never autonomous |
+| R0 internal, reversible, own data | tag, create a task, move a CRM stage, attach a note | propose; auto-commit only after the owner enables the class; always logged |
+| R1 internal, bulk or structural | merge firms, bulk stage move, directory import, rebuild a profile | propose, one-click approve |
+| R2 external to a third party | send an email or LinkedIn message, publish an update | propose; approve per batch; rate limits, suppression, sender caps and `List-Unsubscribe` enforced; **never auto-commit** |
+| R3 money, legal, regulatory | capital call, distribution, KYC decision, filing, signature | propose only; maker–checker (two people) where the fund requires it; never autonomous |
 
-The `BLOCKED` list in `policy.ts` becomes the first set of `propose` capabilities (`crm_update_stage`,
-`crm_add_task`, `enrich_firms`, `build_investor_profile`), so the work that is blocked today starts working
-under governance rather than being unblocked blindly.
+An action whose inputs include untrusted content (a crawled page, an uploaded file, an inbound message) is **capped at
+R0 auto-commit** whatever the setting; anything above R0 needs a human to see the evidence (§9).
 
-**Approval inbox.** One queue per workspace (and a roll-up in SAIL for staff oversight): pending proposals
-grouped by agent run, with the diff, the evidence, approve / edit / reject, and "always allow this class".
-Acceptance is in §8.
+The `BLOCKED` set becomes the first `propose` capabilities (`crm_update_stage`, `crm_add_task`, `enrich_firms`,
+`build_investor_profile`), so blocked work starts working under governance instead of being unblocked blindly.
 
-### 5.2 The agent runtime (closes G3)
+**Approval inbox.** One queue per workspace: pending proposals grouped by run, with the diff and evidence;
+approve / edit / reject / "always allow this class". Staff see a roll-up in SAIL ([38](38-sail-monitoring-and-admin.md)
+§3.3).
 
-An **agent definition** is data, not a route:
+**Audit.** Every proposal state change and every commit writes `audit_events` (the table exists with zero rows; making it
+carry assistant, CRM and agent actions is a Phase 1 deliverable, closing the §2.4 gap).
 
-```
-id, persona, goal (one sentence), tools (capabilities), policy (risk ceiling, budget),
-triggers [ schedule | event | manual | inbound-message ],
-inputs (what it reads), outputs (proposals or artifacts), success check (how it knows it is done)
-```
+### 5.2 The agent runtime (G3)
 
-The runtime provides: trigger dispatch (a cron fan-out plus an event bus over the existing event log); **durable
-runs** (state in `agent_runs` and the existing chat event log, resumable after a crash, with the single request
-clock of §4.5); a **plan step** (the run writes its plan as the first event, so a person can read intent before
-action); **memory** (§5.3); **budgets** per definition; and a **dry-run mode** that executes everything except
-`commit`. The two bespoke agents (outreach tick, campaign engine) are re-expressed as definitions; nothing else
-about them changes. New agents (§6) are then a definition and a test, not a route.
+An **agent definition** is data, not a route: `id, persona, goal, tools (capabilities), policy (risk ceiling, budget),
+triggers [schedule | event | manual | inbound-message], inputs, outputs, success check`.
 
-### 5.3 Entity identity and memory (closes G6, G7)
+The runtime provides trigger dispatch (a cron fan-out plus an event bus over the existing event log); **durable runs**
+(state in `agent_runs`, which finally gets writers, and the chat event log; resumable after a crash; one request clock);
+a **plan step** written first so a person can read intent before action; **memory** (§5.3); per-definition **budgets**;
+a **dry-run** mode that executes everything except `commit`; and a **kill switch** per definition and per workspace. The
+two bespoke agents are re-expressed as definitions with no behaviour change.
 
-- **Entity graph.** A single `entities` identity (type, canonical id) for firm, person, company, fund, LP, deal;
-  existing tables keep their rows and gain a `entity_id`. Identity resolution is **one service** with the rules
-  already proven this week (accent folding, acronym and former-name aliases, initials, website host, same-name
-  collision guard) and a **review queue** for the cases it will not decide. The import conflict CSV becomes a
-  queue in SAIL ([38](38-sail-monitoring-and-admin.md) §3.4), not a file in Downloads.
-- **Provenance on every field.** Where a value came from, when, and how sure (the founder profile already stores
-  provenance per field; extend the same shape to directory fields).
-- **Entity memory.** Durable facts about an entity, scoped to a workspace, each with provenance and an expiry:
-  `(entity, key, value, source, confidence, valid_until)`. Agents read it as context and write to it only through
-  `propose`. A memory a person edits is pinned.
-- **Freshness.** Every directory record carries `verified_at` and `activity_at`; stale records are down-weighted in
-  ranking (the recency component exists) and queued for re-verification by an agent.
+### 5.3 Entity identity and memory (G6, G7)
 
-### 5.4 Governance: traces, evals, budgets (closes G4, G5, G9)
+- **Entity graph.** One `entities` identity (type, canonical id) for firm, person, company, fund, LP, deal; existing
+  tables keep their rows and gain `entity_id`. **Identity resolution is one service** using the rules proven this week
+  (accent folding, acronym and former-name aliases, initials, website host, same-name collision guard) with a **review
+  queue** for what it will not decide. The import conflicts (716 still open) become that queue.
+- **Provenance on every field:** where from, when, how sure; extend the founder profile's per-field provenance to
+  directory fields, and add **source and licence** per import batch (§8.2).
+- **Entity memory:** `(entity, key, value, source, confidence, valid_until)`, workspace-scoped, written only through
+  `propose`; a person-edited memory is pinned. **Memory is tenant data**: never shared across workspaces, never used to
+  train, covered by erasure (§8.2).
+- **Freshness:** `verified_at` and `activity_at` per record; stale records down-weighted in ranking and queued for
+  re-verification by an agent.
 
-- **Run traces.** One structured record per run: plan, each model call (provider, model, lane, tokens, cost,
-  latency, outcome), each tool call (input hash, duration, result size, error), the final answer, every proposal
-  it made, and the request clock at each step. Streamed calls record too (doc 30's open finding). Logs carry the
-  run id so a platform-level timeout is still attributable.
-- **Evals.** A versioned golden set (`evals/`), starting from the cases we have run by hand: a matching run for a
-  pre-seed healthcare deck, a US-VC-sports mandate, a Germany climate search with a stated country, the
-  count-claim correction, an import that must add nothing on re-run. Each case asserts structure and invariants
-  (no duplicate firm, scores strictly ordered, count equals tool count, location required, no unstated check
-  size used), not exact text. Run **on every deploy** against production data read-only and **nightly**; results
-  are stored and charted (SAIL).
-- **Scale budget in CI.** A directory-sized fixture (21,000 firms) and a time budget on every function that
-  touches it. A change that goes quadratic fails CI.
-- **Dependency checks.** A startup and nightly check that every external dependency a feature names (search,
-  OCR, email, DNS, model lanes) answers from the production runtime, reported to SAIL. (`web_search` would have
-  failed this on day one.)
-- **Spend.** The per-run ceiling exists ([33](33-cost-ceiling.md)); add a per-workspace daily ceiling and a
-  platform alert threshold.
+### 5.4 Governance: traces, evals, budgets (G4, G5, G9)
 
-### 5.5 Surfaces
+- **Run traces.** Add `run_id` to `ai_calls` and to tool-call records; add a **cost** column computed at write time from
+  tokens and the catalogue price (priced or explicitly unpriced); store, per run, the plan, each model call (provider,
+  model, lane, tokens, cost, latency, outcome), each tool call (input hash, duration, result size, error), every proposal
+  made, the request clock at each step, and the final answer. **Streamed calls record too** (doc 30's open finding).
+  Application logs carry the run id so a platform-level timeout is still attributable.
+- **Evals.** A versioned golden set (`evals/`), starting from cases run by hand: a matching run for a pre-seed healthcare
+  deck, a US-VC-sports mandate, a Germany climate search with a stated country, the count-claim correction, an import
+  that must add nothing on re-run, a prompt-injection case (§9). Cases assert invariants (no duplicate firm; scores
+  strictly ordered; count equals tool count; location required; no unstated check size used; no R1+ action from untrusted
+  input), not text. Run on every deploy against production data read-only and nightly; results stored and charted in SAIL.
+- **Scale budget in CI.** A directory-sized fixture (21,000 firms) and a time budget on every function that touches it.
+- **Dependency checks.** Nightly and on deploy: every external dependency a feature names (search, OCR, email, DNS,
+  model lanes) answers from the production runtime, reported to SAIL.
+- **Spend.** Per-run ceiling exists ([33](33-cost-ceiling.md)); add per-workspace daily ceilings and a platform alert.
 
-The assistant and Anker AI stay the conversational surface; the **approval inbox** and a **run timeline** are the
-new first-class surfaces; MCP and the browser extension call the same capabilities (so they inherit policy).
-Email-in is added later (§6.2 inbound).
+### 5.5 Entitlements and metering (G11)
+
+Plans are defined once (features, limits, credits); a single `can(workspace, feature)` and a single
+`meter(workspace, unit, qty)` are called by every capability. AI runs debit credits from the ledger at the cost recorded
+in §5.4; exhausted credits degrade to the free lane or stop with a clear message, never an error. SAIL edits plans and
+overrides per tenant ([38](38-sail-monitoring-and-admin.md) §3.6).
+
+### 5.6 Surfaces
+
+The assistant and Anker AI stay the conversational surface; the **approval inbox** and **run timeline** become
+first-class; MCP (`POST /api/mcp`, multi-tenant token map) and the browser extension call the same capabilities and so
+inherit policy; email-in comes later. WebMCP exposes page tools and must respect the same gate.
 
 ---
 
 ## 6. The modules, as agent jobs
 
-For each persona: the system-of-record work to finish, then the agent jobs, each with its autonomy ceiling. A
-job ships when its acceptance (§8) passes. "Today" is from §2.
+For each persona: the work to finish, the agent jobs with their autonomy ceilings, and today's state from §2.
 
 ### 6.1 Founder: run the raise
 
 | Agent job | Reads | Proposes / commits | Ceiling | Today |
 | --- | --- | --- | --- | --- |
 | Match and rank investors (with mandate) | deck, profile, directory | ranked workbook, saved run | R0 | **done** |
-| Keep the pipeline current | replies, calendar, calls | stage moves, tasks, notes | R0 auto after enable | blocked (`crm_*`) |
-| Run outreach waves | approved sequences, suppression | send batches | R2 per batch | engine exists, no approval inbox |
+| Keep the pipeline current | replies, calendar, calls | stage moves, tasks, notes | R0 after enable | blocked (`crm_*`) |
+| Run outreach waves | approved sequences, suppression | send batches | R2 per batch | engine exists; no approval inbox |
 | Follow-up sweep | stale contacts | drafts for approval | R2 | drafts exist |
-| Weekly raise brief | pipeline, activity, signals | a one-page update to the founder | R0 | missing |
-| Data room readiness | data room, checklist | gap list, requests | R1 | tools exist (`dataroom_*`) |
-| Round modelling | cap table, term sheets | scenarios, dilution | R0 | tools exist |
-
-System of record to finish: one CRM per persona is built ([25](25-per-persona-crm.md)); cap table, 409A, share
-plans, term sheet are screens and need the proposal path (a model change is a proposal, not a direct edit).
+| Weekly raise brief | pipeline, activity, signals | a one-page update | R0 | missing |
+| Data-room readiness | data room, checklist | gap list, requests | R1 | tools exist; 0 files in production |
+| Round modelling | cap table, term sheets | scenarios, dilution | R0 | engines exist (waterfall, 409A, vesting) |
 
 ### 6.2 VC: run the fund
 
 | Agent job | Reads | Proposes / commits | Ceiling | Today |
 | --- | --- | --- | --- | --- |
-| Deal intake and screen | inbound decks, forms, email | deal record, first screen, scorecard | R1 | deal pipeline view only |
-| IC memo | deal, data room, calls | memo draft with cited evidence | R0 | `ic_memo` tool exists |
-| Portfolio monitoring | KPIs, updates, signals | alerts, update requests, KPI rollup | R1 | `portfolio_kpi_rollup` exists |
-| LP reporting | positions, KPIs | quarterly report draft, LP Q&A answers | R1 / R2 on send | report tables exist |
-| Capital calls and distributions | fund, LP positions | drafted call/distribution | **R3 propose only** | `draft_capital_call` exists |
-| KYC/AML | cases, screening hits | case triage, evidence pack | **R3** | module is a screen |
-| Compliance calendar | deadlines, filings | reminders, filing drafts | R1 / R3 on file | digest cron exists |
+| Deal intake and screen | inbound decks, forms, email | deal record, first screen, scorecard | R1 | `deals` = 0; pipeline view only |
+| IC memo | deal, data room, calls | memo draft with cited evidence | R0 | `ic_memo` tool exists; 0 memos |
+| Portfolio monitoring | KPIs, updates, signals | alerts, update requests, KPI rollup | R1 | `portfolio_kpi_rollup` exists; 0 portfolio companies |
+| LP reporting | positions, KPIs | quarterly report draft, LP answers | R1 / R2 on send | report tables exist |
+| Capital calls and distributions | fund, LP positions | drafted call or distribution | **R3 propose only** | `draft_capital_call` exists; 4 calls, 3 distributions seeded |
+| KYC/AML | cases, screening hits | triage, evidence pack | **R3** | `kyc` module; 9 cases |
+| Compliance calendar | deadlines, filings | reminders, filing drafts | R1 / R3 on file | weekly digest cron; `lib/compliance` is 120 lines |
 | LP prospecting | directory, matching | ranked LPs, outreach | R2 | LP matching exists |
 
-This is where the ERP claim lives or dies. The fund-operations modules (KYC, fund tax, SPVs, loans, contracts)
-each need the same audit before any agent touches them: *what is the workflow a GP follows, which step is a
-decision, which is a lookup*. Agents take the lookups first.
+The fund-operations modules need one audit each before an agent touches them: *what workflow does a GP follow, which step
+is a decision, which a lookup*. Agents take lookups first. The deep, tested part is the ledger (§2.3); the thin parts are
+compliance and forecasting, which are where the agent jobs will find the least to stand on.
 
 ### 6.3 LP: watch the capital
 
-Read-only by design: positions, capital account, distributions and documents, with an assistant that answers
-from the fund's own records and **cites the record**. Ceiling R0 throughout; any request that implies action
-(redemption, transfer) is routed to the GP as a proposal on the GP's queue.
+Read-only by design (R0): positions, capital account, distributions, documents, with an assistant that answers from the
+fund's own records **and cites the record**; any request that implies action (redemption, transfer) becomes a proposal on
+the GP's queue. **Open structural hole:** no LP onboarding, no commitment or subscription flow, `lp_entities` = 0, three
+pages. The LP leg needs onboarding, subscription, a capital-account drill-down and self-serve tax documents before an LP
+agent has anything to say. This is its own phase (Phase 6) and an honest "not yet" on the site until it ships (§8.1).
 
 ### 6.4 What Anker must expose to SAIL
 
-SAIL is the operator console ([38](38-sail-monitoring-and-admin.md)). Anker owes it, behind the existing
-service-token relay and allowlist: run traces and AI usage (read), the proposal queue roll-up (read, plus
-staff-only force-reject), eval results (read), dependency check results (read), cron/job health (read), import and
-identity review queues (read/write), tenant usage metrics (read), and feature/entitlement flags (read/write).
-The contract is listed in [38](38-sail-monitoring-and-admin.md) §5.
+Behind the existing service-token relay and allowlist: run traces and AI usage, the proposal roll-up, eval and
+dependency results, cron health, identity and import review queues, tenant usage, entitlements, and a **working view-as
+accept endpoint** (§2.4). The contract is in [38](38-sail-monitoring-and-admin.md) §5.
 
 ### 6.5 The directory as a product
 
-The directory (firms, people, activity) is the asset every persona depends on. It needs an owner and an SLO:
-identity resolution service and review queue (§5.3); freshness agent (re-verify, re-activity); conflict
-policy ("fill what is empty, never overwrite, record disagreements", [24](24-directory-import.md)) turned into a
-queue with a decision log; per-source quality scores; and the import path gated by the same dry-run → approve →
-apply flow as every other R1 action.
+The directory is the asset every persona depends on and needs an owner and an SLO: the identity service and review queue;
+freshness agent; the conflict policy ("fill what is empty, never overwrite, record disagreements",
+[24](24-directory-import.md)) as a queue with a decision log; per-source quality scores; the import path gated by the
+dry-run → approve → apply flow as every R1 action; and **source, licence and lawful-basis fields per batch** (§8.2).
 
 ---
 
-## 7. Metrics: how we know it is working
+## 7. Business: customers, pricing, position
 
-| Outcome | Measure | Target by end of phase 4 |
+### 7.1 Design partners first (Phase A)
+
+The test of the spec is real firms. Target: **3 founders on the full loop and 1 VC fund on Fund OS with real data** within
+the first phase, chosen to exercise what has never run: a real fund's capital calls, an IC memo, a portfolio KPI roll-up,
+a data room with files, an investor update. Success = each partner completes the loop unaided and says what they would
+pay. Everything in Phases 0–3 is sequenced to serve these partners, not the other way round.
+
+### 7.2 Who pays for what
+
+| Buyer | Pays for | Unit | Evidence needed |
+| --- | --- | --- | --- |
+| Founder | the raise: matching, outreach, data room, modelling | per workspace per month + credits | 3 partners complete a raise cycle |
+| GP / fund | fund ops, reporting, LP portal, agents | per fund + LPs seat or AUM tier | 1 fund runs a quarter-end |
+| LP | free through the GP's fund | none | LP onboarding exists |
+
+Plans today: `starter` 500, `pro` 5,000, `scale` 25,000 credits, persona-agnostic ([04](04-personas-entitlements-and-billing.md)).
+The pricing model is not validated and nothing enforces it.
+
+### 7.3 Metering and unit economics (G11)
+
+Nothing debits credits; there is no cost per run in storage; and the free-lane-first routing means current AI spend is
+near zero but unmeasured. Before pricing: (1) record cost per call and per run (§5.4); (2) compute cost per completed job
+(a matching run, an LP report); (3) set a gross-margin target and per-job ceilings; (4) debit credits from the ledger;
+(5) enforce plan limits in `can()`. Do **not** publish usage-based prices before step 2.
+
+### 7.4 Position (from our own gap analyses; not re-researched in this pass)
+
+[`metal-feature-gap`](../metal-feature-gap.md) and [`carta-parity-plan`](../carta-parity-plan.md) place the nearest
+products as an "OS for capital formation" (fundraising workflow, investor updates, guidance) and a cap-table/fund-admin
+platform. The wedge that neither covers, per those documents: **one platform spanning founder, GP and LP**, a 50,000-person
+directory with a ranked matching engine, and approval-gated outreach. The risks: the investor-data vendors Anker does not
+integrate (the audit found 11 of 12 logos decorative), and a deep ledger without customers. A competitor review (data
+vendors, VC CRMs, fund-admin tools) is an open task (§15).
+
+### 7.5 Capacity
+
+The roadmap sizes in §13 assume a small team working in parallel. Team size is not in the repository and SAIL has one staff
+account; the schedule must be re-cut to real capacity before commitment (decision D7).
+
+---
+
+## 8. Compliance, legal and trust
+
+This section lists exposures found in the code and public pages. It is **not legal advice**; each item is a question for
+counsel before launch to customers beyond the pilot.
+
+### 8.1 Claims integrity
+
+The audit's removal of SOC 2 / 2FA / SSO claims was correct and is verified. Make it a process: a **claims register** (every
+public claim, its measured source, owner, last-verified date) checked at release; any number on the site comes from a
+query, not a draft. Re-verify the integrations marquee, the investor-count figures and the performance statistics the
+audit flagged (§2.5).
+
+### 8.2 Personal data: the directory and data-subject rights (G7, G12)
+
+Anker holds **50,000 person records** (names, titles, emails, LinkedIn URLs, locations) it did not collect from the data
+subjects, sourced from imports, scraping and partner lists, plus contact data founders upload. Findings:
+
+- The privacy policy (`app/privacy/page.tsx`) describes account data, uploaded content and usage data. It does **not**
+  describe the third-party investor directory, its sources, the lawful basis (typically legitimate interest, with a written
+  assessment), the Article 14 notice, or how an investor opts out.
+- `email_suppressions` has 0 rows and `li_suppressions` exists; there is **no cross-channel suppression registry** and no
+  public opt-out path for a directory person.
+- **No data-subject-request tooling** (access, rectification, erasure, restriction, objection) and no retention schedule
+  was found; a person's record is referenced by CRM entries, match results and outcome events, so erasure is a design
+  problem (tombstone and anonymise, keep the aggregates).
+- Imported lists carry provenance only as a `source` string; some arrived with the vendor's promotional footer. **Licence
+  and permitted use per source are not recorded.** Require source, licence, acquisition date and permitted use per batch
+  before an import is applied.
+
+Requirements: a directory privacy notice and legitimate-interest assessment; a public opt-out that suppresses everywhere;
+DSAR/erasure tooling with tombstones; retention rules by table; per-source licence fields; and a record of processing.
+
+### 8.3 Outreach law and platform terms (G13)
+
+- **Email.** Outreach sends from `outreach_messages` through the configured provider. **No `List-Unsubscribe` header
+  exists in the code** and suppression is per-address with 0 entries. Bulk-sender rules at major mailbox providers expect
+  a one-click unsubscribe; separately, cold B2B email is regulated differently by country (the platform is operated from
+  the EU, and German unfair-competition law is strict about unsolicited email). Counsel must settle the lawful basis per
+  target jurisdiction; engineering must add the header, a working unsubscribe, and per-jurisdiction send gates.
+- **LinkedIn.** The engine automates connection requests and messages through an extension, with warm-up-adjusted daily caps
+  (`lib/linkedin/sending-window.ts`). Automating LinkedIn is restricted by LinkedIn's terms and can restrict a customer's
+  account. State this plainly to customers, keep human approval, keep caps conservative, and plan for the API-only
+  alternative.
+- **Approval gate.** Outreach never auto-sends; keep that invariant (R2 is never auto-committed).
+
+### 8.4 AI processing and data residency (G14)
+
+The privacy policy lists Anthropic, OpenAI, Google, Alibaba Cloud and local models and says sub-processors may be outside
+the EU. Production is **Qwen-first**: confidential decks, data-room files and LP documents go to Alibaba Cloud's
+international (Singapore) endpoint by default; the keys on file are Qwen, OpenAI, Mistral and Resend. Findings:
+
+- The router policy is **global** (SAIL sets provider and per-task models for the whole platform). There is **no
+  per-workspace provider policy**, so a GP cannot say "never send my deal documents to a third-country provider".
+- Requirements: a **sub-processor register** (provider, region, purpose, DPA status, retention, training opt-out) kept as
+  data and shown in the privacy page and in SAIL; a **per-workspace data-handling policy** (allowed providers and regions,
+  by data class: public web, deck, data room, LP documents) enforced in the router; an "EU-only" and a "no external
+  provider (local model)" mode for confidential data classes; and attachment retention limits (the upload sweep exists).
+- Provider terms (no training on customer data, retention) must be verified in writing per provider; the policy's "we
+  choose providers that contractually agree not to train" is a claim that needs the paper.
+
+### 8.5 Security attestations and enterprise readiness (G15)
+
+No MFA, no SSO/SAML, no SOC 2 report. Institutional LPs and larger funds will ask. Order of work: MFA for all users (and
+for SAIL staff first), session management, SSO/SAML for GP workspaces, then a SOC 2 Type I readiness exercise (policies,
+access reviews, change management, vendor management; the audit log, migration process and CI are the evidence base),
+then Type II. Do not claim any of it before it exists.
+
+### 8.6 Financial and regulatory scope
+
+Anker computes IRR, 409A backsolves, waterfalls, capital accounts and drafts capital calls and KYC cases. It must stay on
+the side of **tooling for a regulated person**, never the regulated act: it does not give investment advice, make KYC
+decisions, file, sign or move money (R3). Valuation outputs carry the model, inputs and a "not a valuation opinion" notice;
+the AI Act risk class of each agent job is recorded in its definition (none of the current jobs is expected to be high-risk;
+KYC triage must be re-assessed if it ever scores individuals).
+
+---
+
+## 9. Security: the agent threat model (G16)
+
+A write-capable agent changes the security posture; reading a hostile web page was low-stakes, acting on it is not.
+
+| Threat | Path | Control |
 | --- | --- | --- |
-| Agents do the routine work | share of routine actions executed by agents (proposals applied ÷ all CRM/outreach/report changes) | > 60% for founder, > 40% for VC |
-| Humans review exceptions | proposals approved unchanged ÷ decided | > 85% (else the agent is wrong, not the human lazy) |
-| Safe | irreversible actions taken without approval | 0 |
-| Reliable | run success rate; p95 run time; hung/timeout runs | > 97%; < 120 s; 0 bare 504s |
-| Correct | eval pass rate on every deploy; nightly drift | 100% invariants; no regression > 2 pts |
-| Cheap | cost per completed job | tracked per job, ceiling per workspace |
-| Clean data | duplicate rate in the directory; stale (> 12 months) share | < 0.5%; < 15% |
+| **Indirect prompt injection** | A crawled page, an uploaded deck, an inbound email or a LinkedIn message tells the agent to act | All external text is wrapped as untrusted data (already done for uploads and `web_crawl`); actions with untrusted inputs are capped at R0 (§5.1); injection cases are part of the eval suite |
+| **Confused deputy** | The agent acts with the user's full rights | `commit` is checked against the acting principal, never the model's claim; capabilities are scoped per agent definition |
+| **Model-supplied identifiers** | The model passes ids (`score_investors ids`, `crm` ids) that belong to another workspace | Every capability re-authorises every id against the workspace; tests for cross-tenant ids |
+| **Data exfiltration** | The agent fetches an attacker URL with data in it (SSRF, link rendering) | `public-fetch.ts` private-address guard exists; add an allowlist mode for confidential workspaces and strip active content |
+| **Cross-tenant memory leakage** | Shared memory or caches | Memory and caches keyed by workspace; no global learned state from tenant data |
+| **Cost abuse** | A loop or a malicious prompt burns credits | Per-run, per-workspace, platform ceilings (§5.4) |
+| **Token and secret exposure** | MCP tokens, service token, provider keys | Scoped, rotatable, shown once; MCP tokens carry a persona and tool allowlist; SAIL's service token is full admin on the tenant side and gets a request log and an IP/identity restriction |
+| **Public endpoints** | `/apply`, `/api/public/*`, early access | Rate limits exist on the public submit routes; only 11 of 407 API routes use the limiter, so audit the rest, add bot protection to public forms |
+| **Supply chain** | Dependencies, the browser extension | Lockfile CI; the extension release workflow already exists; add dependency scanning |
 
 ---
 
-## 8. Roadmap with acceptance
+## 10. Engineering quality
 
-Phases are ordered by what unblocks the rest. Each ends in a demo a partner could watch.
+### 10.1 Testing strategy
+
+Today: unit tests and in-process Postgres integration tests under `lib/**` (authorization is well covered), a build, a
+typecheck, a redaction scan. **Missing:** route-handler contract tests, component tests, any end-to-end test, scale
+tests, evals, a post-deploy smoke, and chaos for provider failure. Add, in order of value: (1) the directory-scale and
+time-budget tests; (2) evals (§5.4) on every deploy; (3) route contract tests for the capability layer and the
+proposal state machine; (4) a handful of end-to-end journeys on a preview (sign in, match a deck, approve a proposal,
+undo it); (5) provider-failure drills (lane exhausted, key rejected, search 403) asserting the typed failure reaches the
+user; (6) property tests for the financial engines (IRR, waterfall, ledger balance).
+
+### 10.2 Migrations and schema governance
+
+The migration ledger (`schema_migrations`, 118 rows) has reported already-applied migrations as pending, so it cannot be
+trusted as a gate; `pnpm migrate` targets the production Neon database, not a local one; SAIL and Anker both write to
+tables the other reads, with duplicated helpers; an orphan table was found by the September audit. Requirements: migrations
+applied to an ephemeral database in CI; a ledger reconciliation job; expand/contract for breaking changes; **one owner per
+table** and a published schema contract for the tables SAIL touches; no destructive migration without a restore point.
+
+### 10.3 Reliability, backup and recovery
+
+Not found in the repository: SLOs, an RPO/RTO, a restore drill, an incident process, a status page. Set: availability and
+latency SLOs for the app, matching, and chat; a documented restore of the shared Neon database (point-in-time recovery) with
+a **quarterly drill**; an incident template and a blameless review for each Sev-1/2; a customer status page after the
+internal board is trusted ([38](38-sail-monitoring-and-admin.md) §3.5).
+
+---
+
+## 11. Integrations inventory
+
+| Integration | In code | Live in production |
+| --- | --- | --- |
+| Stripe (billing) | yes, webhooks, test mode | no subscriptions *(webhook secret and Vercel env were pending as of the last memory note)* |
+| Resend (email), IMAP/Gmail (inbound, send) | yes | Resend key present |
+| LinkedIn (extension, action queue) | yes | 3 campaigns, 1 queued action |
+| DocuSign | yes (`lib/contracts/docusign.ts`) | *(unverified)* |
+| OpenSanctions (KYC screening) | yes | *(unverified)*; 9 KYC cases |
+| Companies House | yes (`lib/compliance`) | *(unverified)* |
+| Twenty CRM | yes (`lib/twenty`) | *(unverified)* |
+| n8n, doc-worker (high-fidelity PDFs), SearXNG | optional services (`infra/`, `services/`) | not used by production (search now via Qwen) |
+| MCP server (`/api/mcp`, `mcp-server/`), WebMCP, browser extension | yes | in use by the owner *(unverified)* |
+| Qwen (free + plan lanes), OpenAI, Mistral | yes | keys present; Qwen-first routing |
+| Data vendors (PitchBook, Preqin, Crunchbase API, SEC) | **none** | — |
+| Calendar, bank feeds, accounting (for the ledger) | **none** | — |
+
+---
+
+## 12. Metrics: how we know it is working
+
+| Outcome | Measure | Target by end of Phase 4 |
+| --- | --- | --- |
+| **Activation** | organizations completing the full loop with real data; weekly active users; time to first value | 3 founders + 1 fund; 20 WAU |
+| **Revenue** | paying workspaces; monthly recurring revenue; credit burn vs plan | first paying customers; gross margin above target |
+| Agents do the routine work | share of routine actions executed by agents (proposals applied ÷ all CRM/outreach/report changes) | > 60% founder, > 40% VC |
+| Humans review exceptions | proposals approved unchanged ÷ decided | > 85% |
+| Safe | irreversible actions without approval; R1+ actions from untrusted input | 0; 0 |
+| Reliable | run success rate; p95 run time; platform-killed runs | > 97%; < 120 s; 0 |
+| Correct | eval pass rate per deploy; nightly drift | 100% invariants; no regression > 2 pts |
+| Cheap | cost per completed job vs ceiling | tracked per job |
+| Clean data | duplicate rate; stale share; sources with a licence on file | < 0.5%; < 15%; 100% |
+| Compliant | DSARs closed in time; suppressions honoured across channels | 100%; 100% |
+| Honest | public claims with a verified source | 100% |
+
+The current baselines are in §2.2 (for example 96.7% AI call success over 7 days, 2 monthly active users, 0 paying).
+
+---
+
+## 13. Roadmap with acceptance
+
+Order is set by what unblocks the rest; every phase ends in a demo a partner could watch. **Phase A and Phase 0 run in
+parallel and are the commitment.**
+
+**Phase A — Activation and truth.**
+Recruit design partners (§7.1); instrument activation (page views, loop completion, first-value time); verify and fix the
+public claims register (§8.1); live billing (webhook, live keys) and metering recorded but not enforced; LP onboarding
+placeholder replaced with an honest "coming" state; the in-app and SAIL view-as made to work.
+*Acceptance:* a real fund's quarter is entered and the ledger balances; a partner's deck-to-first-outreach path is timed;
+every number on the site traces to a query.
 
 **Phase 0 — Foundations (the 504 class never returns).**
-Run traces with run id in every log line; streamed calls recorded; dependency checks (nightly and on deploy);
-directory-scale fixture and time budgets in CI; evals v0 (the five hand-run cases) wired to CI and a nightly job.
-*Acceptance:* a deliberately slowed run produces a trace that names the slow step; CI fails on a quadratic change
-to firm clustering; evals fail when a golden case is made wrong on purpose.
+`run_id` and cost on `ai_calls`; run traces and structured logs; streamed calls recorded; dependency checks; directory-scale
+fixture and time budgets in CI; evals v0 with an injection case; `cron_runs`; migration CI on an ephemeral database.
+*Acceptance:* a deliberately slowed run produces a trace naming the slow step; CI fails on a quadratic change to firm
+clustering; evals fail when a golden case is made wrong on purpose.
 
 **Phase 1 — The action layer and the approval inbox.**
-`action_proposals`, the three capability kinds, risk classes, the inbox UI, undo records; move `crm_update_stage`,
-`crm_add_task`, `enrich_firms`, `build_investor_profile` off `BLOCKED` onto `propose`; audit events for every
-decision; owner-set autonomy per class.
-*Acceptance:* "move the stale contacts to *Contacted* and add follow-up tasks" yields one proposal with a diff;
-approving applies it once (idempotent on retry) and an undo restores the prior state; with auto-commit enabled for
-R0, the same request commits without a click and still appears in the log; an R3 capability can never auto-commit
-whatever the setting.
+`action_proposals`, capability kinds, risk classes, the inbox, undo, `audit_events` for assistant/CRM/agent actions;
+`crm_*`, `enrich_firms`, `build_investor_profile` off `BLOCKED` onto `propose`; owner-set autonomy per class; untrusted-input
+cap.
+*Acceptance:* "move the stale contacts to *Contacted* and add follow-up tasks" yields one proposal with a diff; approving
+applies it once (idempotent on retry) and undo restores the prior state; with R0 auto-commit on, the same request commits
+and still appears in the log; an R3 capability never auto-commits; a proposal built from an injected page is capped.
 
 **Phase 2 — The agent runtime.**
-Agent definitions as data; schedule and event triggers; durable resume; dry-run; per-definition budgets; the
-outreach tick and campaign engine re-expressed as definitions with no behaviour change.
-*Acceptance:* a new agent ("weekly raise brief") ships as a definition plus a test with no new route; killing the
-process mid-run and restarting resumes it; dry-run produces the proposals it would make and applies none.
+Definitions as data; schedule and event triggers; durable resume; dry-run; budgets; kill switches; outreach tick and campaign
+engine re-expressed as definitions.
+*Acceptance:* a new agent ("weekly raise brief") ships as a definition plus a test with no new route; killing the process
+mid-run and restarting resumes it; dry-run produces proposals and applies none.
 
-**Phase 3 — Identity and memory.**
-`entities` and `entity_id` on firm/person/fund/LP/company; the identity service and its review queue; provenance
-on directory fields; entity memory with expiry; freshness agent.
-*Acceptance:* the same real firm written four ways resolves to one entity across founder, VC and LP views;
-re-importing the 2026-10 drop adds nothing and surfaces its conflicts in the queue; a stated fact on a deck is
-retrievable with its source on the next run.
+**Phase 3 — Identity, memory, compliance foundations.**
+`entities` and the identity service with its review queue; provenance and licence per import batch; entity memory;
+suppression registry across channels; DSAR/erasure tooling; directory privacy notice; per-workspace provider policy and
+sub-processor register; `List-Unsubscribe`; entitlements and credit debiting.
+*Acceptance:* one real firm written four ways resolves to one entity across founder, VC and LP views; an erasure request
+removes a person from the directory and every module while keeping aggregates; a workspace set to "no third-country
+provider" runs a deck match on an allowed provider or refuses with a clear message; a plan change flips a limit.
 
 **Phase 4 — The founder loop, closed.**
-Pipeline-keeping, outreach waves through the inbox, follow-up sweep, weekly brief, data-room readiness.
-*Acceptance:* a founder connects a deck and a mailbox and, a week later, has a current pipeline, a drafted next
-wave awaiting approval and a one-page brief, having made only approvals.
+Pipeline-keeping, outreach waves through the inbox, follow-up sweep, weekly brief, data-room readiness; MFA.
+*Acceptance:* a founder connects a deck and a mailbox and a week later has a current pipeline, a drafted next wave awaiting
+approval and a one-page brief, having made only approvals.
 
 **Phase 5 — The VC fund loop.**
-Audit each fund-operations module (§6.2) → workflows; deal intake and IC memo; portfolio monitoring; LP reporting;
-capital call and distribution proposals (R3, two-person).
-*Acceptance:* a quarter-end for a test fund: LP reports drafted from KPIs with every figure traceable to a record,
-capital call proposal with a human two-person approval, compliance calendar current.
+Audit each fund-operations module into workflows; deal intake and IC memo; portfolio monitoring; LP reporting; capital call
+and distribution proposals (R3, maker–checker); compliance and forecasting depth; SSO for GP workspaces.
+*Acceptance:* a test fund's quarter-end: LP reports drafted from KPIs with every figure traceable to a record, a capital call
+proposal with a two-person approval, the compliance calendar current.
 
 **Phase 6 — LP and the network.**
-LP assistant with cited answers; GP-routed requests; LP prospecting.
-*Acceptance:* an LP question is answered with the record it came from, and an action request lands on the GP queue.
+LP onboarding, subscription, capital-account drill-down; LP assistant with cited answers; GP-routed requests; LP prospecting;
+SOC 2 Type I readiness.
+*Acceptance:* an LP onboards, sees their account, asks a question and gets an answer with the record it came from; an action
+request lands on the GP's queue.
 
-Phases 0 and 1 are the commitment; later phases are re-planned from what they teach. Rough size: P0 about two
-weeks, P1 three, P2 three, P3 four; P4–P6 each about four, in parallel where teams allow.
-
----
-
-## 9. Security, tenancy and compliance
-
-- Policy is evaluated server-side on every `commit`, against the **acting principal** (persona, role, workspace),
-  never against the model's claim. The existing `canUseTool` becomes `canUseCapability` and gains the risk class.
-- The owner tier stays firewalled from tenant private records ([00](00-persona-isolation.md), owner-account
-  rules). SAIL reads aggregate and trace data, not tenant private records, except through an audited view-as grant.
-- Proposals and traces store **no prompt text** by default (the call log already does not); evidence is stored as
-  references to records, not copies.
-- Third-party sends keep suppression, rate limits and the deliverability gate; R2 is never auto-committed.
-- Regulatory actions (R3) always keep a human decision of record. Anker does not decide KYC outcomes, file, or move
-  money.
-- Redaction and secrets rules unchanged; no customer name enters the repository.
+Sizes, assuming a small parallel team: A and 0 about 3–4 weeks, P1 3, P2 3, P3 5, P4–P6 about 4 each. Re-cut to real
+capacity (D7) before committing.
 
 ---
 
-## 10. Decisions for the founder
+## 14. Risk register
+
+| # | Risk | Likelihood | Impact | Mitigation |
+| --- | --- | --- | --- | --- |
+| R1 | No customers: building an operator for a firm that does not exist | High | High | Phase A first; design partners are an exit criterion |
+| R2 | An agent commits a wrong or hostile action | Medium | High | Proposals, risk classes, untrusted-input cap, undo, evals |
+| R3 | Directory personal-data exposure (no notice, no DSAR, unlicensed sources) | Medium | High | §8.2 before wider launch |
+| R4 | Cold-email or LinkedIn automation causes legal or account harm to a customer | Medium | High | §8.3; approval gate; caps; counsel |
+| R5 | Confidential deal documents processed by a provider the customer would reject | Medium | High | §8.4 per-workspace provider policy |
+| R6 | A repeat of the quadratic-style outage | Medium | Medium | Scale tests, one clock, traces, canaries |
+| R7 | Public claims drift ahead of the product again | Medium | High | Claims register at release |
+| R8 | Single shared database is a blast radius and a coupling point with SAIL | Medium | High | Schema contract, owners, least-privilege roles, restore drill |
+| R9 | Vendor or model lane change breaks quality or cost | Medium | Medium | Router, evals as the safety net, cost per job |
+| R10 | Team capacity below the plan | High | Medium | D7; cut scope, not safety layers |
+
+---
+
+## 15. Decisions and open questions for the founder
 
 | # | Question | Recommendation |
 | --- | --- | --- |
-| D1 | Default autonomy: ship with R0 auto-commit **on** or **off**? | Off at launch; owners turn it on per class after seeing the inbox for a week |
-| D2 | One database or per-tenant? | Keep the shared database and scope keys; revisit only at enterprise demand |
-| D3 | Fund-operations modules (KYC, tax, SPVs, loans, contracts): build, partner, or integrate? | Audit first (Phase 5); integrate regulated parts (screening, e-signature) rather than build |
-| D4 | Retire the in-app `/dashboard/admin` once SAIL has parity? | Yes ([38](38-sail-monitoring-and-admin.md) §4) |
-| D5 | Which persona leads the next quarter? | Founder loop (Phase 4): it is the revenue product and the shortest path to proof |
-| D6 | Model policy: stay Qwen-first? | Yes; the router and the eval harness are what make a model swap safe |
+| D1 | Default autonomy: R0 auto-commit **on** or **off** at launch? | Off; owners enable per class after a week of the inbox |
+| D2 | One database or per-tenant? | Keep shared and scope keys; revisit at enterprise demand |
+| D3 | Fund-operations modules: build, partner, or integrate? | Audit first; integrate regulated parts (screening, e-signature, bank) |
+| D4 | Retire the in-app `/dashboard/admin` once SAIL has parity? | Yes |
+| D5 | Which persona leads? | Founder loop (revenue product, shortest proof), with one real fund in parallel to exercise Fund OS |
+| D6 | Stay Qwen-first? | Yes, behind a per-workspace provider policy; evals make a swap safe |
+| D7 | Team size and weekly capacity? | Needed to re-cut the roadmap |
+| D8 | Who are the 3 founders and 1 fund for Phase A? | Name them this week |
+| D9 | Is the investor directory a product, a service, or an internal asset? | Treat it as the core asset; fund the privacy and licence work in Phase 3 |
+| D10 | Do we pursue SOC 2? | Yes, Type I readiness in Phase 6; MFA and SSO earlier because they unblock sales |
+| Q1 | Counsel review of §8 (directory lawful basis, cold email by country, LinkedIn terms, provider DPAs) | Before any customer beyond the pilot |
+| Q2 | Competitor review (data vendors, VC CRMs, fund admin) | One week, before pricing |
+| Q3 | Which integrations are live and which are decoration? | A one-hour check against production, then fix the site |
 
 ---
 
-## 11. Non-goals
+## 16. Non-goals
 
-A general-purpose workflow builder; a second chat product; replacing the matching engine; autonomous financial,
-legal or regulatory action; per-tenant infrastructure; building screening or e-signature ourselves.
+A general-purpose workflow builder; a second chat product; replacing the matching engine; autonomous financial, legal or
+regulatory action; per-tenant infrastructure; building screening or e-signature ourselves; advice, valuation opinions or
+KYC decisions presented as Anker's own.
 
 ---
 
-## 12. First two weeks (if approved)
+## 17. Revision notes: what the scrutiny pass changed
 
-1. Trace record and run id through the loop, the tools and the logs (Phase 0).
-2. Directory-scale fixture and time budgets in CI; nightly dependency check.
-3. Evals v0: the five cases, run on deploy.
-4. `action_proposals` table, the capability kinds, the first `propose` capability (`crm_add_task`), and a minimal
-   inbox page, behind a flag.
+The first edition of this document (earlier on 2026-10-03) had these faults, now corrected:
 
-The Phase 1 demo (one proposal, approved, applied once, undone) is the milestone that turns "assistant" into
-"operator".
+1. **Depth was judged by page size.** Measured by library code, Fund OS (16,900 lines) and the matching and outreach engines
+   are deep; compliance (120), forecasting (60), compensation (100), signals, updates, calls and planning are thin (§2.3).
+2. **It ignored the September audit and four planning documents.** Its findings, and which are fixed or open, are in §2.5.
+3. **It omitted the business reality** (12 organizations, 2 monthly active users, 0 paying, 0 LPs) and so put engineering
+   ahead of activation. Phase A and §7 are new.
+4. **`agent_runs` and `audit_events` were described as existing infrastructure.** Both have zero rows and few or no writers.
+5. **Missing areas added:** compliance and legal (§8), the agent threat model (§9), testing, migrations and recovery (§10),
+   entitlements and metering (§5.5, §7.3), integrations (§11), position and capacity (§7), a risk register (§14).
+6. **The ERP definition was implicit;** the completeness checklist is §0.1.
+7. **`ai_calls` was assumed to support cost and traces;** it has no cost column and no run id (§2.4, §5.4).
+8. **Still unverified:** which integrations are live; whether the site's integrations and investor-count claims were fixed;
+   per-module workflow depth beyond library size; the team size; legal conclusions in §8 (counsel).
