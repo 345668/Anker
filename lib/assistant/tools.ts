@@ -385,7 +385,8 @@ export const TOOLS: Record<string, ToolDef> = {
       const report =
         `Scored investors: ${scored.length} firms ranked together${batches > 1 ? ` (${batches} batches merged, ${added} new in the latest)` : ""}\n` +
         `Scored 1 to 10 against: ${thesis.slice(0, 160)}${thesis.length > 160 ? "…" : ""}\n` +
-        (country ? `Limited to firms located in ${country}.\n` : "") + `\n` +
+        (country ? `Limited to firms located in ${country}.\n` : "") +
+        (Number(inp.limit) > scored.length ? `Found ${scored.length} matching firms, fewer than the ${Number(inp.limit)} asked for: that is all the database holds for these filters.\n` : "") + `\n` +
         `Top ${Math.min(25, scored.length)}\n${scored.slice(0, 25).map(label).join("\n")}\n\n` +
         `Full ranked list: ${artifact.name}`;
       return {
