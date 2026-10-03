@@ -241,6 +241,7 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
 
   return {
     report,
+    countClaim: groups.length < count ? { asked: count, found: groups.length } : undefined,
     notice: groups.length < count ? `Only ${groups.length} firms qualified, not the ${count} asked for. Counts in the text below that say otherwise are wrong; the verified list is at the end.` : undefined,
     observation:
       `A verified results list (counts and the top ${Math.min(SHOWN, groups.length)}) is appended to your answer automatically; do not retype it.\n` +

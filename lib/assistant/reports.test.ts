@@ -68,3 +68,30 @@ describe("tool notices", () => {
     expect(out).not.toContain("short")
   })
 })
+
+import { correctCountClaims } from "./reports"
+describe("correctCountClaims", () => {
+  const c = { asked: 40, found: 37 }
+  it("puts the found count where the model wrote the asked one", () => {
+    expect(correctCountClaims("score_investors scored 40 firms in a single batch.", c)).toBe("score_investors scored 37 firms in a single batch.")
+    expect(correctCountClaims("Here are all 40 investors, ranked.", c)).toBe("Here are all 37 investors, ranked.")
+    expect(correctCountClaims("I found 40 matches.", c)).toBe("I found 37 matches.")
+  })
+  it("reads number words", () => {
+    expect(correctCountClaims("I scored eight firms.", { asked: 8, found: 5 })).toBe("I scored five firms.")
+    expect(correctCountClaims("I scored 8 German VCs.", { asked: 8, found: 5 })).toBe("I scored 5 German VCs.")
+  })
+  it("leaves the request and other numbers alone", () => {
+    expect(correctCountClaims("(keyword: climate, limit: 40)", c)).toBe("(keyword: climate, limit: 40)")
+    expect(correctCountClaims("Tier 1 has 14 firms; checks of $40K.", c)).toBe("Tier 1 has 14 firms; checks of $40K.")
+    expect(correctCountClaims("Top 25 below, 400 rows.", c)).toBe("Top 25 below, 400 rows.")
+  })
+  it("does nothing when nothing is short", () => {
+    expect(correctCountClaims("scored 40 firms", { asked: 40, found: 40 })).toBe("scored 40 firms")
+  })
+  it("appendReports applies it from a step's claim and clears it on a later complete run", () => {
+    const short: any = { tool: "t", report: "H\nrows", countClaim: { asked: 8, found: 5 } }
+    expect(appendReports("I scored 8 firms.", [short])).toContain("I scored 5 firms.")
+    expect(appendReports("I scored 8 firms.", [short, { tool: "t", report: "H2\nrows" }] as any)).toContain("I scored 8 firms.")
+  })
+})

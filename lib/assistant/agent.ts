@@ -49,6 +49,8 @@ export interface AssistantStep {
   report?: string;
   /** A correction the tool needs shown ABOVE the model's text (reports.ts), e.g. a count the model may have overstated. */
   notice?: string;
+  /** What was asked for and what exists, so a count the model states can be corrected in its text (reports.ts). */
+  countClaim?: { asked: number; found: number };
 }
 export interface AssistantResult {
   answer: string;
@@ -338,7 +340,7 @@ async function runNativeLoop(a: {
         // executeTool re-checks authority and input regardless of the schema.
         const r = await executeTool(principal, call.name, call.input, opts.imageRefs);
         const files = r.artifacts ?? (r.artifact ? [r.artifact] : []);
-        const step: AssistantStep = { tool: call.name, input: call.input, observation: r.observation, report: r.report, notice: r.notice };
+        const step: AssistantStep = { tool: call.name, input: call.input, observation: r.observation, report: r.report, notice: r.notice, countClaim: r.countClaim };
         if (files.length) { step.artifact = files[0]; artifacts.push(...files); }
         steps.push(step);
         await logEvent(opts.chatId, principal.userId, {
@@ -487,7 +489,7 @@ async function runAssistantLoop(
 
     try {
       const res = await executeTool(principal, toolName, input, opts.imageRefs);
-      const step: AssistantStep = { thought: obj.thought, tool: toolName, input, observation: res.observation, report: res.report, notice: res.notice };
+      const step: AssistantStep = { thought: obj.thought, tool: toolName, input, observation: res.observation, report: res.report, notice: res.notice, countClaim: res.countClaim };
       const files = res.artifacts ?? (res.artifact ? [res.artifact] : []);
       if (files.length) { step.artifact = files[0]; artifacts.push(...files); }
       steps.push(step);

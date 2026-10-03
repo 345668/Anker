@@ -9,6 +9,8 @@ export interface ToolResult {
   report?: string
   /** A short correction shown above the model's text when it may have overstated a fact (reports.ts). */
   notice?: string
+  /** What was asked for and what exists, so a count the model states can be corrected in its text (reports.ts). */
+  countClaim?: { asked: number; found: number }
 }
 export interface ToolDef {
   name: string;
