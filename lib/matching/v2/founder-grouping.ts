@@ -46,18 +46,22 @@ function sendableOrder(p: Scored): number {
 }
 
 /**
- * Ranking order. Scores are shown to the founder as whole numbers, so a tie is a tie at that precision:
- * "99" and "99" were being ordered by 99.4 against 98.8, which a founder cannot see and which put a
- * $25K-$250K angel above $250K-$2M funds. Order by tier first (a rounding step never crosses a tier
- * boundary), then the shown score; inside it the firms that can lead come first, then the tie value, then
- * the exact score and the older evidence keys.
+ * Ranking order: tier, then the score exactly as shown (one decimal), so the list never contradicts its own
+ * numbers. Inside an equal score the firms that can lead come first, then the tie value, then the older
+ * evidence keys.
+ *
+ * This used to compare WHOLE-number scores, so that 99.4 against 98.8 (invisible to a founder reading "99")
+ * would not put a $25K-$250K angel above $250K-$2M funds. Headroom (founder-scoring.ts) now puts that
+ * difference in the score itself: a range that does not reach the lead band scores lower, in the number the
+ * founder reads. With the score carrying it, rounding only hid a real order, and a one-decimal display
+ * showed the list out of sequence (95.6 above 95.9).
  */
 const TIER_ORDER = ["prospect_c", "priority_b", "priority_a", "champion"]
 const tierRank = (score: number) => TIER_ORDER.indexOf(tierFor(score))
 
 export function compareRanked(a: Scored, b: Scored): number {
   return tierRank(b.score) - tierRank(a.score)
-    || Math.round(b.score) - Math.round(a.score)
+    || b.score - a.score
     || (b.leadTier ?? 0) - (a.leadTier ?? 0)
     || (b.tieValue ?? 0) - (a.tieValue ?? 0)
     || b.score - a.score

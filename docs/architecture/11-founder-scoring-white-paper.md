@@ -426,3 +426,5 @@ Each of those four is now graded between a floor and 1.0 by how strongly the fir
 | Lead (5) | 0.70 | how much of the round the firm's largest check could carry |
 
 Only the points change. The raw component, every gate, the tier thresholds and the explanations are untouched, and a component already below 1.0 is never altered, so headroom splits the top without lifting anything above it or demoting a strong match. A 100 now means all four at their best. The tie-break still orders firms that land on the same score. Scores are shown to one decimal in the assistant report so near neighbours can be told apart.
+
+Ordering follows the score as shown. The list used to compare whole-number scores and then the tie value, which kept a founder-invisible 99.4-versus-98.8 from putting an angel above lead funds. Headroom now puts that difference in the score itself, and with a one-decimal display the old order read as a mistake (95.6 above 95.9). `compareRanked` is now: tier, the exact one-decimal score, lead tier, tie value, then the older keys.

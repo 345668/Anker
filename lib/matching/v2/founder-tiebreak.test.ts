@@ -130,11 +130,15 @@ describe("ordering", () => {
   it("never lets the tie-break lift a lower SHOWN score above a higher one", () => {
     expect(compareRanked(scored("1", "Low tie", 100, 0.1), scored("2", "High tie", 98.9, 0.99))).toBeLessThan(0)
   })
-  it("treats scores that show as the same whole number as tied, so a founder-invisible 99.4 vs 98.8 does not decide", () => {
-    const angel = scored("1", "Angel", 99.4, 0.5, 0)
-    const lead = scored("2", "Lead Fund", 98.8, 0.5, 1)
-    expect(compareRanked(lead, angel)).toBeLessThan(0)             // both show 99; the one that can lead comes first
-    expect([angel, lead].sort(compareRanked).map((f) => f.name)).toEqual(["Lead Fund", "Angel"])
+  it("orders by the score exactly as shown, to one decimal: the list never contradicts its own numbers", () => {
+    const a = scored("1", "Shown 95.9", 95.9, 0.1, 0), b = scored("2", "Shown 95.6", 95.6, 0.9, 1)
+    expect(compareRanked(a, b)).toBeLessThan(0)                       // 95.9 above 95.6 whatever the tie value or lead tier
+    expect([b, a].sort(compareRanked).map((f) => f.name)).toEqual(["Shown 95.9", "Shown 95.6"])
+  })
+  it("keeps a check range too small to lead below a lead fund through the score itself", () => {
+    const angel = scoreInvestor(firm({ check_size_min: 25_000, check_size_max: 250_000 }), ctx, 0)
+    const fund = scoreInvestor(firm({ check_size_min: 250_000, check_size_max: 2_000_000 }), ctx, 0)
+    expect(fund.score).toBeGreaterThan(angel.score)
   })
   it("never crosses a tier boundary when rounding: 79.6 is Priority A, 80.0 is Champion", () => {
     const champion = scored("1", "Champion", 80.0, 0.1, 0), nearly = scored("2", "Nearly", 79.6, 0.9, 1)
