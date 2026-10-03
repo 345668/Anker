@@ -153,7 +153,7 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
   }
 
   try {
-    const result = await sendEmail({ purpose: "outreach", to: toEmail, subject, text: draft, trackingId, inReplyTo, idempotencyKey: `anker-reply/${outreachMessageId}` })
+    const result = await sendEmail({ purpose: "outreach", senderUserId: userId, to: toEmail, subject, text: draft, trackingId, inReplyTo, idempotencyKey: `anker-reply/${outreachMessageId}` })
     await sql`
       UPDATE outreach_messages SET
         tracking_id      = ${result.trackingId},

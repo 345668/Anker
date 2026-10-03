@@ -22,6 +22,8 @@
 
 import { sql } from "@/lib/db"
 import { randomUUID } from "node:crypto"
+import { unsubscribeFooter, unsubscribeHeaders } from "@/lib/email/unsubscribe"
+import { assertOutreachAllowed } from "@/lib/email/send-gate"
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
@@ -48,6 +50,8 @@ export interface GmailAccount {
 
 export interface SendGmailInput {
   account: GmailAccount
+  /** Recipient country if known (name or ISO code); otherwise the directory and the domain decide. */
+  recipientCountry?: string | null
   to: string
   subject: string
   text?: string
@@ -211,6 +215,7 @@ function buildRawMime(input: SendGmailInput, messageId: string): string {
   if (input.inReplyTo)    headers.push(`In-Reply-To: ${input.inReplyTo}`)
   if (input.references?.length) headers.push(`References: ${input.references.join(" ")}`)
   if (input.trackingId)   headers.push(`X-Anker-Tracking-Id: ${input.trackingId}`)
+  for (const [k, v] of Object.entries(unsubscribeHeaders(input.to))) headers.push(`${k}: ${v}`)
   headers.push(`MIME-Version: 1.0`)
 
   const text = input.text ?? ""
@@ -249,6 +254,15 @@ function defaultMessageId(domain: string): string {
 
 export async function sendGmail(input: SendGmailInput): Promise<{ ok: true; result: SendGmailResult } | { ok: false; error: string }> {
   if (input.account.status !== "active") return { ok: false, error: `account status=${input.account.status}: ${input.account.last_error ?? ""}` }
+  // Every Gmail send is outreach to a third party: same opt-out and country gate as sendEmail, and the same footer.
+  try {
+    await assertOutreachAllowed({ to: input.to, senderUserId: input.account.user_id, recipientCountry: input.recipientCountry })
+  } catch (e: any) {
+    if (e?.code === "recipient_suppressed" || e?.code === "country_gated") return { ok: false, error: e.message }
+    throw e
+  }
+  const footer = unsubscribeFooter(input.to)
+  input = { ...input, text: input.text ? input.text + footer.text : input.html ? undefined : footer.text, html: input.html ? input.html + footer.html : undefined }
   const tok = await ensureAccessToken(input.account)
   if (!tok.ok) return { ok: false, error: tok.error }
 

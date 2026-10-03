@@ -899,3 +899,11 @@ The first edition of this document (earlier on 2026-10-03) had these faults, now
 | Team size | The founder | One founder and Claude |
 | Legal premises | Statute text (UWG section 7 read from the raw English translation), the platform user agreement (LinkedIn 8.2), the mailbox provider sender requirements, GDPR Article 14 | Premises confirmed; **applying them is for counsel** (§8.7) |
 
+
+**Revision 2026-10-03 (send-gate):** `lib/email/send-gate.ts` is now the single gate for outreach: the global opt-out, then the country rule
+(Germany and the other EU/EEA states need a per-recipient attestation in `outreach_consents`, recorded through `/api/outreach/consent`; the
+country comes from the caller, then the directory record, then the domain's country code; unknown or non-EU is permitted with footer and
+opt-out; `OUTREACH_COUNTRY_GATE=off` disables the country rule only). Found and closed in the same change: the **Gmail send path
+(`sendGmail`) bypassed the opt-out, the footer and the unsubscribe headers**; it now passes the same gate and carries the same footer and
+headers. The platform's own pitch-us cron has no sender user, so gated recipients are blocked there until an attestation flow exists for it.
+Still open: cross-channel suppression (email opt-out to LinkedIn and back) and an Anker screen to record attestations (API only today).

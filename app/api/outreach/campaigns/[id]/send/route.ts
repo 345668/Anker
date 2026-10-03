@@ -202,6 +202,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         } else {
           result = await sendEmail({
             purpose: "outreach",
+            senderUserId: user.id,
             to: email,
             subject,
             text: row.body,

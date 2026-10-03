@@ -16,7 +16,8 @@
  */
 
 import { randomUUID } from "node:crypto"
-import { isGloballySuppressed, SuppressedRecipientError, unsubscribeFooter, unsubscribeHeaders } from "@/lib/email/unsubscribe"
+import { unsubscribeFooter, unsubscribeHeaders } from "@/lib/email/unsubscribe"
+import { assertOutreachAllowed } from "@/lib/email/send-gate"
 
 const RESEND_API = "https://api.resend.com/emails"
 
@@ -54,6 +55,10 @@ export interface SendEmailInput {
    * invitation mail, which a recipient still needs after opting out of outreach.
    */
   purpose?: "outreach" | "transactional"
+  /** The Anker user sending, so the country gate can find their consent attestations. Required to email gated countries. */
+  senderUserId?: string | null
+  /** Recipient country if the caller knows it (name or ISO code); otherwise the directory and the domain decide. */
+  recipientCountry?: string | null
   /** Stable key used by Resend to make retries safe. */
   signal?: AbortSignal
   idempotencyKey?: string
@@ -162,7 +167,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const isOutreach = input.purpose === "outreach"
   // The opt-out is checked here, in the one function every send passes through, so a path that forgot to check
   // (four of eight did) cannot email someone who unsubscribed.
-  if (isOutreach && (await isGloballySuppressed(input.to))) throw new SuppressedRecipientError(input.to)
+  if (isOutreach) await assertOutreachAllowed({ to: input.to, senderUserId: input.senderUserId, recipientCountry: input.recipientCountry })
   let html = input.html ?? (input.text ? textToHtml(input.text) : "")
   if (!input.noTracking && trackViaApp && html) {
     html = rewriteLinks(html, trackingId)
