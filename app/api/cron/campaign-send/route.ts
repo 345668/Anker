@@ -82,6 +82,7 @@ export async function GET(req: NextRequest) {
       }
       try {
         const res = await sendEmail({
+          purpose: "outreach",
           to: e.investor_email,
           subject: e.draft_subject || `Intro: ${sub.startup_name}`,
           text: e.draft_body,

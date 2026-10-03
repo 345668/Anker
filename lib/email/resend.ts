@@ -16,6 +16,7 @@
  */
 
 import { randomUUID } from "node:crypto"
+import { isGloballySuppressed, SuppressedRecipientError, unsubscribeFooter, unsubscribeHeaders } from "@/lib/email/unsubscribe"
 
 const RESEND_API = "https://api.resend.com/emails"
 
@@ -46,6 +47,13 @@ export interface SendEmailInput {
   bcc?: string[]
   /** File attachments — content is base64-encoded. Used for LP notice PDFs. */
   attachments?: { filename: string; content: string }[]
+  /**
+   * What the message is. `outreach` is mail to a third party who did not ask for it (founder and LP outreach,
+   * investor updates): it carries an unsubscribe footer and the `List-Unsubscribe` headers, and is refused for any
+   * address on the global do-not-send list. `transactional` (the default) is account, invoice, notice and
+   * invitation mail, which a recipient still needs after opting out of outreach.
+   */
+  purpose?: "outreach" | "transactional"
   /** Stable key used by Resend to make retries safe. */
   signal?: AbortSignal
   idempotencyKey?: string
@@ -151,12 +159,21 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   // dev setup.  By default we rely on Resend's server-side open + click
   // tracking and pull the events via lib/email/resend-sync.ts.
   const trackViaApp = (process.env.TRACK_VIA_APP ?? "false") === "true"
+  const isOutreach = input.purpose === "outreach"
+  // The opt-out is checked here, in the one function every send passes through, so a path that forgot to check
+  // (four of eight did) cannot email someone who unsubscribed.
+  if (isOutreach && (await isGloballySuppressed(input.to))) throw new SuppressedRecipientError(input.to)
   let html = input.html ?? (input.text ? textToHtml(input.text) : "")
   if (!input.noTracking && trackViaApp && html) {
     html = rewriteLinks(html, trackingId)
     html = injectPixel(html, trackingId)
   }
-  const text = input.text ?? stripTags(html)
+  let text = input.text ?? stripTags(html)
+  if (isOutreach) {
+    const footer = unsubscribeFooter(input.to)
+    html = html ? html + footer.html : textToHtml(footer.text)
+    text = text + footer.text
+  }
 
   // Normalise cc/bcc: trim, dedupe, drop empties / the primary recipient.
   // Done here so the dry-run path can surface what WOULD be sent.
@@ -190,6 +207,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     "Message-ID": messageId,
     "X-Anker-Tracking-Id": trackingId,
   }
+  if (isOutreach) Object.assign(headers, unsubscribeHeaders(input.to))
   if (input.inReplyTo) {
     headers["In-Reply-To"] = input.inReplyTo
     headers["References"] = input.inReplyTo

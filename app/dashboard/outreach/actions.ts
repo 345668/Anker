@@ -101,6 +101,7 @@ export async function sendOutreachEmailAction(data: {
   if (isResendConfigured()) {
     try {
       const res = await sendEmail({
+        purpose: "outreach",
         to: data.to,
         subject,
         text: body,

@@ -158,6 +158,7 @@ export async function POST(req: NextRequest) {
       }
     } else {
       result = await sendEmail({
+        purpose: "outreach",
         to: toEmail,
         subject,
         text: (row as any).body,

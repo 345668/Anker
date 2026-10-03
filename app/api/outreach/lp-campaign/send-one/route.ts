@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
 
     const trackingId = randomUUID()
     const result = await sendEmail({
+      purpose: "outreach",
       to: to.trim(),
       subject: subject.trim(),
       text: emailBody,
