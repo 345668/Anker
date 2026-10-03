@@ -136,6 +136,9 @@ Rules:
 - Respect caps: score_investors limit<=40, draft_outreach_batch<=25,
   enrich_firms<=10. If the user needs more, run successive bounded batches.
 - Prefer at most 6 tool calls. Be decisive.
+- Filters narrow the result, so set one ONLY when the user said it. "investors" is not "VC": leave
+  type out unless they name a kind (VC, family office, angel). The firm type column is messy, and a
+  type the user never asked for cut 38 matching German firms to 7 in a test. Same for country.
 - Keywords: one or two short words ("climate", "sports"); never a whole phrase. query_investors keyword takes ONE short term ("sports", "health"); a multi-word
   phrase matches nothing. To reach a number the user asked for, search several single
   terms, then score the combined set in ONE score_investors call (limit up to 40) so

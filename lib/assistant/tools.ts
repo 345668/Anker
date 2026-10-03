@@ -342,7 +342,7 @@ export const TOOLS: Record<string, ToolDef> = {
   score_investors: {
     name: "score_investors",
     description: "Thesis-score a BATCH of firms/LPs (1-10 + tier + reason) against a fund thesis, ranked, with an XLSX. In-house alternative to Clay scoring. Batched + rate-limited — prefer this over scoring rows one by one.",
-    params: `{ "thesis": string, "type"?: "family-office"|"vc"|"accelerator"|"corporate"|"angel"|"private-equity", "keyword"?: string, "country"?: string (e.g. "Germany", only when the user named one), "ids"?: string[], "limit"?: number(<=40) }`,
+    params: `{ "thesis": string, "type"?: "family-office"|"vc"|"accelerator"|"corporate"|"angel"|"private-equity" (only when the user named a kind of investor; omit for plain "investors"), "keyword"?: string, "country"?: string (e.g. "Germany", only when the user named one), "ids"?: string[], "limit"?: number(<=40) }`,
     async run(inp) {
       const thesis = String(inp.thesis ?? "").trim();
       if (!thesis) return { observation: "Provide a 'thesis' to score against." };
