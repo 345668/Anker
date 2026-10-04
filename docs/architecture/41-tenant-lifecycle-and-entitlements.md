@@ -79,3 +79,17 @@ dry-run against a real Postgres (PGlite) with a representative schema: counts ma
 ## 9. Phases
 
 **A (this change):** tables, catalogue, resolver, enforcement points, SAIL entitlements/lifecycle/flags screens with audit. **B:** export and erasure executor, request queue with deadline clock and step-up, tenant-visible log.
+
+## 10. Phase A built and verified, 2026-10-04
+
+Tables (`plan_catalog` seeded with placeholder plans, `tenant_entitlements`, `tenant_lifecycle` and its events, `platform_flags` with `maintenance`, `tenant_requests` for phase B) are in production. Anker: `lib/entitlements`
+(pure resolver and rules, DB layer with a 30 s cache and fail-open, `assertAllowed`, `assertWithinLimit`, `assertSenderMayContact`, path to module map), enforced at AI runs (`withAiContext`), outreach (`assertOutreachAllowed`), the public intake form and its monthly cap, document
+conversion, and the dashboard (banner for paused, closing or maintenance; an upgrade page for a module the plan lacks). A refusal reaches the user as the plain sentence, not a generic error. SAIL: `/organizations/<id>/control` (state with history, plan, per-module and per-limit overrides with the effective result
+shown, reason on every change, optimistic version check), `/flags` (rollout percentages, maintenance, superadmin only), and Plan and state columns on the organizations list. Staff changes are audited and written to the workspace's own access log. Roles: staff read, admin change, superadmin offboard
+and maintenance.
+
+Verified on production with Summit Venture Studio (then restored): paused gave the banner, a refused conversion with the plain reason, and a refused AI message with the plain reason, while reading stayed open; a Starter plan hid the intake module and the deal pipeline behind "not part of your plan". All test rows removed.
+
+Finding: with the placeholder catalogue, Starter excludes `fund_ops`, which blocks a fund's own deal pipeline. The catalogue needs a design pass (what each plan includes for a founder, a fund and an LP) before any real workspace is put on a plan; nothing is restricted until an operator assigns one.
+
+Phase B (export and erasure executor, request queue with deadline clock, step-up two-factor) is not built.
