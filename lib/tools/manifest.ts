@@ -14,10 +14,51 @@ export interface NativeTool {
   category: string
   href: string // /dashboard/tools/<slug> or /dashboard/<existing>
   status: "shipped" | "planned"
-  exports: ("xlsx" | "csv" | "pdf" | "json")[]
+  exports: ("xlsx" | "csv" | "pdf" | "docx" | "json")[]
 }
 
 export const NATIVE_TOOLS: NativeTool[] = [
+  // ─── Document tools (run in the browser; nothing is uploaded) ─────────
+  {
+    slug: "pdf-compress",
+    title: "Shrink a PDF",
+    description: "Make a large PDF, such as a pitch deck, small enough to email or upload. Done in your browser; the file is never uploaded.",
+    audience: "both",
+    category: "Documents",
+    href: "/dashboard/tools/pdf-compress",
+    status: "shipped",
+    exports: ["pdf"],
+  },
+  {
+    slug: "pdf-merge",
+    title: "Merge PDFs",
+    description: "Combine several PDFs into one, in the order you choose. Done in your browser; nothing is uploaded.",
+    audience: "both",
+    category: "Documents",
+    href: "/dashboard/tools/pdf-merge",
+    status: "shipped",
+    exports: ["pdf"],
+  },
+  {
+    slug: "word-to-pdf",
+    title: "Word to PDF",
+    description: "Turn a .docx into a PDF: headings, paragraphs, lists, simple tables and pictures. Done in your browser; nothing is uploaded.",
+    audience: "both",
+    category: "Documents",
+    href: "/dashboard/tools/word-to-pdf",
+    status: "shipped",
+    exports: ["pdf"],
+  },
+  {
+    slug: "pdf-to-word",
+    title: "PDF to Word",
+    description: "Recover the text of a PDF as an editable .docx, with headings and lists. Done in your browser; nothing is uploaded.",
+    audience: "both",
+    category: "Documents",
+    href: "/dashboard/tools/pdf-to-word",
+    status: "shipped",
+    exports: ["docx"],
+  },
   // ─── Shipped (this commit) ───────────────────────────────────────────
   {
     slug: "unit-economics",

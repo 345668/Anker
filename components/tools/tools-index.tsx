@@ -30,6 +30,7 @@ const CAT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "VC Fund Modeling": Briefcase,
   "VC Performance": TrendingUp,
   "Tax & Legal": FileText,
+  "Documents": FileText,
 }
 
 const AUDIENCE_LABEL: Record<ToolAudience, string> = {

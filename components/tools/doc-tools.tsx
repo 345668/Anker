@@ -1,0 +1,158 @@
+"use client"
+
+import { useState } from "react"
+import { mergePdfs, pdfToWord, wordToPdf } from "@/lib/tools/doc-engines"
+import { humanBytes } from "@/lib/uploads/limits"
+
+const btn = "h-10 rounded-md px-5 text-sm font-medium disabled:opacity-50"
+const primary = { background: "var(--primary)", color: "var(--primary-foreground)" }
+
+function Download({ file, note }: { file: File; note: string }) {
+  const [url] = useState(() => URL.createObjectURL(file))
+  return (
+    <div className="mt-4 rounded-lg border border-border p-4 text-sm">
+      <p>{note}</p>
+      <a href={url} download={file.name} className={`${btn} mt-3 inline-flex items-center`} style={primary}>Download {file.name} ({humanBytes(file.size)})</a>
+    </div>
+  )
+}
+
+function Frame({ children, limits, selfTest }: { children: React.ReactNode; limits: string; selfTest: () => Promise<string> }) {
+  const [check, setCheck] = useState<string | null>(null)
+  const [running, setRunning] = useState(false)
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl border border-border bg-card p-5">{children}</div>
+      <p className="text-xs text-muted-foreground">Done in this browser tab: your file is never uploaded. {limits}</p>
+      <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">Check that it works</summary>
+        <button className={`${btn} mt-3 border border-border`} disabled={running} onClick={async () => { setRunning(true); setCheck("Running…"); try { setCheck(await selfTest()) } catch (e) { setCheck(`FAIL: ${(e as Error).message}`) } finally { setRunning(false) } }}>Run a self-test</button>
+        {check && <p className="mt-2 font-mono text-xs" data-testid="selftest">{check}</p>}
+      </details>
+    </div>
+  )
+}
+
+const pdfText = async (file: File) => {
+  const pdfjs = await import("pdfjs-dist")
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString()
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise
+  let text = ""
+  for (let i = 1; i <= doc.numPages; i++) text += ((await (await doc.getPage(i)).getTextContent()).items as any[]).map((x) => x.str).join(" ") + "\n"
+  return { text, pages: doc.numPages }
+}
+
+// ── merge ───────────────────────────────────────────────────────────────
+
+export function PdfMergeTool() {
+  const [files, setFiles] = useState<File[]>([])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [out, setOut] = useState<{ file: File; pages: number } | null>(null)
+  const move = (i: number, d: number) => setFiles((f) => { const n = [...f]; const j = i + d; if (j < 0 || j >= n.length) return f; [n[i], n[j]] = [n[j], n[i]]; return n })
+
+  async function run() {
+    setBusy(true); setError(null); setOut(null)
+    try { setOut(await mergePdfs(files)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+  }
+  async function selfTest() {
+    const { PDFDocument } = await import("pdf-lib")
+    const mk = async (n: number, name: string) => { const d = await PDFDocument.create(); for (let i = 0; i < n; i++) d.addPage([300, 300]); return new File([(await d.save()) as BlobPart], name, { type: "application/pdf" }) }
+    const r = await mergePdfs([await mk(3, "a.pdf"), await mk(2, "b.pdf")])
+    return r.pages === 5 ? `PASS: 3 + 2 pages merged into ${r.pages} pages.` : `FAIL: expected 5 pages, got ${r.pages}.`
+  }
+
+  return (
+    <Frame limits="Password-protected PDFs cannot be merged; remove the password first." selfTest={selfTest}>
+      <label className="block text-sm font-medium">Add PDFs (select several; choose again to add more)
+        <input type="file" multiple accept="application/pdf,.pdf" className="mt-2 block w-full text-sm" onChange={(e) => { setFiles((f) => [...f, ...Array.from(e.target.files ?? []).filter((x) => /\.pdf$/i.test(x.name))]); setOut(null); e.target.value = "" }} />
+      </label>
+      {files.length > 0 && (
+        <ol className="mt-4 space-y-1.5 text-sm">{files.map((f, i) => (
+          <li key={i} className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5">
+            <span className="w-5 tabular-nums text-muted-foreground">{i + 1}</span><span className="flex-1 truncate">{f.name}</span><span className="text-xs text-muted-foreground">{humanBytes(f.size)}</span>
+            <button className="px-1 text-xs underline" disabled={i === 0} onClick={() => move(i, -1)}>Up</button>
+            <button className="px-1 text-xs underline" disabled={i === files.length - 1} onClick={() => move(i, 1)}>Down</button>
+            <button className="px-1 text-xs text-muted-foreground underline" onClick={() => setFiles((x) => x.filter((_, j) => j !== i))}>Remove</button>
+          </li>))}</ol>)}
+      <button className={`${btn} mt-4`} style={primary} disabled={busy || files.length < 2} onClick={run}>{busy ? "Merging…" : `Merge ${files.length || ""} PDFs`}</button>
+      {files.length === 1 && <span className="ml-3 text-xs text-muted-foreground">Add at least two.</span>}
+      {error && <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>}
+      {out && <Download file={out.file} note={`Merged ${files.length} files into ${out.pages} pages.`} />}
+    </Frame>
+  )
+}
+
+// ── Word to PDF ─────────────────────────────────────────────────────────
+
+export function WordToPdfTool() {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [out, setOut] = useState<{ file: File; pages: number; images: number } | null>(null)
+
+  async function run(f: File) { setBusy(true); setError(null); setOut(null); try { setOut(await wordToPdf(f)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
+  async function selfTest() {
+    const d = await import("docx")
+    const doc = new d.Document({ sections: [{ children: [
+      new d.Paragraph({ heading: d.HeadingLevel.HEADING_1, children: [new d.TextRun("Quarterly Report")] }),
+      new d.Paragraph({ children: [new d.TextRun("Revenue grew "), new d.TextRun({ text: "strongly", bold: true }), new d.TextRun(" this quarter, with café sales up 12% and a new € price list.")] }),
+      new d.Paragraph({ bullet: { level: 0 }, children: [new d.TextRun("First point")] }), new d.Paragraph({ bullet: { level: 0 }, children: [new d.TextRun("Second point")] }),
+      new d.Table({ rows: [new d.TableRow({ children: ["Region", "Sales"].map((t) => new d.TableCell({ children: [new d.Paragraph(t)] })) }), new d.TableRow({ children: ["Berlin", "120"].map((t) => new d.TableCell({ children: [new d.Paragraph(t)] })) })] }),
+    ] }] })
+    const r = await wordToPdf(new File([await d.Packer.toBlob(doc)], "report.docx"))
+    const { text, pages } = await pdfText(r.file)
+    const want = ["Quarterly Report", "strongly", "First point", "Second point", "Berlin", "120"]
+    const missing = want.filter((w) => !text.includes(w))
+    return missing.length ? `FAIL: missing ${missing.join(", ")} in the PDF text.` : `PASS: ${pages} page(s), headings, bold, list and table text all present (${humanBytes(r.file.size)}).`
+  }
+
+  return (
+    <Frame limits="Keeps headings, paragraphs, bold and italic, lists, simple tables and pictures. Does not reproduce headers and footers, columns, text boxes or exact fonts; for a pixel-perfect copy use Word's Save as PDF." selfTest={selfTest}>
+      <label className="block text-sm font-medium">Word document (.docx)
+        <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={busy} className="mt-2 block w-full text-sm" onChange={(e) => { const f = e.target.files?.[0]; if (f) run(f) }} />
+      </label>
+      {busy && <p className="mt-3 text-sm text-muted-foreground">Converting…</p>}
+      {error && <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>}
+      {out && <Download file={out.file} note={`${out.pages} page${out.pages === 1 ? "" : "s"}${out.images ? `, ${out.images} picture${out.images === 1 ? "" : "s"}` : ""}.`} />}
+    </Frame>
+  )
+}
+
+// ── PDF to Word ─────────────────────────────────────────────────────────
+
+export function PdfToWordTool() {
+  const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [out, setOut] = useState<{ file: File; pages: number; paragraphs: number } | null>(null)
+
+  async function run(f: File) {
+    setBusy(true); setError(null); setOut(null)
+    try { setOut(await pdfToWord(f, (p, n) => setProgress(`Page ${p} of ${n}…`))) } catch (e) { setError((e as Error).message) } finally { setBusy(false); setProgress(null) }
+  }
+  async function selfTest() {
+    const { PDFDocument, StandardFonts } = await import("pdf-lib")
+    const d = await PDFDocument.create(); const f = await d.embedFont(StandardFonts.Helvetica); const fb = await d.embedFont(StandardFonts.HelveticaBold)
+    const p = d.addPage([595, 842])
+    p.drawText("Investment Memo", { x: 56, y: 780, size: 24, font: fb })
+    ;["The company sells software to hospitals and", "has two signed pilots this year."].forEach((t, i) => p.drawText(t, { x: 56, y: 740 - i * 15, size: 11, font: f }))
+    p.drawText("- Founders hold the patent", { x: 56, y: 690, size: 11, font: f })
+    p.drawText("- Pilots start in March", { x: 56, y: 675, size: 11, font: f })
+    const r = await pdfToWord(new File([(await d.save()) as BlobPart], "memo.pdf", { type: "application/pdf" }))
+    const mammoth = await import("mammoth")
+    const { value: html } = await mammoth.convertToHtml({ arrayBuffer: await r.file.arrayBuffer() })
+    const checks = { heading: /<h1[^>]*>Investment Memo/.test(html), joinedParagraph: html.includes("hospitals and has two signed pilots"), list: /<li>[^<]*Founders hold the patent/.test(html) }
+    const bad = Object.entries(checks).filter(([, ok]) => !ok).map(([k]) => k)
+    return bad.length ? `FAIL: ${bad.join(", ")}. Got: ${html.slice(0, 200)}` : `PASS: heading, joined paragraph and bullet list recovered (${humanBytes(r.file.size)}).`
+  }
+
+  return (
+    <Frame limits="Recovers the text in reading order with headings and lists. It does not rebuild the page layout, and cannot read a scanned PDF or a deck made of images (that needs OCR)." selfTest={selfTest}>
+      <label className="block text-sm font-medium">PDF
+        <input type="file" accept="application/pdf,.pdf" disabled={busy} className="mt-2 block w-full text-sm" onChange={(e) => { const f = e.target.files?.[0]; if (f) run(f) }} />
+      </label>
+      {progress && <p className="mt-3 text-sm text-muted-foreground">{progress}</p>}
+      {error && <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>}
+      {out && <Download file={out.file} note={`${out.pages} page${out.pages === 1 ? "" : "s"}, ${out.paragraphs} paragraphs of text recovered.`} />}
+    </Frame>
+  )
+}
