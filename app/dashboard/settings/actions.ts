@@ -4,6 +4,15 @@ import { sql } from "@/lib/db"
 import { decryptSecret, encryptSecret } from "@/lib/db/secrets"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { resolveActiveMembership } from "@/lib/org/active"
+
+/** The account type is the active workspace's persona, not a toggle: a fund workspace is always an investor account. Null for a workspace with no founder or VC persona (an LP, say) or no workspace yet. */
+async function workspaceUserType(userId: string): Promise<"founder" | "vc" | null> {
+  try {
+    const { active } = await resolveActiveMembership(userId)
+    return active?.persona === "founder" || active?.persona === "vc" ? active.persona : null
+  } catch { return null }
+}
 
 // API-key fields are encrypted at rest with AES-256-GCM (lib/db/secrets.ts).
 const SECRET_FIELDS = [
@@ -73,18 +82,21 @@ export async function getUserSettings(): Promise<{ success: boolean; settings: U
     const result = await sql`
       SELECT * FROM user_settings WHERE user_id = ${user.id}
     `
-    
+    const persona = await workspaceUserType(user.id)
+
     if (result.length === 0) {
       // Create default settings
       const newSettings = await sql`
         INSERT INTO user_settings (user_id, user_type)
-        VALUES (${user.id}, 'founder')
+        VALUES (${user.id}, ${persona ?? 'founder'})
         RETURNING *
       `
       return { success: true, settings: decryptRow(newSettings[0]) as UserSettings }
     }
 
-    return { success: true, settings: decryptRow(result[0]) as UserSettings }
+    // The stored value is a legacy default ('founder') that was never tied to the workspace; the workspace wins.
+    const row = decryptRow(result[0]) as UserSettings
+    return { success: true, settings: persona ? { ...row, user_type: persona } : row }
   } catch (error) {
     console.error('Error fetching user settings:', error)
     return { success: false, settings: null, error: "Failed to fetch settings" }
@@ -103,6 +115,10 @@ export async function saveUserSettings(data: Partial<UserSettings>): Promise<{ s
   console.log("[v0] saveUserSettings for user:", user.id, "data:", JSON.stringify(data).slice(0, 200))
   
   try {
+    // The account type follows the workspace; a client-sent value cannot change it.
+    const persona = await workspaceUserType(user.id)
+    if (persona) data = { ...data, user_type: persona }
+
     // Check if settings exist
     const existing = await sql`SELECT id FROM user_settings WHERE user_id = ${user.id}`
     

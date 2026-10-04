@@ -57,6 +57,16 @@ export const formSchema = z.object({
 })
 export type FormConfig = z.infer<typeof formSchema>
 
+/** Who hears about a new application: the fund workspace's owners and admins, by email, for the categories ticked. */
+export const notifySchema = z.object({
+  onNew: z.boolean().default(true),
+  passed: z.boolean().default(true),
+  review: z.boolean().default(true),
+  notAFit: z.boolean().default(false),
+})
+export type NotifyConfig = z.infer<typeof notifySchema>
+export const wantsNotice = (n: NotifyConfig, category: Category): boolean => n.onNew && (category === "passed" ? n.passed : category === "review" ? n.review : n.notAFit)
+
 export const configSchema = z.object({
   enabled: z.boolean().default(false),
   headline: z.string().trim().max(120).default(""),
@@ -67,6 +77,7 @@ export const configSchema = z.object({
   rubric: z.array(rubricDimensionSchema).min(1).max(10).default(() => DEFAULT_RUBRIC),
   thresholds: thresholdsSchema.default(() => thresholdsSchema.parse({})),
   form: formSchema.default(() => formSchema.parse({})),
+  notify: notifySchema.default(() => notifySchema.parse({})),
 }).superRefine((c, ctx) => {
   const sum = c.rubric.reduce((s, d) => s + d.weight, 0)
   if (Math.abs(sum - 1) > 0.011) ctx.addIssue({ code: "custom", path: ["rubric"], message: `Rubric weights must add up to 100% (now ${(sum * 100).toFixed(0)}%)` })

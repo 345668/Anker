@@ -103,5 +103,8 @@ categorised Deal flow with filter chips, the assessment card on each deal, the s
 confirmation email to the applicant (transactional, no tracking). Verified end to end on the Summit Venture Studio workspace with a
 labelled test application: submitted on the public form, assessed as Review (58.8) by the fund's own thesis and instructions, landed in
 Sourced with the evidence per criterion, then removed. Notes: the first run used the reasoning tier and took about a minute, so the task
-now runs on the balanced tier. Intake is left switched off for the partner workspaces until a fund turns it on. Not built: notifying
-the fund when an application arrives, an editable slug, and a per-fund Turnstile site key.
+now runs on the balanced tier. Intake is left switched off for the partner workspaces until a fund turns it on. Not built: a per-fund Turnstile site key.
+
+## 9. Notifications and the address, 2026-10-04
+
+When an application has been assessed, the owners and admins of the fund workspace get a transactional email (category, score, reason, summary, link to the deal), once per application: a re-run does not email again (`notified_at`). Settings choose which categories notify (default Passed and Review, not Not a fit) or switch it off. The public address is editable (`PUT .../intake/slug`: 3 to 60 letters, numbers and hyphens, not reserved, unique); the old link stops working and the screen says so.

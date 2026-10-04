@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const [stored, submissions] = await Promise.all([getConfig(guard.fund.id), listSubmissions(guard.fund.id)])
   const link = `${appUrl()}/intake/${guard.fund.slug}`
   return NextResponse.json({
-    config: stored.config, version: stored.version, exists: stored.exists, submissions, presets: PRESETS, link,
+    config: stored.config, version: stored.version, exists: stored.exists, submissions, presets: PRESETS, link, slug: guard.fund.slug,
     embed: `<iframe src="${link}" style="width:100%;min-height:900px;border:0" title="Pitch ${guard.fund.name}"></iframe>`,
   })
 }

@@ -13,7 +13,7 @@ const fromCsv = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean)
 const numOrNull = (s: string) => (s.trim() === "" ? null : Number(s.replace(/[^0-9.]/g, "")))
 const slugKey = (s: string) => (s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^[0-9_]+/, "") || "dim").slice(0, 30)
 
-interface Loaded { config: IntakeConfig; version: number; exists: boolean; submissions: any[]; presets: Preset[]; link: string; embed: string }
+interface Loaded { config: IntakeConfig; version: number; exists: boolean; submissions: any[]; presets: Preset[]; link: string; embed: string; slug: string }
 const HARD: { key: IntakeConfig["gates"]["hard"][number]; label: string }[] = [
   { key: "stage", label: "Stage" }, { key: "sector", label: "Sector" }, { key: "excludedSector", label: "Excluded sector" },
   { key: "geography", label: "Geography" }, { key: "excludedGeography", label: "Excluded geography" }, { key: "raise", label: "Round size" }, { key: "cheque", label: "Cheque" },
@@ -27,6 +27,7 @@ export function IntakeSettings({ fundId }: { fundId: string }) {
   const [test, setTest] = useState({ companyName: "Example Co", stage: "Seed", sectors: "AI", location: "United States", raise: "1000000", problem: "", traction: "" })
   const [testResult, setTestResult] = useState<EngineResult | null>(null)
   const [testing, setTesting] = useState(false)
+  const [slugDraft, setSlugDraft] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/portfolio/funds/${fundId}/intake`, { cache: "no-store" })
@@ -63,6 +64,14 @@ export function IntakeSettings({ fundId }: { fundId: string }) {
     } catch (e) { setMsg({ ok: false, text: (e as Error).message }) } finally { setTesting(false) }
   }
 
+  async function saveSlug() {
+    setMsg(null)
+    const r = await fetch(`/api/portfolio/funds/${fundId}/intake/slug`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: slugDraft }) })
+    const d = await r.json()
+    if (!r.ok) { setMsg({ ok: false, text: d.error || "Could not change the address" }); return }
+    setSlugDraft(null); setMsg({ ok: true, text: `The address is now /intake/${d.slug}. The old link no longer works.` }); await load()
+  }
+
   async function rerun(id: string) {
     await fetch(`/api/portfolio/funds/${fundId}/intake/rerun`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ submissionId: id }) })
     await load()
@@ -78,6 +87,14 @@ export function IntakeSettings({ fundId }: { fundId: string }) {
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div><div className={label}>Your link</div><div className="mt-1 flex gap-2"><input readOnly value={data.link} className={input + " font-mono text-xs"} /><button type="button" className="mt-1 rounded-md border border-border px-3 text-xs" onClick={() => navigator.clipboard?.writeText(data.link)}>Copy</button></div></div>
           <div><div className={label}>Embed on your website</div><div className="mt-1 flex gap-2"><input readOnly value={data.embed} className={input + " font-mono text-xs"} /><button type="button" className="mt-1 rounded-md border border-border px-3 text-xs" onClick={() => navigator.clipboard?.writeText(data.embed)}>Copy</button></div></div>
+        </div>
+        <div className="mt-3 text-sm">
+          {slugDraft === null ? (
+            <span className="text-muted-foreground">Address: <span className="font-mono">/intake/{data.slug}</span> <button type="button" className="ml-2 underline" onClick={() => setSlugDraft(data.slug)}>Change</button></span>
+          ) : (
+            <span className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs">/intake/</span><input className={input + " !mt-0 w-64"} value={slugDraft} onChange={(e) => setSlugDraft(e.target.value)} />
+              <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs" onClick={saveSlug}>Save address</button><button type="button" className="text-xs underline" onClick={() => setSlugDraft(null)}>Cancel</button>
+              <span className="text-xs text-muted-foreground">Links you have already shared stop working.</span></span>)}
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label><div className={label}>Headline on the form</div><input className={input} value={cfg.headline} maxLength={120} onChange={(e) => set({ headline: e.target.value })} placeholder="Pitch us" /></label>
@@ -135,6 +152,16 @@ export function IntakeSettings({ fundId }: { fundId: string }) {
           <label><div className={label}>Review at or above</div><input className={input} inputMode="numeric" value={cfg.thresholds.review} onChange={(e) => set({ thresholds: { ...cfg.thresholds, review: Number(e.target.value) || 0 } })} /></label>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">Below the review line is Not a fit. If the AI fails for any reason the deal goes to Review, never to Not a fit.</p>
+      </section>
+
+      <section className={box}>
+        <h2 className="text-base font-semibold">Notifications</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Email the owners and admins of this workspace when an application has been assessed.</p>
+        <div className="mt-2 flex flex-wrap gap-4 text-sm">
+          <label className="flex items-center gap-1"><input type="checkbox" checked={cfg.notify.onNew} onChange={(e) => set({ notify: { ...cfg.notify, onNew: e.target.checked } })} />Notify me</label>
+          {([["passed", "Passed"], ["review", "Review"], ["notAFit", "Not a fit"]] as const).map(([k, l]) => (
+            <label key={k} className="flex items-center gap-1"><input type="checkbox" disabled={!cfg.notify.onNew} checked={cfg.notify[k]} onChange={(e) => set({ notify: { ...cfg.notify, [k]: e.target.checked } })} />{l}</label>))}
+        </div>
       </section>
 
       <section className={box}>

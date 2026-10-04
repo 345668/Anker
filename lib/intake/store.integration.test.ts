@@ -3,9 +3,10 @@ import { PGlite } from "@electric-sql/pglite"
 import { readFileSync } from "node:fs"
 import { beforeAll, afterAll, beforeEach, describe, it, expect, vi } from "vitest"
 vi.mock("server-only", () => ({}))
-const h = vi.hoisted(() => ({ sql: vi.fn(), gen: vi.fn() }))
+const h = vi.hoisted(() => ({ sql: vi.fn(), gen: vi.fn(), mail: vi.fn() }))
 vi.mock("@/lib/db", () => ({ sql: h.sql }))
 vi.mock("@/lib/ai/provider", () => ({ generateDetailed: h.gen }))
+vi.mock("@/lib/email/resend", () => ({ isResendConfigured: () => true, sendEmail: h.mail }))
 vi.mock("@/lib/portfolio/deal-pipeline", () => ({
   hasDealTables: async () => true,
   createDeal: async (i: any) => (await h.sql`INSERT INTO deal_opportunities (fund_id, company_name, sector, source, submitted_via, deck_url, contact_email) VALUES (${i.fundId}, ${i.companyName}, ${i.sector ?? null}, ${i.source}, ${i.submittedVia}, ${i.deckUrl ?? null}, ${i.contactEmail}) RETURNING *`)[0],
@@ -24,14 +25,18 @@ beforeAll(async () => {
   await db.exec(`CREATE TABLE funds (id text PRIMARY KEY, name text, slug text);
     CREATE TABLE deal_opportunities (id text PRIMARY KEY DEFAULT gen_random_uuid()::text, fund_id text, company_name text, sector text, source text, submitted_via text, deck_url text, contact_email text, metadata jsonb DEFAULT '{}'::jsonb, updated_at timestamptz DEFAULT now(), created_at timestamptz DEFAULT now());
     CREATE TABLE deal_evaluations (deal_id text PRIMARY KEY, scores jsonb);
-    INSERT INTO funds VALUES ('f1', 'Summit', 'summit'), ('f2', 'Other', 'other');`)
+    CREATE TABLE organizations (id text PRIMARY KEY, fund_id text); CREATE TABLE memberships (org_id text, user_id text, org_role text); CREATE TABLE profiles (id text, email text);
+    INSERT INTO funds VALUES ('f1', 'Summit', 'summit'), ('f2', 'Other', 'other');
+    INSERT INTO organizations VALUES ('o1', 'f1'); INSERT INTO memberships VALUES ('o1', 'u1', 'workspace_owner'), ('o1', 'u2', 'admin'), ('o1', 'u3', 'member');
+    INSERT INTO profiles VALUES ('u1', 'owner@fund.test'), ('u2', 'admin@fund.test'), ('u3', 'member@fund.test');`)
   await db.exec(readFileSync("scripts/migrations/2026-10-04-fund-intake.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-04b-intake-notified.sql", "utf8"))
   h.sql.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => (await db.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values)).rows)
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => {
   await db.exec("DELETE FROM intake_submissions; DELETE FROM deal_opportunities; DELETE FROM deal_evaluations; DELETE FROM fund_intake_configs")
-  h.gen.mockReset(); h.gen.mockResolvedValue({ text: reply(5) })
+  h.gen.mockReset(); h.gen.mockResolvedValue({ text: reply(5) }); h.mail.mockReset(); h.mail.mockResolvedValue({})
   await saveConfig("f1", { enabled: true, thesis: "software", gates: { stages: ["Seed"], sectors: ["AI"], excludedSectors: ["Crypto"] } }, "u1")
 })
 
@@ -95,5 +100,26 @@ describe("processing", () => {
     const id = await sub()
     await db.query("UPDATE intake_submissions SET status = 'assessing', updated_at = now() - interval '20 minutes' WHERE id = $1", [id])
     await sweepSubmissions(); expect((await row(id)).status).toBe("assessed")
+  })
+})
+
+describe("telling the fund", () => {
+  it("emails the owners and admins, not plain members, once, with a link to the deal", async () => {
+    const id = await sub(); await processSubmission(id)
+    expect(h.mail.mock.calls.map((c) => c[0].to).sort()).toEqual(["admin@fund.test", "owner@fund.test"])
+    const m = h.mail.mock.calls[0][0]
+    expect(m).toMatchObject({ purpose: "transactional", noTracking: true }); expect(m.subject).toMatch(/Passed: Acme applied \(score 100\)/); expect(m.text).toContain(`/dashboard/portfolio/fund/deals/${(await row(id)).deal_id}`)
+    h.mail.mockClear(); await rerunSubmission(id, "f1"); expect(h.mail).not.toHaveBeenCalled()
+  })
+  it("Not a fit stays quiet by default, and the switch and the ticks are honoured", async () => {
+    await processSubmission(await sub({ sectors: "Crypto" })); expect(h.mail).not.toHaveBeenCalled()
+    await saveConfig("f1", { enabled: true, gates: { stages: ["Seed"], sectors: ["AI"], excludedSectors: ["Crypto"] }, notify: { onNew: true, notAFit: true } }, "u1")
+    await processSubmission(await sub({ sectors: "Crypto" })); expect(h.mail).toHaveBeenCalledTimes(2)
+    h.mail.mockClear(); await saveConfig("f1", { enabled: true, notify: { onNew: false } }, "u1")
+    await processSubmission(await sub()); expect(h.mail).not.toHaveBeenCalled()
+  })
+  it("a failing email never fails the assessment", async () => {
+    h.mail.mockRejectedValue(new Error("smtp down")); const id = await sub()
+    expect(await processSubmission(id)).toMatchObject({ outcome: "assessed" })
   })
 })

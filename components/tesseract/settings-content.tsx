@@ -334,10 +334,12 @@ function AccountTab({ user, settings, onSave, saving, saved }: TabProps & { user
           <div className="flex-1 h-px bg-foreground/10" />
         </div>
         
+        <p className="mb-4 text-sm text-muted-foreground">Set by your workspace: {settings?.user_type === 'vc' ? "this is an investor workspace" : "this is a founder workspace"}. To work as the other, create or switch to a workspace of that type.</p>
         <div className="grid grid-cols-2 gap-4">
           <button
+            disabled
             onClick={() => setUserType('founder')}
-            className={`p-6 border-2 transition-all text-left ${
+            className={`p-6 border-2 transition-all text-left disabled:cursor-default ${
               userType === 'founder' 
                 ? 'border-foreground bg-foreground/5' 
                 : 'border-foreground/10 hover:border-foreground/30'
@@ -350,8 +352,9 @@ function AccountTab({ user, settings, onSave, saving, saved }: TabProps & { user
             </p>
           </button>
           <button
+            disabled
             onClick={() => setUserType('vc')}
-            className={`p-6 border-2 transition-all text-left ${
+            className={`p-6 border-2 transition-all text-left disabled:cursor-default ${
               userType === 'vc' 
                 ? 'border-foreground bg-foreground/5' 
                 : 'border-foreground/10 hover:border-foreground/30'

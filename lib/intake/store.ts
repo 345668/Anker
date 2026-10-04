@@ -4,7 +4,7 @@
  */
 import "server-only"
 import { sql } from "@/lib/db"
-import { configSchema, defaultConfig, type EngineResult, type IntakeConfig, type Submission } from "./model"
+import { CATEGORY_LABEL, configSchema, defaultConfig, wantsNotice, type EngineResult, type IntakeConfig, type Submission } from "./model"
 import { assess } from "./engine"
 import { MAX_AUTO_READ_BYTES } from "@/lib/uploads/limits"
 import { createDeal, hasDealTables, upsertEvaluation } from "@/lib/portfolio/deal-pipeline"
@@ -21,7 +21,7 @@ export async function getConfig(fundId: string): Promise<StoredConfig> {
   const parsed = configSchema.safeParse({
     enabled: r.enabled, headline: r.headline ?? "", intro: r.intro ?? "", thesis: r.thesis ?? "", instructions: r.instructions ?? "",
     gates: asObj(r.gates), rubric: Array.isArray(asObj(r.rubric)) && asObj(r.rubric).length ? asObj(r.rubric) : undefined,
-    thresholds: asObj(r.thresholds), form: asObj(r.form),
+    thresholds: asObj(r.thresholds), form: asObj(r.form), notify: asObj(r.notify),
   })
   return { config: parsed.success ? parsed.data : defaultConfig(), version: Number(r.version), exists: true }
 }
@@ -29,12 +29,12 @@ export async function getConfig(fundId: string): Promise<StoredConfig> {
 export async function saveConfig(fundId: string, input: unknown, userId: string | null): Promise<StoredConfig> {
   const config = configSchema.parse(input)
   await sql`
-    INSERT INTO fund_intake_configs (fund_id, enabled, headline, intro, thesis, instructions, gates, rubric, thresholds, form, version, updated_by)
+    INSERT INTO fund_intake_configs (fund_id, enabled, headline, intro, thesis, instructions, gates, rubric, thresholds, form, notify, version, updated_by)
     VALUES (${fundId}, ${config.enabled}, ${config.headline}, ${config.intro}, ${config.thesis}, ${config.instructions},
-      ${JSON.stringify(config.gates)}::jsonb, ${JSON.stringify(config.rubric)}::jsonb, ${JSON.stringify(config.thresholds)}::jsonb, ${JSON.stringify(config.form)}::jsonb, 1, ${userId})
+      ${JSON.stringify(config.gates)}::jsonb, ${JSON.stringify(config.rubric)}::jsonb, ${JSON.stringify(config.thresholds)}::jsonb, ${JSON.stringify(config.form)}::jsonb, ${JSON.stringify(config.notify)}::jsonb, 1, ${userId})
     ON CONFLICT (fund_id) DO UPDATE SET enabled = EXCLUDED.enabled, headline = EXCLUDED.headline, intro = EXCLUDED.intro,
       thesis = EXCLUDED.thesis, instructions = EXCLUDED.instructions, gates = EXCLUDED.gates, rubric = EXCLUDED.rubric,
-      thresholds = EXCLUDED.thresholds, form = EXCLUDED.form, version = fund_intake_configs.version + 1,
+      thresholds = EXCLUDED.thresholds, form = EXCLUDED.form, notify = EXCLUDED.notify, version = fund_intake_configs.version + 1,
       updated_by = EXCLUDED.updated_by, updated_at = now()`
   return getConfig(fundId)
 }
@@ -105,6 +105,7 @@ export async function processSubmission(id: string): Promise<ProcessOutcome> {
     const sub = toSubmission(row, summary)
     const result = await assess(config, version, sub)
     const dealId = await landDeal(row, sub, result)
+    await notifyFund(row, result, dealId, config)
     await sql`UPDATE intake_submissions SET status = 'assessed', category = ${result.category}, score = ${result.score}, result = ${JSON.stringify(result)}::jsonb,
       config_version = ${version}, deal_id = ${dealId}, last_error = NULL, updated_at = now() WHERE id = ${id}`
     return { id, outcome: "assessed", category: result.category, score: result.score, dealId }
@@ -114,6 +115,25 @@ export async function processSubmission(id: string): Promise<ProcessOutcome> {
     await sql`UPDATE intake_submissions SET status = ${row.attempts >= 3 ? "failed" : "received"}, last_error = ${msg}, updated_at = now() WHERE id = ${id}`
     return { id, outcome: "failed", detail: msg }
   }
+}
+
+/** Tell the fund's owners and admins a new application has landed. Best effort: never fails the assessment, never repeats on a re-run. */
+async function notifyFund(row: any, result: EngineResult, dealId: string, config: IntakeConfig): Promise<void> {
+  try {
+    if (row.notified_at || !wantsNotice(config.notify, result.category)) return
+    const { sendEmail, isResendConfigured } = await import("@/lib/email/resend")
+    if (!isResendConfigured()) return
+    const people = (await sql`SELECT DISTINCT p.email FROM organizations o JOIN memberships m ON m.org_id = o.id AND m.org_role IN ('workspace_owner','admin')
+      JOIN profiles p ON p.id::text = m.user_id WHERE o.fund_id = ${row.fund_id} AND p.email IS NOT NULL`) as any[]
+    if (!people.length) return
+    const base = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://www.an-ker.de").replace(/\/$/, "")
+    const label = CATEGORY_LABEL[result.category]
+    for (const p of people) {
+      await sendEmail({ purpose: "transactional", noTracking: true, to: String(p.email), subject: `${label}: ${row.company_name} applied${result.score != null ? ` (score ${result.score})` : ""}`,
+        text: `${row.company_name} applied through your intake form.\n\nAssessment: ${label}${result.score != null ? `, ${result.score}/100` : ""}.\n${result.reason}\n${result.summary ? `\n${result.summary}\n` : ""}\nOpen the deal: ${base}/dashboard/portfolio/fund/deals/${dealId}\n\nYou get this because you own or administer this fund workspace. Change it under Deal intake, Notifications.` }).catch(() => {})
+    }
+    await sql`UPDATE intake_submissions SET notified_at = now() WHERE id = ${row.id}`
+  } catch (e) { console.warn("[intake] notify failed:", (e as Error).message) }
 }
 
 async function landDeal(row: any, sub: Submission, result: EngineResult): Promise<string> {
