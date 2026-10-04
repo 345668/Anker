@@ -28,7 +28,7 @@ GET /health → { "ok": true }
 
 Auth: requests must send `Authorization: Bearer <token>`. The worker refuses to start without `DOC_WORKER_TOKEN` (set `DOC_WORKER_ALLOW_NO_AUTH=1` for local development only).
 
-Supported conversions: `docx doc odt rtf txt` → `pdf`; `pdf` → `docx`. Errors: 400 unsupported combination, 401, 413 too large, 422 the converter could not read it, 429 busy, 504 timed out.
+Supported conversions: `docx doc odt rtf txt xls xlsx ods csv ppt pptx odp` → `pdf` (spreadsheets accept `options.singlePageSheets`); `pdf` → `docx`. Errors: 400 unsupported combination, 401, 413 too large, 422 the converter could not read it, 429 busy, 504 timed out.
 
 ## Run
 
@@ -91,7 +91,7 @@ About 1 GB of memory per container is comfortable (LibreOffice peaks near 400 MB
 
 ## Build options
 
-`--build-arg LO_PACKAGES="libreoffice-writer libreoffice-calc libreoffice-impress"` adds spreadsheets and presentations (about 300 MB). `--build-arg WITH_TECTONIC=1` installs the LaTeX engine (not packaged in Debian bookworm, so it is downloaded as a release binary).
+`--build-arg LO_PACKAGES="libreoffice-writer"` drops spreadsheets and presentations (saves about 300 MB); the default includes Calc and Impress. `--build-arg WITH_TECTONIC=1` installs the LaTeX engine (not packaged in Debian bookworm, so it is downloaded as a release binary).
 
 ## Deployed (Railway)
 
