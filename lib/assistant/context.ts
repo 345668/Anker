@@ -64,6 +64,12 @@ export function withAiContext<T>(
   logEvent("run.start", { persona: principal.persona, org: principal.orgId, budget_ms: store.deadline - startedAt }, runId)
   return context.run(store, async () => {
     try {
+      // The workspace's plan and state: a paused workspace, a module its plan lacks, or a used-up monthly AI allowance stop the run here.
+      if (principal.orgId) {
+        const { assertAllowed, assertWithinLimit } = await import("@/lib/entitlements")
+        await assertAllowed(principal.orgId, "ai", "assistant")
+        await assertWithinLimit(principal.orgId, "ai_spend_usd_month")
+      }
       const out = await run()
       logEvent("run.end", { outcome: "ok", ms: Date.now() - startedAt, model_calls: store.modelCalls, spend_usd: Number(store.budget.spendUsd.toFixed(6)) }, runId)
       return out

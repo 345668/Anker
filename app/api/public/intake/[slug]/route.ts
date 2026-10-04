@@ -62,6 +62,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
   if (!str(form, "terms_accepted", 10)) return NextResponse.json({ error: "Please accept the privacy notice to submit." }, { status: 400 })
   for (const q of intake.form.questions) if (q.required && !str(form, `q_${q.id}`)) return NextResponse.json({ error: `Please answer: ${q.label}` }, { status: 400 })
 
+  if (intake.orgId) {
+    try { await (await import("@/lib/entitlements")).assertWithinLimit(intake.orgId, "intake_submissions_month") }
+    catch { return NextResponse.json({ error: "This fund is not taking more applications right now. Please try again later." }, { status: 429 }) }
+  }
   const er = rateLimit(`intake:email:${intake.fundId}:${contactEmail}`, EMAIL_LIMIT)
   if (!er.ok) return NextResponse.json({ error: "You have already applied recently. The team will be in touch." }, { status: 429 })
   if (!(await turnstileOk(str(form, "turnstile_token", 4000), ip))) return NextResponse.json({ error: "Bot verification failed. Please try again." }, { status: 403 })

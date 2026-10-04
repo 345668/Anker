@@ -45,7 +45,14 @@ export async function getPublicIntake(slug: string) {
   if (!funds[0]) return null
   const { config } = await getConfig(String(funds[0].id))
   if (!config.enabled) return null
-  return { fundId: String(funds[0].id), fundName: String(funds[0].name), slug: String(funds[0].slug), headline: config.headline, intro: config.intro, form: config.form }
+  // A paused or closing workspace, or a plan without intake, answers like a form that does not exist.
+  let orgId: string | null = null
+  try {
+    const org = ((await sql`SELECT id FROM organizations WHERE fund_id = ${funds[0].id} LIMIT 1`) as any[])[0]
+    orgId = org ? String(org.id) : null
+    if (orgId) { const { assertAllowed } = await import("@/lib/entitlements"); await assertAllowed(orgId, "intake", "intake") }
+  } catch (e) { if ((e as any)?.status) return null }
+  return { orgId, fundId: String(funds[0].id), fundName: String(funds[0].name), slug: String(funds[0].slug), headline: config.headline, intro: config.intro, form: config.form }
 }
 
 export interface NewSubmission {

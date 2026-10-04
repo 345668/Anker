@@ -26,9 +26,13 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   let scopeKey: string
-  try { scopeKey = (await requireAiPrincipal()).scopeKey } catch (e) {
+  let orgId: string | null = null
+  try { const p = await requireAiPrincipal(); scopeKey = p.scopeKey; orgId = p.orgId } catch (e) {
     if (e instanceof WorkspaceError) return NextResponse.json({ error: e.message }, { status: e.status })
     return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  }
+  if (orgId) {
+    try { await (await import("@/lib/entitlements")).assertAllowed(orgId, "convert", "tools") } catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.status ?? 403 }) }
   }
   const rl = rateLimit(`tools-convert:${scopeKey}`, { limit: 20, windowMs: 60 * 60_000 })
   if (!rl.ok) return rateLimitResponse(rl)

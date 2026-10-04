@@ -5,6 +5,10 @@ import { NavModeShell } from "@/components/shell/nav-mode-shell";
 import { CommandPalette } from "@/components/shell/command-palette";
 import { isAdminUser } from "@/lib/auth/require-admin";
 import { resolveActiveMembership } from "@/lib/org/active";
+import { headers } from "next/headers";
+import { getEffective } from "@/lib/entitlements";
+import { featureForPath } from "@/lib/entitlements/routes";
+import { EntitlementBanner, ModuleNotIncluded } from "@/components/shell/entitlement-notice";
 
 // Dashboard touches a live DB (PGlite locally, Neon in prod) — never prerender.
 export const dynamic = "force-dynamic";
@@ -38,6 +42,11 @@ export default async function DashboardLayout({
   const ownLp = !active && user.email_confirmed_at && user.email ? await getLpMembershipsForEmail(user.email) : [];
   const persona = active?.persona ?? (ownLp.length ? "lp" : null);
 
+  // The workspace's plan and state. Open by default: a workspace with no plan sees everything. The lookup fails open.
+  const entitlements = active ? await getEffective(active.orgId) : null;
+  const feature = featureForPath((await headers()).get("x-pathname"));
+  const blocked = entitlements && feature && !entitlements.features[feature] ? feature : null;
+
   return (
     <div className="platform-workspace">
       {/* Shared operational shell with role-specific work areas. */}
@@ -46,7 +55,8 @@ export default async function DashboardLayout({
         isAdmin={isAdmin}
         persona={persona}
       >
-        {children}
+        {entitlements && <EntitlementBanner e={entitlements} />}
+        {blocked ? <ModuleNotIncluded feature={blocked} /> : children}
       </NavModeShell>
 
       {/* Global ⌘K command palette — persona-scoped, shared by both chromes. */}

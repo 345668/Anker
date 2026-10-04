@@ -46,6 +46,8 @@ function iaRedirect(request: NextRequest) {
 export async function proxy(request: NextRequest) {
   const redirected = iaRedirect(request)
   if (redirected) return redirected
+  // The dashboard layout needs the path to know which module a page belongs to (entitlements); layouts cannot read it otherwise.
+  request.headers.set("x-pathname", request.nextUrl.pathname)
   return await updateSession(request)
 }
 
