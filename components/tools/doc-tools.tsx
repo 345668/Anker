@@ -18,13 +18,13 @@ function Download({ file, note }: { file: File; note: string }) {
   )
 }
 
-function Frame({ children, limits, selfTest }: { children: React.ReactNode; limits: string; selfTest: () => Promise<string> }) {
+function Frame({ children, limits, selfTest, local = true }: { children: React.ReactNode; limits: string; selfTest: () => Promise<string>; local?: boolean }) {
   const [check, setCheck] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-border bg-card p-5">{children}</div>
-      <p className="text-xs text-muted-foreground">Done in this browser tab: your file is never uploaded. {limits}</p>
+      <p className="text-xs text-muted-foreground">{local ? "Done in this browser tab: your file is never uploaded. " : ""}{limits}</p>
       <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">Check that it works</summary>
         <button className={`${btn} mt-3 border border-border`} disabled={running} onClick={async () => { setRunning(true); setCheck("Running…"); try { setCheck(await selfTest()) } catch (e) { setCheck(`FAIL: ${(e as Error).message}`) } finally { setRunning(false) } }}>Run a self-test</button>
         {check && <p className="mt-2 font-mono text-xs" data-testid="selftest">{check}</p>}
@@ -137,7 +137,7 @@ export function WordToPdfTool() {
   }
 
   return (
-    <Frame limits={useExactMode ? "Exact layout sends the file to Anker's own converter, which deletes it as soon as the PDF is made. Calibri, Cambria, Arial and Times New Roman documents match Word; other fonts are replaced by the closest one." : "Keeps headings, paragraphs, bold and italic, lists, simple tables and pictures. Does not reproduce headers and footers, columns, text boxes or exact fonts."} selfTest={selfTest}>
+    <Frame limits={useExactMode ? "Exact layout sends the file to Anker's own converter, which deletes it as soon as the PDF is made. Calibri, Cambria, Arial and Times New Roman documents match Word; other fonts are replaced by the closest one." : "Keeps headings, paragraphs, bold and italic, lists, simple tables and pictures. Does not reproduce headers and footers, columns, text boxes or exact fonts."} selfTest={selfTest} local={!useExactMode}>
       <ModePicker exact={exact} mode={mode} setMode={setMode} exactText="Headers, footers, columns, tables and fonts as in Word. The file goes to Anker's converter and is deleted straight after. Up to 25 MB." browserText="Nothing leaves your computer. Text, headings, lists, simple tables and pictures; no headers, footers or columns." />
       <label className="block text-sm font-medium">Word document ({useExactMode ? ".docx, .doc, .odt, .rtf" : ".docx"})
         <input type="file" accept={useExactMode ? ".docx,.doc,.odt,.rtf" : ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"} disabled={busy} className="mt-2 block w-full text-sm" onChange={(e) => { const f = e.target.files?.[0]; if (f) run(f) }} />
@@ -184,7 +184,7 @@ export function PdfToWordTool() {
   }
 
   return (
-    <Frame limits={useExactMode ? "Exact layout keeps every line where it sits on the page, as positioned text, so it looks like the PDF but is awkward to re-flow when you edit. Scanned pages come through as pictures (no OCR)." : "Recovers the text in reading order with headings and lists. It does not rebuild the page layout, and cannot read a scanned PDF or a deck made of images (that needs OCR)."} selfTest={selfTest}>
+    <Frame limits={useExactMode ? "Exact layout keeps every line where it sits on the page, as positioned text, so it looks like the PDF but is awkward to re-flow when you edit. Scanned pages come through as pictures (no OCR)." : "Recovers the text in reading order with headings and lists. It does not rebuild the page layout, and cannot read a scanned PDF or a deck made of images (that needs OCR)."} selfTest={selfTest} local={!useExactMode}>
       <ModePicker exact={exact} mode={mode} setMode={setMode} exactText="Looks like the PDF: text boxes placed where they are on each page. Harder to edit as flowing text. The file goes to Anker's converter and is deleted straight after. Up to 25 MB." browserText="Nothing leaves your computer. Clean, editable text in reading order with headings and lists; no page layout." />
       <label className="block text-sm font-medium">PDF
         <input type="file" accept="application/pdf,.pdf" disabled={busy} className="mt-2 block w-full text-sm" onChange={(e) => { const f = e.target.files?.[0]; if (f) run(f) }} />

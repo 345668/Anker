@@ -42,7 +42,7 @@ export const NATIVE_TOOLS: NativeTool[] = [
   {
     slug: "word-to-pdf",
     title: "Word to PDF",
-    description: "Turn a .docx into a PDF: headings, paragraphs, lists, simple tables and pictures. Done in your browser; nothing is uploaded.",
+    description: "Turn a Word document into a PDF. Exact layout through our converter (headers, footers, columns, fonts as in Word), or private in your browser.",
     audience: "both",
     category: "Documents",
     href: "/dashboard/tools/word-to-pdf",
@@ -52,7 +52,7 @@ export const NATIVE_TOOLS: NativeTool[] = [
   {
     slug: "pdf-to-word",
     title: "PDF to Word",
-    description: "Recover the text of a PDF as an editable .docx, with headings and lists. Done in your browser; nothing is uploaded.",
+    description: "Turn a PDF into a Word document: exact layout through our converter, or clean editable text in your browser.",
     audience: "both",
     category: "Documents",
     href: "/dashboard/tools/pdf-to-word",
