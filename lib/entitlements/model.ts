@@ -2,7 +2,7 @@
  * Entitlements, pure (no database): the resolver and the rules. docs/architecture/41.
  * The catalogue itself lives in the `plan_catalog` table so SAIL can edit it; the keys below are the universe the code knows.
  */
-export const FEATURE_KEYS = ["assistant", "outreach", "linkedin", "matchmaking", "intake", "tools", "fund_ops", "spvs"] as const
+export const FEATURE_KEYS = ["assistant", "outreach", "linkedin", "matchmaking", "intake", "tools", "fund_ops", "spvs", "deals"] as const
 export const LIMIT_KEYS = ["ai_spend_usd_month", "seats", "outreach_sends_day", "intake_submissions_month", "storage_mb"] as const
 export type FeatureKey = (typeof FEATURE_KEYS)[number]
 export type LimitKey = (typeof LIMIT_KEYS)[number]

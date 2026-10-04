@@ -3,6 +3,7 @@ import type { FeatureKey } from "./model"
 
 const MAP: Array<[string, FeatureKey]> = [
   ["/dashboard/portfolio/fund/intake", "intake"],
+  ["/dashboard/portfolio/fund/deals", "deals"],
   ["/dashboard/portfolio/compliance", "fund_ops"],
   ["/dashboard/portfolio/fund", "fund_ops"],
   ["/dashboard/assistant", "assistant"],

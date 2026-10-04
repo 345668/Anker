@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { resolveEffective, bucketOf, flagOn, canMove, minRoleFor, refusal, FEATURE_KEYS, type PlanRow } from "./model"
 
-const pro: PlanRow = { plan: "pro", features: { assistant: true, outreach: true, linkedin: true, intake: true, tools: true, matchmaking: true, fund_ops: true, spvs: false }, limits: { ai_spend_usd_month: 100, seats: 10 } }
+const pro: PlanRow = { plan: "pro", features: { assistant: true, outreach: true, linkedin: true, intake: true, tools: true, matchmaking: true, fund_ops: true, spvs: false, deals: true }, limits: { ai_spend_usd_month: 100, seats: 10 } }
 const starter: PlanRow = { plan: "starter", features: { assistant: true, outreach: true, tools: true }, limits: { seats: 2, outreach_sends_day: 50 } }
 
 describe("resolveEffective", () => {
@@ -62,7 +62,8 @@ import { featureForPath } from "./routes"
 describe("featureForPath", () => {
   it("maps module paths, longest prefix first, and leaves the rest alone", () => {
     expect(featureForPath("/dashboard/portfolio/fund/intake")).toBe("intake")
-    expect(featureForPath("/dashboard/portfolio/fund/deals/abc")).toBe("fund_ops")
+    expect(featureForPath("/dashboard/portfolio/fund/deals/abc")).toBe("deals")
+    expect(featureForPath("/dashboard/portfolio/fund/calls")).toBe("fund_ops")
     expect(featureForPath("/dashboard/outreach/consent")).toBe("outreach")
     expect(featureForPath("/dashboard/linkedin/campaigns/?x=1")).toBe("linkedin")
     expect(featureForPath("/dashboard")).toBeNull(); expect(featureForPath("/dashboard/settings")).toBeNull(); expect(featureForPath(null)).toBeNull()

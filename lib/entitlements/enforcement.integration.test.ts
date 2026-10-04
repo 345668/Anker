@@ -22,6 +22,7 @@ beforeAll(async () => {
     CREATE TABLE organizations (id text PRIMARY KEY, fund_id text);
     CREATE TABLE intake_submissions (fund_id text, created_at timestamptz DEFAULT now());`)
   await db.exec(readFileSync("scripts/migrations/2026-10-04c-tenant-control.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-04d-plan-catalogue.sql", "utf8"))
   h.sql.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => (await db.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values)).rows)
 }, 30000)
 afterAll(async () => db.close())
@@ -32,13 +33,28 @@ beforeEach(async () => {
 
 describe("resolution from the database", () => {
   it("seeds the plan catalogue and an unknown workspace is open", async () => {
-    expect(((await db.query("SELECT plan FROM plan_catalog ORDER BY sort")).rows as any[]).map((r) => r.plan)).toEqual(["starter", "pro", "scale", "internal"])
+    expect(((await db.query("SELECT plan FROM plan_catalog WHERE status = 'active' ORDER BY plan")).rows as any[]).map((r) => r.plan)).toEqual(["founder_explore", "founder_raise", "founder_raise_plus", "fund_studio", "fund_pro", "fund_institutional", "lp_access", "design_partner", "internal"].sort())
     expect(await getEffective("nobody")).toMatchObject({ open: true, state: "active" })
   })
+  it("the catalogue is coherent: known keys only, every fund plan has the deal pipeline, free plans cost nothing, retired plans are not offered", async () => {
+    const { FEATURE_KEYS, LIMIT_KEYS } = await import("./model")
+    const plans = (await db.query("SELECT * FROM plan_catalog")).rows as any[]
+    for (const p of plans) {
+      for (const k of Object.keys(p.features)) expect(FEATURE_KEYS as readonly string[]).toContain(k)
+      for (const k of Object.keys(p.limits)) expect(LIMIT_KEYS as readonly string[]).toContain(k)
+    }
+    for (const p of plans.filter((x) => x.persona === "vc" || x.plan === "design_partner")) expect(p.features.deals).toBe(true)
+    for (const p of plans.filter((x) => x.persona === "founder" && x.status === "active")) expect(p.features.deals).toBe(false)
+    expect(plans.filter((x) => x.price_eur_month === 0).map((x) => x.plan).sort()).toEqual(["design_partner", "founder_explore", "lp_access"])
+    expect(plans.filter((x) => x.status === "retired").map((x) => x.plan).sort()).toEqual(["pro", "scale", "starter"])
+    // Prices rise with the tier inside a persona, and the yearly price is cheaper than twelve months.
+    for (const [a, b] of [["founder_raise", "founder_raise_plus"], ["fund_studio", "fund_pro"]]) expect(plans.find((x) => x.plan === a).price_eur_month).toBeLessThan(plans.find((x) => x.plan === b).price_eur_month)
+    for (const p of plans.filter((x) => x.price_eur_month > 0)) expect(p.price_eur_year).toBeLessThan(p.price_eur_month * 12)
+  })
   it("a plan and its overrides resolve, and changes show after the cache is cleared", async () => {
-    await set("o1", "starter", { linkedin: true }, { seats: null })
+    await set("o1", "founder_raise", { linkedin: true }, { seats: null })
     const e = await getEffective("o1")
-    expect(e.features).toMatchObject({ linkedin: true, intake: false, assistant: true }); expect(e.limits.seats).toBeNull(); expect(e.limits.outreach_sends_day).toBe(50)
+    expect(e.features).toMatchObject({ linkedin: true, intake: false, assistant: true, deals: false }); expect(e.limits.seats).toBeNull(); expect(e.limits.outreach_sends_day).toBe(50)
   })
   it("fails open when the lookup itself breaks", async () => {
     h.sql.mockRejectedValueOnce(new Error("db down")); clearEntitlementCache()
@@ -53,7 +69,7 @@ describe("lifecycle and modules", () => {
     await state("o1", "active"); expect(await refused(assertAllowed("o1", "ai"))).toBeNull()
   })
   it("a module the plan lacks is refused", async () => {
-    await set("o1", "starter"); clearEntitlementCache()
+    await set("o1", "founder_raise"); clearEntitlementCache()
     expect(await refused(assertAllowed("o1", "intake", "intake"))).toMatchObject({ code: "module" }); expect(await refused(assertAllowed("o1", "ai", "assistant"))).toBeNull()
   })
   it("maintenance stops AI for everyone, flags roll out per workspace", async () => {
@@ -96,7 +112,7 @@ describe("enforcement points", () => {
   })
   it("platform senders, strangers and a database failure are not blocked; the daily cap is", async () => {
     await expect(assertSenderMayContact("platform:pitch-us")).resolves.toBeUndefined(); await expect(assertSenderMayContact("nobody")).resolves.toBeUndefined(); await expect(assertSenderMayContact(null)).resolves.toBeUndefined()
-    await db.query("INSERT INTO memberships (org_id, user_id) VALUES ('c','s3'), ('c','s4')"); await set("c", "starter"); clearEntitlementCache()
+    await db.query("INSERT INTO memberships (org_id, user_id) VALUES ('c','s3'), ('c','s4')"); await set("c", "founder_raise"); clearEntitlementCache()
     for (let i = 0; i < 50; i++) await db.query("INSERT INTO outreach_messages (user_id, sent_at) VALUES ('s4', now())")
     await expect(assertSenderMayContact("s3")).rejects.toMatchObject({ code: "limit", status: 402 })
     h.sql.mockRejectedValueOnce(new Error("db down")); await expect(assertSenderMayContact("s3")).resolves.toBeUndefined()
