@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
+import { Turnstile } from "@/components/shared/turnstile";
 import { INLINE_TOTAL_BYTES, MAX_DATAROOM_FILES, MAX_FILE_BYTES, PENDING_PREFIX } from "@/lib/campaign/submission-files";
 
 const SECTORS = [
@@ -717,6 +718,7 @@ export default function ApplyPage() {
                     emailing vc@an-ker.de.
                   </span>
                 </label>
+                <Turnstile />
                 <div className="flex justify-end">
                   <button
                     type="submit"

@@ -2,6 +2,7 @@
 # Build:  docker build -t anker-doc-worker services/doc-worker
 # Run:    docker run -p 8080:8080 -e DOC_WORKER_TOKEN=secret anker-doc-worker
 #
+# CJK: WenQuanYi Micro Hei (Chinese), VL Gothic (Japanese) and NanumGothic (Korean), small and enough for body text; add fonts-noto-cjk for fuller coverage.
 # Fidelity depends on fonts. Carlito and Caladea are metric-compatible with Calibri and Cambria, Liberation with
 # Arial, Times New Roman and Courier New, so a document set in those looks the same as it does in Word. Fonts that are
 # not here fall back to the closest one and the line breaks can shift: add them to /usr/share/fonts to be exact.
@@ -18,6 +19,7 @@ ARG TECTONIC_VERSION=0.15.0
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libreoffice-core ${LO_PACKAGES} \
       fontconfig fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea fonts-dejavu-core \
+      fonts-wqy-microhei fonts-vlgothic fonts-nanum \
       ca-certificates curl \
     && if [ "$WITH_TECTONIC" = "1" ]; then \
          arch="$(uname -m)"; \

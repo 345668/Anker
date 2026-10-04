@@ -5,6 +5,7 @@ import { STAGES, type FormConfig } from "@/lib/intake/model"
 import { INTAKE_PENDING_PREFIX, INTAKE_MAX_BYTES } from "@/lib/intake/files"
 import { prepareUpload, CompressError, type Progress } from "@/lib/pdf/compress"
 import { humanBytes } from "@/lib/uploads/limits"
+import { Turnstile } from "@/components/shared/turnstile"
 
 const INLINE_MAX = 3 * 1024 * 1024
 const field = "mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
@@ -87,6 +88,7 @@ export function IntakeForm({ slug, fundName, headline, intro, form }: { slug: st
         <input type="checkbox" name="terms_accepted" value="1" required className="mt-0.5" />
         <span>I agree that {fundName} may process this application, including my name, email and the materials I attach, to assess it and to contact me about it. They will keep it only as long as needed for that, and I can ask them to delete it.</span>
       </label>
+      <Turnstile />
       {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
       <button disabled={busy} className="h-10 rounded-md px-5 text-sm font-medium disabled:opacity-50" style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}>{busy ? "Sending…" : "Submit application"}</button>
     </form>

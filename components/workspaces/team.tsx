@@ -6,6 +6,29 @@ import type { getWorkspaceTeam } from "@/lib/org/team"
 
 type Team = Awaited<ReturnType<typeof getWorkspaceTeam>>
 type Change = { action: string; [key: string]: unknown }
+
+/** What Anker staff did to the workspace, in plain words. These entries are written by the platform (SAIL) and are the customer's record of it. */
+const STAFF_LABEL: Record<string, string> = {
+  staff_inspect: "Anker staff looked at usage and settings (no records)",
+  staff_plan_change: "Anker staff changed the plan",
+  staff_lifecycle: "Anker staff changed the workspace state",
+  staff_export: "An export of your data was prepared",
+  staff_erasure_scheduled: "Erasure of this workspace was scheduled",
+  staff_erasure_cancelled: "A scheduled erasure was cancelled",
+}
+function staffEventLabel(e: any): string | null {
+  const base = STAFF_LABEL[e.action]
+  if (!base) return null
+  const d = typeof e.details === "string" ? (() => { try { return JSON.parse(e.details) } catch { return {} } })() : e.details ?? {}
+  if (e.action === "staff_lifecycle" && d.to) return `${base}: ${d.from ?? "?"} to ${d.to}`
+  if (e.action === "staff_plan_change" && d.plan) return `${base} to ${d.plan}`
+  if (e.action === "staff_erasure_scheduled" && d.executeAfter) return `${base} for ${String(d.executeAfter).slice(0, 10)}`
+  return base
+}
+function staffEventReason(e: any): string | null {
+  const d = typeof e.details === "string" ? (() => { try { return JSON.parse(e.details) } catch { return {} } })() : e.details ?? {}
+  return typeof d.reason === "string" && d.reason ? d.reason : null
+}
 const button = "inline-flex min-h-11 items-center justify-center rounded border border-border px-4 py-2 text-sm disabled:opacity-50"
 const field = "mt-1 min-h-11 w-full rounded border border-input bg-background px-3 text-foreground"
 export function WorkspaceTeam({ orgId }: { orgId: string }) {
@@ -69,7 +92,7 @@ export function WorkspaceTeam({ orgId }: { orgId: string }) {
       </form>
       {inviteLink && <div className="mt-4"><label className="text-sm">Invitation link<input aria-label="Invitation link" readOnly value={inviteLink} className={field} onFocus={e=>e.target.select()}/></label><button className={button+" mt-2"} onClick={()=>void (navigator.clipboard ? navigator.clipboard.writeText(inviteLink) : Promise.reject(new Error("Clipboard unavailable"))).then(()=>setNotice("Invitation link copied.")).catch(()=>setNotice("Select the invitation link above and copy it manually."))}>Copy invitation link</button><p className="mt-2 text-xs text-muted-foreground">For security, the link is only shown immediately after creation. Replace the invitation if you need a new link later.</p></div>}
       <ul className="mt-5 grid gap-3">{team.invitations.map((inv:any)=><li key={inv.id} className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-sm"><span>{inv.email} · {inv.role} · {inv.status} · email: {inv.delivery_status}</span>{inv.status==="pending" && (team.isOwner || inv.role!=="admin") && <button className={button} disabled={busy} onClick={()=>void change({action:"revoke_invitation",invitationId:inv.id})}>Revoke invitation</button>}</li>)}</ul></section>}
-      {team.canManage && <section className="mt-6 border border-border p-5"><h2 className="font-serif text-2xl">Access history</h2><ol className="mt-4 grid gap-3 text-sm">{team.events.length ? team.events.map((event:any)=><li key={event.id} className="border-t border-border pt-3"><span className="font-medium">{event.action.replaceAll("_"," ")}</span> · {new Date(event.created_at).toLocaleString()}<p className="text-xs text-muted-foreground">Actor: {event.actor_user_id}{event.target_user_id ? ` · Teammate: ${event.target_user_id}` : ""}</p></li>):<li>No access changes recorded yet.</li>}</ol></section>}
+      {team.canManage && <section className="mt-6 border border-border p-5"><h2 className="font-serif text-2xl">Access history</h2><ol className="mt-4 grid gap-3 text-sm">{team.events.length ? team.events.map((event:any)=><li key={event.id} className="border-t border-border pt-3"><span className="font-medium">{staffEventLabel(event) ?? event.action.replaceAll("_"," ")}</span> · {new Date(event.created_at).toLocaleString()}<p className="text-xs text-muted-foreground">{String(event.actor_user_id).startsWith("staff:") ? "Done by Anker staff" : `Actor: ${event.actor_user_id}`}{event.target_user_id ? ` · Teammate: ${event.target_user_id}` : ""}{staffEventReason(event) ? ` · Reason: ${staffEventReason(event)}` : ""}</p></li>):<li>No access changes recorded yet.</li>}</ol></section>}
       {!archived && <div className="mt-8 flex flex-wrap gap-3">{team.isOwner?<button className={button} disabled={busy} onClick={()=>confirm({action:"archive"},"Archive this workspace?","Operating access will stop, but records and memberships are retained. Pending invitations and transfers will be cancelled. You can restore the workspace from Manage workspaces.")}>Archive workspace</button>:<button className={button} disabled={busy} onClick={()=>confirm({action:"leave"},"Leave this workspace?","You will lose access. Shared records stay with the team; you will need a new invitation to return.")}>Leave workspace</button>}</div>}
     </>}
     <Dialog open={!!confirmation} onOpenChange={open=>{if(!open && !busy)setConfirmation(null)}}><DialogContent onCloseAutoFocus={event=>{event.preventDefault();if(opener.current?.isConnected)opener.current.focus()}}><DialogTitle>{confirmation?.title}</DialogTitle><DialogDescription>{confirmation?.detail}</DialogDescription>{error&&<p role="alert">{error}</p>}<div className="flex gap-3"><button className={button} disabled={busy} onClick={()=>setConfirmation(null)}>Cancel</button><button className={button} disabled={busy} onClick={()=>confirmation && void change(confirmation.change)}>{busy?"Saving…":"Confirm change"}</button></div></DialogContent></Dialog>

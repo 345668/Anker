@@ -103,7 +103,7 @@ categorised Deal flow with filter chips, the assessment card on each deal, the s
 confirmation email to the applicant (transactional, no tracking). Verified end to end on the Summit Venture Studio workspace with a
 labelled test application: submitted on the public form, assessed as Review (58.8) by the fund's own thesis and instructions, landed in
 Sourced with the evidence per criterion, then removed. Notes: the first run used the reasoning tier and took about a minute, so the task
-now runs on the balanced tier. Intake is left switched off for the partner workspaces until a fund turns it on. Not built: a per-fund Turnstile site key.
+now runs on the balanced tier. Intake is left switched off for the partner workspaces until a fund turns it on. The Turnstile bot check is wired on the form (one site key for the platform, not per fund): set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` to turn it on; without them the form works as before. The founder-campaign form `/apply` renders the same widget and sends the same field, so one pair of keys covers both public forms.
 
 ## 9. Notifications and the address, 2026-10-04
 

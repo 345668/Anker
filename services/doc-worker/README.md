@@ -83,7 +83,7 @@ curl -s -X POST http://localhost:8080/render \
 
 ## Fonts and fidelity
 
-The image carries Carlito, Caladea, Liberation and DejaVu. Carlito and Caladea are metric-compatible with Calibri and Cambria, Liberation with Arial, Times New Roman and Courier New, so documents set in those paginate exactly as in Word. Any other font is replaced by the closest installed one and line breaks can move: copy the font files into `/usr/share/fonts` in the image to be exact. No CJK font is installed (add `fonts-noto-cjk`).
+The image carries Carlito, Caladea, Liberation and DejaVu. Carlito and Caladea are metric-compatible with Calibri and Cambria, Liberation with Arial, Times New Roman and Courier New, so documents set in those paginate exactly as in Word. Any other font is replaced by the closest installed one and line breaks can move: copy the font files into `/usr/share/fonts` in the image to be exact. Chinese, Japanese and Korean text uses WenQuanYi Micro Hei, VL Gothic and NanumGothic (small fonts for body text; add `fonts-noto-cjk` for fuller coverage).
 
 ## Resources and network
 
