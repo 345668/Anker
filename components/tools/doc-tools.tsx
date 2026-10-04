@@ -18,17 +18,17 @@ function Download({ file, note }: { file: File; note: string }) {
   )
 }
 
-function Frame({ children, limits, selfTest, local = true }: { children: React.ReactNode; limits: string; selfTest: () => Promise<string>; local?: boolean }) {
+function Frame({ children, limits, selfTest, local = true }: { children: React.ReactNode; limits: string; selfTest?: () => Promise<string>; local?: boolean }) {
   const [check, setCheck] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-border bg-card p-5">{children}</div>
       <p className="text-xs text-muted-foreground">{local ? "Done in this browser tab: your file is never uploaded. " : ""}{limits}</p>
-      <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">Check that it works</summary>
+      {selfTest && <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">Check that it works</summary>
         <button className={`${btn} mt-3 border border-border`} disabled={running} onClick={async () => { setRunning(true); setCheck("Running…"); try { setCheck(await selfTest()) } catch (e) { setCheck(`FAIL: ${(e as Error).message}`) } finally { setRunning(false) } }}>Run a self-test</button>
         {check && <p className="mt-2 font-mono text-xs" data-testid="selftest">{check}</p>}
-      </details>
+      </details>}
     </div>
   )
 }
@@ -192,6 +192,42 @@ export function PdfToWordTool() {
       {progress && <p className="mt-3 text-sm text-muted-foreground">{progress}</p>}
       {error && <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>}
       {out && <Download file={out.file} note={out.pages ? `${out.pages} page${out.pages === 1 ? "" : "s"}, ${out.paragraphs} paragraphs of text recovered.` : "Converted with the exact-layout converter."} />}
+    </Frame>
+  )
+}
+
+// ── spreadsheet and presentation to PDF (exact layout only: there is no faithful in-browser route) ──
+
+const OFFICE = {
+  "excel-to-pdf": { label: "Spreadsheet", accept: ".xlsx,.xls,.ods,.csv", exts: ".xlsx, .xls, .ods, .csv", note: "Every sheet becomes pages with the formatting, number formats and charts you see in Excel. Formulas are shown as their values." },
+  "powerpoint-to-pdf": { label: "Presentation", accept: ".pptx,.ppt,.odp", exts: ".pptx, .ppt, .odp", note: "Every slide becomes a page with its layout, images and fonts. Animations and speaker notes are not included." },
+} as const
+
+export function OfficeToPdfTool({ direction }: { direction: keyof typeof OFFICE }) {
+  const exact = useExact()
+  const cfg = OFFICE[direction]
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [out, setOut] = useState<File | null>(null)
+  const [onePage, setOnePage] = useState(false)
+
+  async function run(f: File) {
+    setBusy(true); setError(null); setOut(null)
+    try { setOut(await convertExact(f, direction, exact!.prefix, { singlePageSheets: direction === "excel-to-pdf" && onePage })) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+  }
+
+  return (
+    <Frame local={false} limits={`${cfg.note} The file goes to Anker's own converter and is deleted as soon as the PDF is made. Up to 25 MB. Fonts that are not installed are replaced by the closest one, so line breaks can move.`}>
+      {exact && !exact.available && <p className="mb-4 text-sm text-muted-foreground">This conversion needs Anker's document converter, which is not set up on this deployment.</p>}
+      {direction === "excel-to-pdf" && (
+        <label className="mb-4 flex items-start gap-2 text-sm"><input type="checkbox" checked={onePage} onChange={(e) => setOnePage(e.target.checked)} className="mt-1" />
+          <span><b>One page per sheet</b><br /><span className="text-xs text-muted-foreground">Keeps a wide sheet whole instead of splitting it across pages. The pages can be large.</span></span></label>)}
+      <label className="block text-sm font-medium">{cfg.label} ({cfg.exts})
+        <input type="file" accept={cfg.accept} disabled={busy || !exact?.available} className="mt-2 block w-full text-sm" onChange={(e) => { const f = e.target.files?.[0]; if (f) run(f) }} />
+      </label>
+      {busy && <p className="mt-3 text-sm text-muted-foreground">Converting on the server, this can take up to a minute…</p>}
+      {error && <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>}
+      {out && <Download file={out} note="Converted with the exact-layout converter." />}
     </Frame>
   )
 }

@@ -1,7 +1,7 @@
 /**
  * Exact-layout document conversion through the doc worker (LibreOffice). docs/architecture/40.
  *   GET  /api/tools/convert              { available } so the page knows whether to offer it
- *   POST /api/tools/convert              { direction: "word-to-pdf" | "pdf-to-word", blobUrl, filename }
+ *   POST /api/tools/convert              { direction: "word-to-pdf" | "pdf-to-word" | "excel-to-pdf" | "powerpoint-to-pdf", blobUrl, filename, singlePageSheets? }
  * The browser uploads the file straight to private storage (convert-upload); this route reads it, sends it to the worker,
  * streams the result back, and deletes the upload. Signed-in workspace members only, rate limited, 25 MB.
  */
@@ -45,7 +45,9 @@ export async function POST(req: NextRequest) {
   if (!bytes) return NextResponse.json({ error: "The uploaded file could not be found. Please attach it again." }, { status: 400 })
   if (bytes.length > CONVERT_MAX_BYTES) { await cleanup(); return NextResponse.json({ error: "The file is over 25 MB." }, { status: 413 }) }
 
-  const out = await convertViaDocWorker(bytes, `input.${plan.ext}`, plan.format)
+  // Only spreadsheets take an option: print each sheet on one page instead of splitting a wide sheet across pages.
+  const options = b?.direction === "excel-to-pdf" && b?.singlePageSheets === true ? { singlePageSheets: true } : undefined
+  const out = await convertViaDocWorker(bytes, `input.${plan.ext}`, plan.format, 110_000, options)
   await cleanup()
   if (!out.ok) return NextResponse.json({ error: out.error }, { status: out.status })
   const base = String(b.filename).replace(/\.[^.]+$/, "").replace(/[^\w.\- ]/g, "_").slice(0, 100) || "document"

@@ -86,7 +86,7 @@ export function docWorkerBase(): string | null {
  * browser without being held in memory or hitting the platform's response size limit. Never throws: a worker that is
  * down, slow or unconfigured becomes `{ ok:false, status, error }` so the caller can answer the user plainly.
  */
-export async function convertViaDocWorker(bytes: Buffer, filename: string, format: "pdf" | "docx", timeoutMs = 110_000):
+export async function convertViaDocWorker(bytes: Buffer, filename: string, format: "pdf" | "docx", timeoutMs = 110_000, options?: { singlePageSheets?: boolean }):
   Promise<{ ok: true; response: Response } | { ok: false; status: number; error: string }> {
   const base = docWorkerBase();
   if (!base) return { ok: false, status: 501, error: "The exact-layout converter is not set up on this deployment." };
@@ -96,7 +96,7 @@ export async function convertViaDocWorker(bytes: Buffer, filename: string, forma
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${base}/render`, { method: "POST", headers, signal: controller.signal,
-      body: JSON.stringify({ engine: "libreoffice", source: bytes.toString("base64"), filename, format }) });
+      body: JSON.stringify({ engine: "libreoffice", source: bytes.toString("base64"), filename, format, ...(options ? { options } : {}) }) });
     if (!res.ok) {
       const msg = await res.json().then((j: any) => String(j?.error ?? "")).catch(() => "");
       // 4xx from the worker is about the document (unsupported, empty); anything else is the converter's problem.

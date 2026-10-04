@@ -18,7 +18,27 @@ export interface NativeTool {
 }
 
 export const NATIVE_TOOLS: NativeTool[] = [
-  // ─── Document tools (run in the browser; nothing is uploaded) ─────────
+  // ─── Document tools (Word/PDF/merge/shrink run in the browser; Excel and PowerPoint use the converter) ─────────
+  {
+    slug: "excel-to-pdf",
+    title: "Excel to PDF",
+    description: "Turn a spreadsheet (.xlsx, .xls, .ods, .csv) into a PDF with its formatting kept. Uses Anker's converter; the file is deleted right after.",
+    audience: "both",
+    category: "Documents",
+    href: "/dashboard/tools/excel-to-pdf",
+    status: "shipped",
+    exports: ["pdf"],
+  },
+  {
+    slug: "powerpoint-to-pdf",
+    title: "PowerPoint to PDF",
+    description: "Turn a presentation (.pptx, .ppt, .odp) into a PDF, one page per slide. Uses Anker's converter; the file is deleted right after.",
+    audience: "both",
+    category: "Documents",
+    href: "/dashboard/tools/powerpoint-to-pdf",
+    status: "shipped",
+    exports: ["pdf"],
+  },
   {
     slug: "pdf-compress",
     title: "Shrink a PDF",

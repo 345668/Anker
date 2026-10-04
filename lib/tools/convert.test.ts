@@ -24,6 +24,12 @@ describe("planning and validation", () => {
     expect("error" in planConvert("word-to-pdf", "a.pdf")).toBe(true)
     expect("error" in planConvert("pdf-to-word", "a.docx")).toBe(true)
     expect("error" in planConvert("mystery", "a.docx")).toBe(true)
+    expect(planConvert("excel-to-pdf", "Budget.XLSX")).toEqual({ format: "pdf", ext: "xlsx" })
+    expect(planConvert("excel-to-pdf", "data.csv")).toEqual({ format: "pdf", ext: "csv" })
+    expect(planConvert("powerpoint-to-pdf", "deck.pptx")).toEqual({ format: "pdf", ext: "pptx" })
+    expect("error" in planConvert("excel-to-pdf", "deck.pptx")).toBe(true)
+    expect("error" in planConvert("powerpoint-to-pdf", "a.xlsx")).toBe(true)
+    expect("error" in planConvert("toString", "a.docx")).toBe(true)
   })
   it("only the caller's own upload folder in our store is accepted", () => {
     expect(isConvertBlobUrl(goodUrl, scope)).toBe(true)
@@ -39,7 +45,13 @@ describe("POST /api/tools/convert", () => {
     const r = await post({ direction: "word-to-pdf", blobUrl: goodUrl, filename: "Q3 report.docx" })
     expect(r.status).toBe(200); expect(await r.text()).toBe("PDFBYTES")
     expect(r.headers.get("content-disposition")).toBe('attachment; filename="Q3 report.pdf"')
-    expect(h.convert).toHaveBeenCalledWith(expect.any(Buffer), "input.docx", "pdf"); expect(h.del).toHaveBeenCalledWith(goodUrl, expect.anything())
+    expect(h.convert).toHaveBeenCalledWith(expect.any(Buffer), "input.docx", "pdf", 110000, undefined); expect(h.del).toHaveBeenCalledWith(goodUrl, expect.anything())
+  })
+  it("spreadsheets pass the one-page-per-sheet option, and nothing else does", async () => {
+    await post({ direction: "excel-to-pdf", blobUrl: goodUrl.replace("report.docx", "b.xlsx"), filename: "b.xlsx", singlePageSheets: true })
+    expect(h.convert).toHaveBeenLastCalledWith(expect.any(Buffer), "input.xlsx", "pdf", 110000, { singlePageSheets: true })
+    await post({ direction: "powerpoint-to-pdf", blobUrl: goodUrl.replace("report.docx", "s.pptx"), filename: "s.pptx", singlePageSheets: true })
+    expect(h.convert).toHaveBeenLastCalledWith(expect.any(Buffer), "input.pptx", "pdf", 110000, undefined)
   })
   it("needs a session, a configured worker, a valid direction and the caller's own upload", async () => {
     h.principal.mockRejectedValueOnce(new Error("no")); expect((await post({})).status).toBe(401)

@@ -44,6 +44,9 @@ test("pure planning", () => {
   assert.equal(inputExtension("evil.exe", Buffer.from("MZ")), "docx");
   assert.deepEqual(planConversion("docx", "pdf"), { target: "pdf", infilter: null, convertTo: "pdf" });
   assert.equal(planConversion("pdf", "docx").infilter, "writer_pdf_import");
+  assert.deepEqual(planConversion("xlsx", "pdf"), { target: "pdf", infilter: null, convertTo: "pdf" });
+  assert.match(planConversion("xlsx", "pdf", { singlePageSheets: true }).convertTo, /calc_pdf_Export.*SinglePageSheets/);
+  assert.equal(planConversion("pptx", "pdf", { singlePageSheets: true }).convertTo, "pdf");
   assert.ok(planConversion("pdf", "pdf").error);
   assert.ok(planConversion("docx", "docx").error);
 });
@@ -70,6 +73,20 @@ test("converts Word to PDF and PDF to Word with the right arguments", async () =
     const calls = readFileSync(path.join(dir, "calls.log"), "utf8");
     assert.match(calls, /--convert-to pdf /); assert.match(calls, /--infilter=writer_pdf_import/); assert.match(calls, /docx:MS Word 2007 XML/);
     assert.match(calls, /--headless --norestore --nolockcheck -env:UserInstallation=file:\/\//);
+  } finally { s.close(); }
+});
+
+test("spreadsheets and presentations convert, and the one-page-per-sheet option reaches only spreadsheets", async () => {
+  const { s, url } = await start();
+  try {
+    let r = await post(url, { engine: "libreoffice", source: b64("sheet"), filename: "Book.XLSX", format: "pdf", options: { singlePageSheets: true } });
+    assert.equal(r.status, 200);
+    let calls = readFileSync(path.join(dir, "calls.log"), "utf8").trim().split("\n").pop();
+    assert.match(calls, /calc_pdf_Export/); assert.match(calls, /input\.xlsx/);
+    r = await post(url, { engine: "libreoffice", source: b64("slides"), filename: "Deck.pptx", format: "pdf", options: { singlePageSheets: true } });
+    assert.equal(r.status, 200);
+    calls = readFileSync(path.join(dir, "calls.log"), "utf8").trim().split("\n").pop();
+    assert.ok(!calls.includes("calc_pdf_Export")); assert.match(calls, /input\.pptx/);
   } finally { s.close(); }
 });
 

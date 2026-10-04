@@ -5,7 +5,7 @@
  *   • libreoffice  — convert Word/Excel/PowerPoint/ODF/RTF → PDF, and PDF → Word
  *
  * The Anker app talks to this over the contract in lib/docworker/client.ts:
- *   POST /render   { engine: "latex"|"libreoffice", source, filename?, format? }
+ *   POST /render   { engine: "latex"|"libreoffice", source, filename?, format?, options?: { singlePageSheets?: boolean } }
  *                  → the rendered bytes (application/pdf or the docx mime)
  *   GET  /health   → { ok: true, soffice: boolean } for load-balancer probes
  *
@@ -46,7 +46,9 @@ export function inputExtension(filename, bytes) {
 }
 
 /** Pure: what to run for a given input and target. Returns { error } for a combination that is not supported. */
-export function planConversion(ext, format) {
+const SHEET_EXT = new Set(["xls", "xlsx", "ods", "csv"]);
+
+export function planConversion(ext, format, options = {}) {
   const target = format === "docx" ? "docx" : "pdf";
   if (ext === "pdf") {
     if (target !== "docx") return { error: "A PDF can only be converted to Word (docx)." };
@@ -54,6 +56,8 @@ export function planConversion(ext, format) {
     return { target, infilter: "writer_pdf_import", convertTo: "docx:MS Word 2007 XML" };
   }
   if (target === "docx") return { error: "Only a PDF can be converted to Word with this worker." };
+  // A spreadsheet printed normally splits a wide sheet across pages; "one page per sheet" keeps each sheet whole (pages can be large).
+  if (SHEET_EXT.has(ext) && options.singlePageSheets === true) return { target, infilter: null, convertTo: 'pdf:calc_pdf_Export:{"SinglePageSheets":{"type":"boolean","value":"true"}}' };
   return { target, infilter: null, convertTo: "pdf" };
 }
 
@@ -108,11 +112,11 @@ export function createWorker(opts = {}) {
     } finally { await rm(dir, { recursive: true, force: true }); }
   }
 
-  async function renderLibreOffice(sourceB64, format, filename) {
+  async function renderLibreOffice(sourceB64, format, filename, options) {
     const bytes = Buffer.from(sourceB64, "base64");
     if (!bytes.length) return { error: "The document is empty." };
     const ext = inputExtension(filename, bytes);
-    const plan = planConversion(ext, format);
+    const plan = planConversion(ext, format, options);
     if (plan.error) return { error: plan.error, status: 400 };
     const dir = await mkdtemp(path.join(tmpdir(), "docw-lo-"));
     try {
@@ -170,7 +174,7 @@ export function createWorker(opts = {}) {
     const t0 = Date.now();
     try {
       const result = engine === "libreoffice"
-        ? await renderLibreOffice(source, body.format === "docx" ? "docx" : "pdf", body.filename)
+        ? await renderLibreOffice(source, body.format === "docx" ? "docx" : "pdf", body.filename, body.options && typeof body.options === "object" ? body.options : {})
         : await renderLatex(source);
       if (result.error || !result.bytes) return json(res, result.status ?? 422, { error: result.error ?? "render failed" });
       res.writeHead(200, { "Content-Type": result.contentType, "Content-Length": result.bytes.length, "X-Doc-Worker-Ms": String(Date.now() - t0) });

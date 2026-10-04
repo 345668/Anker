@@ -6,12 +6,12 @@
 # Arial, Times New Roman and Courier New, so a document set in those looks the same as it does in Word. Fonts that are
 # not here fall back to the closest one and the line breaks can shift: add them to /usr/share/fonts to be exact.
 #
-# Spreadsheets and presentations: build with  --build-arg LO_PACKAGES="libreoffice-writer libreoffice-calc libreoffice-impress"
-# (about 300 MB more). The default is Writer only, which is all Word to PDF and PDF to Word need.
+# Writer (Word and PDF import), Calc (spreadsheets) and Impress (presentations). Drop calc and impress with
+#   --build-arg LO_PACKAGES="libreoffice-writer"   to save about 300 MB if only Word tools are needed.
 # LaTeX: tectonic is not in Debian bookworm. Build with --build-arg WITH_TECTONIC=1 to install a release binary.
 FROM node:22-bookworm-slim
 
-ARG LO_PACKAGES="libreoffice-writer"
+ARG LO_PACKAGES="libreoffice-writer libreoffice-calc libreoffice-impress"
 ARG WITH_TECTONIC=0
 ARG TECTONIC_VERSION=0.15.0
 

@@ -7,21 +7,25 @@ export const CONVERT_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.oasis.opendocument.text",
   "application/rtf", "text/rtf",
+  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.oasis.opendocument.spreadsheet", "text/csv",
+  "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.oasis.opendocument.presentation",
   "application/octet-stream", // some browsers send nothing useful for .doc and .rtf
 ]
 
-export type Direction = "word-to-pdf" | "pdf-to-word"
+export type Direction = "word-to-pdf" | "pdf-to-word" | "excel-to-pdf" | "powerpoint-to-pdf"
 const ACCEPT: Record<Direction, { ext: string[]; format: "pdf" | "docx" }> = {
   "word-to-pdf": { ext: ["doc", "docx", "odt", "rtf"], format: "pdf" },
   "pdf-to-word": { ext: ["pdf"], format: "docx" },
+  "excel-to-pdf": { ext: ["xls", "xlsx", "ods", "csv"], format: "pdf" },
+  "powerpoint-to-pdf": { ext: ["ppt", "pptx", "odp"], format: "pdf" },
 }
 
 /** What the worker should produce for this direction, or an error if the file is the wrong kind. */
 export function planConvert(direction: unknown, filename: unknown): { format: "pdf" | "docx"; ext: string } | { error: string } {
-  if (direction !== "word-to-pdf" && direction !== "pdf-to-word") return { error: "Unknown conversion." }
+  if (typeof direction !== "string" || !Object.hasOwn(ACCEPT, direction)) return { error: "Unknown conversion." }
   const ext = String(filename ?? "").split(".").pop()?.toLowerCase() ?? ""
-  const rule = ACCEPT[direction]
-  if (!rule.ext.includes(ext)) return { error: direction === "word-to-pdf" ? "Please choose a Word document (.doc, .docx), .odt or .rtf file." : "Please choose a PDF file." }
+  const rule = ACCEPT[direction as Direction]
+  if (!rule.ext.includes(ext)) return { error: ({ "word-to-pdf": "Please choose a Word document (.doc, .docx), .odt or .rtf file.", "pdf-to-word": "Please choose a PDF file.", "excel-to-pdf": "Please choose a spreadsheet (.xlsx, .xls, .ods or .csv).", "powerpoint-to-pdf": "Please choose a presentation (.pptx, .ppt or .odp)." } as Record<Direction, string>)[direction as Direction] }
   return { format: rule.format, ext }
 }
 
