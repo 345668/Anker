@@ -19,7 +19,7 @@ export interface DepReport { ok: boolean; checkedAt: string; checks: DepCheck[] 
 /** How old a job's latest run may be before it is stale (about two intervals), in minutes. Covers every job in `vercel.json`. */
 export const CRON_MAX_AGE_MIN: Record<string, number> = {
   "promote-scheduled-articles": 150, "outreach-scheduler": 25, "outreach-poll": 25, "outreach-deliverability": 150,
-  "outreach-reengage": 2880, "market-signals": 2880, "compliance-digest": 20160, "campaign-assessment": 40,
+  "outreach-reengage": 2880, "market-signals": 2880, "compliance-digest": 20160, "campaign-assessment": 40, "intake-assessment": 40,
   "campaign-send": 70, "deadline-reminders": 2880, "verify-emails": 2880, "directory-normalize": 2880,
   "investor-activity": 2880, "assistant-uploads-sweep": 150, "fit-ranker": 90000, "dependency-check": 2880,
 }

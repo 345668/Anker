@@ -12,6 +12,7 @@
  */
 
 import Link from "next/link"
+import { EngineCard } from "@/components/intake/engine-card"
 import { formatMoney } from "@/lib/platform/money"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -287,6 +288,10 @@ export function DealDetailClient({
               Confirm pass
             </button>
           </div>
+        )}
+
+        {(deal.metadata as any)?.engine && (
+          <EngineCard engine={(deal.metadata as any).engine} answers={(deal.metadata as any)?.intake?.answers} ref_={(deal.metadata as any)?.intake?.publicRef} />
         )}
 
         {/* Stage requirements (gate) + move-back / reopen controls */}

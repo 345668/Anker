@@ -9,6 +9,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Plus, Loader2, AlertTriangle } from "lucide-react"
+import { CATEGORY_LABEL, compareDeals, type Category } from "@/lib/intake/model"
 import type { FundFull } from "@/lib/portfolio/funds"
 import type { DealFull, DealStage, PipelineRollup } from "@/lib/portfolio/deal-pipeline"
 
@@ -39,6 +40,7 @@ export function DealBoardClient({ fund, initialDeals, rollup, tablesReady }: Pro
   const [error, setError] = useState<string | null>(null)
 
   const [query, setQuery] = useState("")
+  const [catFilter, setCatFilter] = useState<Category | "all">("all")
   const [companyName, setCompanyName] = useState("")
   const [oneLiner, setOneLiner] = useState("")
   const [sector, setSector] = useState("")
@@ -52,6 +54,13 @@ export function DealBoardClient({ fund, initialDeals, rollup, tablesReady }: Pro
         [d.company_name, d.one_liner, d.sector, d.source, d.contact_email]
           .some((v) => v?.toLowerCase().includes(q)))
     : initialDeals
+  const engineOf = (d: DealFull): { category: Category; score: number | null } | null => {
+    const e = (d.metadata as any)?.engine
+    return e && e.category ? { category: e.category as Category, score: typeof e.score === "number" ? e.score : null } : null
+  }
+  const counts = { all: visibleDeals.length, passed: 0, review: 0, not_a_fit: 0 } as Record<Category | "all", number>
+  for (const d of visibleDeals) { const e = engineOf(d); if (e) counts[e.category]++ }
+  const shownDeals = visibleDeals.filter((d) => catFilter === "all" || engineOf(d)?.category === catFilter)
   const terminal = visibleDeals.filter((d) => d.stage === "closed" || d.stage === "passed")
 
   async function createDealRow() {
@@ -105,6 +114,7 @@ export function DealBoardClient({ fund, initialDeals, rollup, tablesReady }: Pro
                   </div>
                 </div>
               )}
+              <Link href="/dashboard/portfolio/fund/intake" className="text-sm text-muted-foreground underline hover:text-foreground">Intake form</Link>
               <button onClick={() => setShowCreate((v) => !v)}
                 className="inline-flex items-center gap-2 rounded-full h-11 px-5 bg-foreground text-background hover:bg-foreground/90 text-sm">
                 <Plus className="w-4 h-4" />
@@ -159,11 +169,19 @@ export function DealBoardClient({ fund, initialDeals, rollup, tablesReady }: Pro
         <input value={query} onChange={(e) => setQuery(e.target.value)}
           placeholder="Search deals — company, one-liner, sector, source, contact…"
           className="w-full max-w-md h-10 px-3 rounded-md border border-input bg-background text-sm" />
+        {(counts.passed + counts.review + counts.not_a_fit) > 0 && (
+          <div className="flex flex-wrap gap-2 text-xs">
+            {(["all", "passed", "review", "not_a_fit"] as const).map((k) => (
+              <button key={k} onClick={() => setCatFilter(k)} className={`rounded-full border px-3 py-1 ${catFilter === k ? "border-foreground bg-foreground text-background" : "border-foreground/15 text-muted-foreground hover:border-foreground/40"}`}>
+                {k === "all" ? "All" : CATEGORY_LABEL[k]} · {counts[k]}
+              </button>))}
+          </div>
+        )}
 
         {/* Board */}
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
           {BOARD_STAGES.map(({ key, label }) => {
-            const cards = visibleDeals.filter((d) => d.stage === key)
+            const cards = shownDeals.filter((d) => d.stage === key).sort((a, b) => compareDeals({ ...engineOf(a), created_at: a.created_at }, { ...engineOf(b), created_at: b.created_at }))
             return (
               <div key={key} className="rounded-lg border border-foreground/10 bg-foreground/[0.02] min-h-[160px]">
                 <div className="px-3 py-2 border-b border-foreground/10 flex items-center justify-between">
@@ -182,6 +200,11 @@ export function DealBoardClient({ fund, initialDeals, rollup, tablesReady }: Pro
                           </span>
                         )}
                       </div>
+                      {(() => { const e = engineOf(d); return e ? (
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded ${e.category === "passed" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : e.category === "review" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-foreground/10 text-muted-foreground"}`}>{CATEGORY_LABEL[e.category]}</span>
+                          {e.score != null && <span className="font-mono text-[10px] text-muted-foreground">{e.score}</span>}
+                        </div>) : null })()}
                       <div className="text-xs text-muted-foreground truncate">{d.one_liner ?? d.sector ?? "—"}</div>
                       <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] text-muted-foreground">
                         <span>{d.round_name ?? ""}</span>
