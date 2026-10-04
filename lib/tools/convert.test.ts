@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-const h = vi.hoisted(() => ({ principal: vi.fn(), read: vi.fn(), convert: vi.fn(), configured: vi.fn(), del: vi.fn() }))
+const h = vi.hoisted(() => ({ principal: vi.fn(), read: vi.fn(), convert: vi.fn(), configured: vi.fn(), del: vi.fn(), ocr: vi.fn() }))
 vi.mock("@/lib/assistant/principal", () => ({ requireAiPrincipal: h.principal }))
 vi.mock("@/lib/campaign/util", () => ({ readBlobBytes: h.read }))
 vi.mock("@/lib/docworker/client", () => ({ convertViaDocWorker: h.convert, isDocWorkerConfigured: h.configured }))
 vi.mock("@vercel/blob", () => ({ del: h.del }))
+vi.mock("@/lib/ai/pdf-ocr", () => ({ ocrPdfBuffer: h.ocr }))
 import { GET, POST } from "@/app/api/tools/convert/route"
 import { NextRequest } from "next/server"
 import { planConvert, isConvertBlobUrl, convertPrefix } from "./convert-files"
@@ -69,7 +70,32 @@ describe("POST /api/tools/convert", () => {
     expect(h.del).toHaveBeenCalledTimes(2)
   })
   it("GET says whether the converter is available", async () => {
-    expect(await (await GET()).json()).toEqual({ available: true, prefix: convertPrefix(scope) })
+    expect(await (await GET()).json()).toEqual({ available: true, ocr: true, prefix: convertPrefix(scope) })
     h.configured.mockReturnValue(false); expect((await (await GET()).json()).available).toBe(false)
+  })
+})
+
+describe("scanned PDF to Word", () => {
+  it("is a PDF-only direction", async () => {
+    expect(planConvert("scan-to-word", "scan.pdf")).toEqual({ format: "docx", ext: "pdf" })
+    expect("error" in planConvert("scan-to-word", "scan.docx")).toBe(true)
+  })
+})
+
+describe("POST scan-to-word", () => {
+  const scanUrl = goodUrl.replace("report.docx", "scan.pdf")
+  const go = () => post({ direction: "scan-to-word", blobUrl: scanUrl, filename: "scan.pdf" })
+  it("reads the pages, returns a Word file, needs no document converter, and deletes the upload", async () => {
+    h.configured.mockReturnValue(false)
+    h.ocr.mockResolvedValue({ pages: [{ page: 1, text: "Invoice 42\n\nTotal 1,200", ok: true, ms: 1 }, { page: 2, text: "", ok: false, ms: 1 }], pageCount: 2, pagesAttempted: 2, pagesSucceeded: 1, truncated: false })
+    const r = await go()
+    expect(r.status).toBe(200); expect(r.headers.get("content-type")).toMatch(/wordprocessingml/); expect(r.headers.get("content-disposition")).toBe('attachment; filename="scan.docx"'); expect(r.headers.get("x-scan-pages")).toContain("1/2")
+    expect(Buffer.from(await r.arrayBuffer()).subarray(0, 2).toString()).toBe("PK"); expect(h.convert).not.toHaveBeenCalled(); expect(h.del).toHaveBeenCalled()
+    expect(h.ocr).toHaveBeenCalledWith(expect.any(Buffer), expect.objectContaining({ maxPages: 25 }))
+  })
+  it("says plainly when recognition is not set up or nothing could be read", async () => {
+    h.ocr.mockResolvedValueOnce({ pages: [], pageCount: 0, failure: "no_key" }); expect((await go()).status).toBe(501)
+    h.ocr.mockResolvedValueOnce({ pages: [], pageCount: 3, failure: "all_pages_failed" }); const r = await go(); expect(r.status).toBe(422); expect((await r.json()).error).toMatch(/No text could be read/)
+    h.ocr.mockRejectedValueOnce(new Error("boom")); expect((await go()).status).toBe(502); expect(h.del).toHaveBeenCalledTimes(3)
   })
 })

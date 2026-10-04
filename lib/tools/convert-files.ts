@@ -12,10 +12,11 @@ export const CONVERT_TYPES = [
   "application/octet-stream", // some browsers send nothing useful for .doc and .rtf
 ]
 
-export type Direction = "word-to-pdf" | "pdf-to-word" | "excel-to-pdf" | "powerpoint-to-pdf"
+export type Direction = "word-to-pdf" | "pdf-to-word" | "excel-to-pdf" | "powerpoint-to-pdf" | "scan-to-word"
 const ACCEPT: Record<Direction, { ext: string[]; format: "pdf" | "docx" }> = {
   "word-to-pdf": { ext: ["doc", "docx", "odt", "rtf"], format: "pdf" },
   "pdf-to-word": { ext: ["pdf"], format: "docx" },
+  "scan-to-word": { ext: ["pdf"], format: "docx" },
   "excel-to-pdf": { ext: ["xls", "xlsx", "ods", "csv"], format: "pdf" },
   "powerpoint-to-pdf": { ext: ["ppt", "pptx", "odp"], format: "pdf" },
 }
@@ -25,7 +26,7 @@ export function planConvert(direction: unknown, filename: unknown): { format: "p
   if (typeof direction !== "string" || !Object.hasOwn(ACCEPT, direction)) return { error: "Unknown conversion." }
   const ext = String(filename ?? "").split(".").pop()?.toLowerCase() ?? ""
   const rule = ACCEPT[direction as Direction]
-  if (!rule.ext.includes(ext)) return { error: ({ "word-to-pdf": "Please choose a Word document (.doc, .docx), .odt or .rtf file.", "pdf-to-word": "Please choose a PDF file.", "excel-to-pdf": "Please choose a spreadsheet (.xlsx, .xls, .ods or .csv).", "powerpoint-to-pdf": "Please choose a presentation (.pptx, .ppt or .odp)." } as Record<Direction, string>)[direction as Direction] }
+  if (!rule.ext.includes(ext)) return { error: ({ "word-to-pdf": "Please choose a Word document (.doc, .docx), .odt or .rtf file.", "pdf-to-word": "Please choose a PDF file.", "scan-to-word": "Please choose a PDF file.", "excel-to-pdf": "Please choose a spreadsheet (.xlsx, .xls, .ods or .csv).", "powerpoint-to-pdf": "Please choose a presentation (.pptx, .ppt or .odp)." } as Record<Direction, string>)[direction as Direction] }
   return { format: rule.format, ext }
 }
 

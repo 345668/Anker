@@ -72,3 +72,7 @@ take one option, "one page per sheet" (`SinglePageSheets`), which keeps a wide s
 a 41-row by 26-column workbook with euro number formats and a second sheet gave 7 A4 pages normally and one 2493 x 525 pt page for the first sheet with the option, euro formats intact; a 3-slide deck (title, bullets and shape, table) gave 3 pages at slide
 size (720 x 405 pt) with Carlito and OpenSymbol embedded. Notes: formulas print as values; a column too narrow for its number prints `###` exactly as Excel would; animations and speaker notes are not included; the direction lookup is now an own-property
 check (a request for `toString` used to pass the guard).
+
+## 10. Scanned PDFs and CJK, 2026-10-05
+
+The converter image now carries WenQuanYi Micro Hei, VL Gothic and NanumGothic (verified on production: a document with Japanese text embedded WenQuanYiMicroHei). `scan-to-word` reads a scanned or image-only PDF with the OCR model already used for decks (`lib/ai/pdf-ocr.ts`): first 25 pages, inside the request's time, one section per page, held to the workspace's AI plan and monthly allowance, the upload deleted straight after, and the result labelled as needing a check. It does not need the document converter.

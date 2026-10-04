@@ -33,7 +33,7 @@ function Frame({ children, limits, selfTest, local = true }: { children: React.R
   )
 }
 
-type Mode = "exact" | "browser"
+type Mode = "exact" | "browser" | "scan"
 
 /** Whether the exact-layout converter is set up, and the caller's upload folder for it. */
 function useExact() {
@@ -42,14 +42,15 @@ function useExact() {
   return state
 }
 
-function ModePicker({ exact, mode, setMode, exactText, browserText }: { exact: { available: boolean } | null; mode: Mode; setMode: (m: Mode) => void; exactText: string; browserText: string }) {
+function ModePicker({ exact, mode, setMode, exactText, browserText, scanText }: { exact: { available: boolean } | null; mode: Mode; setMode: (m: Mode) => void; exactText: string; browserText: string; scanText?: string }) {
   if (!exact) return null
-  if (!exact.available) return <p className="mb-4 text-xs text-muted-foreground">Exact-layout conversion is not set up on this deployment, so this tool uses the in-browser converter.</p>
+  if (!exact.available && !scanText) return <p className="mb-4 text-xs text-muted-foreground">Exact-layout conversion is not set up on this deployment, so this tool uses the in-browser converter.</p>
   const row = "flex items-start gap-2 rounded-md border border-border p-3 text-sm cursor-pointer"
   return (
-    <fieldset className="mb-4 grid gap-2 sm:grid-cols-2">
-      <label className={`${row} ${mode === "exact" ? "border-[var(--accent)]" : ""}`}><input type="radio" checked={mode === "exact"} onChange={() => setMode("exact")} className="mt-1" /><span><b>Exact layout</b><br /><span className="text-xs text-muted-foreground">{exactText}</span></span></label>
+    <fieldset className={`mb-4 grid gap-2 ${scanText ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+      {exact.available && <label className={`${row} ${mode === "exact" ? "border-[var(--accent)]" : ""}`}><input type="radio" checked={mode === "exact"} onChange={() => setMode("exact")} className="mt-1" /><span><b>Exact layout</b><br /><span className="text-xs text-muted-foreground">{exactText}</span></span></label>}
       <label className={`${row} ${mode === "browser" ? "border-[var(--accent)]" : ""}`}><input type="radio" checked={mode === "browser"} onChange={() => setMode("browser")} className="mt-1" /><span><b>Private, in your browser</b><br /><span className="text-xs text-muted-foreground">{browserText}</span></span></label>
+      {scanText && <label className={`${row} ${mode === "scan" ? "border-[var(--accent)]" : ""}`}><input type="radio" checked={mode === "scan"} onChange={() => setMode("scan")} className="mt-1" /><span><b>Scanned PDF</b><br /><span className="text-xs text-muted-foreground">{scanText}</span></span></label>}
     </fieldset>
   )
 }
@@ -155,6 +156,7 @@ export function PdfToWordTool() {
   const exact = useExact()
   const [mode, setMode] = useState<Mode>("exact")
   const useExactMode = !!exact?.available && mode === "exact"
+  const scanMode = mode === "scan"
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -163,7 +165,8 @@ export function PdfToWordTool() {
   async function run(f: File) {
     setBusy(true); setError(null); setOut(null)
     try {
-      if (useExactMode) { setProgress("Converting on the server, this can take up to a minute for a long document…"); const file = await convertExact(f, "pdf-to-word", exact!.prefix); setOut({ file, pages: 0, paragraphs: 0 }) }
+      if (scanMode) { setProgress("Reading the pages. This takes a few seconds per page, up to about a minute and a half…"); const file = await convertExact(f, "scan-to-word", exact!.prefix); setOut({ file, pages: 0, paragraphs: 0 }) }
+      else if (useExactMode) { setProgress("Converting on the server, this can take up to a minute for a long document…"); const file = await convertExact(f, "pdf-to-word", exact!.prefix); setOut({ file, pages: 0, paragraphs: 0 }) }
       else setOut(await pdfToWord(f, (p, n) => setProgress(`Page ${p} of ${n}…`)))
     } catch (e) { setError((e as Error).message) } finally { setBusy(false); setProgress(null) }
   }
@@ -184,14 +187,14 @@ export function PdfToWordTool() {
   }
 
   return (
-    <Frame limits={useExactMode ? "Exact layout keeps every line where it sits on the page, as positioned text, so it looks like the PDF but is awkward to re-flow when you edit. Scanned pages come through as pictures (no OCR)." : "Recovers the text in reading order with headings and lists. It does not rebuild the page layout, and cannot read a scanned PDF or a deck made of images (that needs OCR)."} selfTest={selfTest} local={!useExactMode}>
-      <ModePicker exact={exact} mode={mode} setMode={setMode} exactText="Looks like the PDF: text boxes placed where they are on each page. Harder to edit as flowing text. The file goes to Anker's converter and is deleted straight after. Up to 25 MB." browserText="Nothing leaves your computer. Clean, editable text in reading order with headings and lists; no page layout." />
+    <Frame limits={scanMode ? "The pages are read as images by an AI model (up to 25 pages), so the text can contain mistakes: check numbers and names. The file goes to Anker's converter and is deleted as soon as the text is read." : useExactMode ? "Exact layout keeps every line where it sits on the page, as positioned text, so it looks like the PDF but is awkward to re-flow when you edit. Scanned pages come through as pictures (no OCR)." : "Recovers the text in reading order with headings and lists. It does not rebuild the page layout, and cannot read a scanned PDF or a deck made of images (that needs OCR)."} selfTest={selfTest} local={!useExactMode && !scanMode}>
+      <ModePicker exact={exact} mode={mode} setMode={setMode} exactText="Looks like the PDF: text boxes placed where they are on each page. Harder to edit as flowing text. The file goes to Anker's converter and is deleted straight after. Up to 25 MB." browserText="Nothing leaves your computer. Clean, editable text in reading order with headings and lists; no page layout." scanText="For a scan, a photo or a deck made of images: the text is read from the page images with AI. First 25 pages, up to 25 MB. Check the result." />
       <label className="block text-sm font-medium">PDF
         <input type="file" accept="application/pdf,.pdf" disabled={busy} className="mt-2 block w-full text-sm" onChange={(e) => { const f = e.target.files?.[0]; if (f) run(f) }} />
       </label>
       {progress && <p className="mt-3 text-sm text-muted-foreground">{progress}</p>}
       {error && <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>}
-      {out && <Download file={out.file} note={out.pages ? `${out.pages} page${out.pages === 1 ? "" : "s"}, ${out.paragraphs} paragraphs of text recovered.` : "Converted with the exact-layout converter."} />}
+      {out && <Download file={out.file} note={out.pages ? `${out.pages} page${out.pages === 1 ? "" : "s"}, ${out.paragraphs} paragraphs of text recovered.` : scanMode ? "Text read from the page images. Please check it before relying on it." : "Converted with the exact-layout converter."} />}
     </Frame>
   )
 }
