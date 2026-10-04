@@ -95,3 +95,13 @@ principle 5. A disabled or missing fund returns the same 404.
 
 Applicant-facing feedback emails, scheduled re-scoring when the fund changes its thesis (a manual "re-run" exists), duplicate
 detection across funds, CRM sync of applicants, an API for the fund's own website to read statuses.
+
+## 8. Built and verified, 2026-10-04
+
+Live on production: the public form (`/intake/<slug>`), the engine, the settings screen (`/dashboard/portfolio/fund/intake`), ranked and
+categorised Deal flow with filter chips, the assessment card on each deal, the sweep cron (`intake-assessment`, every 15 minutes) and a
+confirmation email to the applicant (transactional, no tracking). Verified end to end on the Summit Venture Studio workspace with a
+labelled test application: submitted on the public form, assessed as Review (58.8) by the fund's own thesis and instructions, landed in
+Sourced with the evidence per criterion, then removed. Notes: the first run used the reasoning tier and took about a minute, so the task
+now runs on the balanced tier. Intake is left switched off for the partner workspaces until a fund turns it on. Not built: notifying
+the fund when an application arrives, an editable slug, and a per-fund Turnstile site key.

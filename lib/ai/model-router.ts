@@ -111,7 +111,7 @@ export const TASK_TIER: Record<TaskTag, ModelTier> = {
 
   campaign_readiness: "reason",   // SPCT gate — reasoning tier (falls back to deep model)
   campaign_draft:     "balanced", // structured email JSON, run in bulk
-  intake_assessment:  "reason",   // rubric scoring against the fund thesis — reasoning tier
+  intake_assessment:  "balanced", // rubric scoring against the fund thesis; the reasoning tier took about a minute per submission
 
   investor_score: "deep",   // SPCT scorer — long-form principled critique
   agent_plan:     "reason", // subgoal decomposition before the tool loop

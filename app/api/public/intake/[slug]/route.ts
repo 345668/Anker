@@ -9,6 +9,7 @@ import { NextRequest, NextResponse, after } from "next/server"
 import { createHash, randomBytes } from "node:crypto"
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit"
 import { getPublicIntake, createSubmission, processSubmission } from "@/lib/intake/store"
+import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { parseBlobUrls, nameFromBlobUrl, MAX_FILE_BYTES } from "@/lib/campaign/submission-files"
 
 export const runtime = "nodejs"
@@ -105,6 +106,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     console.error("[intake] insert failed:", (e as Error).message)
     return NextResponse.json({ error: "Could not save your application. Please try again." }, { status: 500 })
   }
+  // Confirm receipt to the applicant. Transactional (they asked), no tracking, and never allowed to fail the submission.
+  try {
+    if (isResendConfigured()) {
+      await sendEmail({ purpose: "transactional", noTracking: true, to: contactEmail, subject: `We received your application to ${intake.fundName}`,
+        text: `Hello ${contactName},\n\n${intake.fundName} has received your application for ${companyName}. Your reference is ${ref}.\n\nThe team reads every submission that fits what they back and will contact you if they want to talk.\n\nThis message was sent because you submitted an application. You will not receive marketing from us.` })
+    }
+  } catch (e) { console.error("[intake] confirmation email failed:", (e as Error).message) }
   // Assess after the response is sent; the cron sweep picks up anything this misses.
   after(async () => { try { await processSubmission(id) } catch (e) { console.error("[intake] assess failed:", (e as Error).message) } })
   return NextResponse.json({ ok: true, publicRef: ref })

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-const h = vi.hoisted(() => ({ get: vi.fn(), create: vi.fn(), process: vi.fn() }))
+const h = vi.hoisted(() => ({ get: vi.fn(), create: vi.fn(), process: vi.fn(), mail: vi.fn() }))
 vi.mock("next/server", async (orig) => ({ ...(await orig<any>()), after: (fn: () => unknown) => { void fn() } }))
+vi.mock("@/lib/email/resend", () => ({ isResendConfigured: () => true, sendEmail: h.mail }))
 vi.mock("@/lib/intake/store", () => ({ getPublicIntake: h.get, createSubmission: h.create, processSubmission: h.process }))
 import { GET, POST } from "@/app/api/public/intake/[slug]/route"
 import { NextRequest } from "next/server"
@@ -12,7 +13,7 @@ const post = (fields: Record<string, string>, slug = "summit") => {
   return POST(new NextRequest(`https://x.test/api/public/intake/${slug}`, { method: "POST", body: fd, headers: { "x-forwarded-for": `10.0.0.${++ip}` } }), { params: Promise.resolve({ slug }) })
 }
 const ok = { company_name: "Acme", contact_name: "Ann", contact_email: "ann@acme.io", terms_accepted: "1", q_q1: "Because" }
-beforeEach(() => { h.get.mockReset(); h.create.mockReset(); h.process.mockReset(); h.get.mockResolvedValue(intake); h.create.mockResolvedValue("sub1"); h.process.mockResolvedValue({}) })
+beforeEach(() => { h.get.mockReset(); h.create.mockReset(); h.process.mockReset(); h.mail.mockReset(); h.mail.mockResolvedValue({}); h.get.mockResolvedValue(intake); h.create.mockResolvedValue("sub1"); h.process.mockResolvedValue({}) })
 
 describe("public intake", () => {
   it("GET returns the form shape only", async () => {
@@ -40,6 +41,11 @@ describe("public intake", () => {
     const arg = h.create.mock.calls[0][0]
     expect(arg).toMatchObject({ fundId: "f1", companyName: "Acme", contactEmail: "ann@acme.io" }); expect(arg.answers).toMatchObject({ stage: "Seed", q1: "Because", problem: "p" })
     expect(h.process).toHaveBeenCalledWith("sub1")
+    expect(h.mail).toHaveBeenCalledWith(expect.objectContaining({ to: "ann@acme.io", purpose: "transactional", noTracking: true }))
+  })
+  it("a failed confirmation email never fails the application", async () => {
+    h.mail.mockRejectedValue(new Error("smtp down"))
+    expect((await post({ ...ok, contact_email: "mailfail@acme.io" })).status).toBe(200); expect(h.create).toHaveBeenCalled()
   })
   it("limits the same email to two applications a day", async () => {
     const e = { ...ok, contact_email: "limit@acme.io" }
