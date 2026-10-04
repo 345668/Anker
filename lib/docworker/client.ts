@@ -75,3 +75,37 @@ export async function renderViaDocWorker(req: RenderRequest): Promise<RenderResu
     clearTimeout(timer);
   }
 }
+
+export function docWorkerBase(): string | null {
+  const base = process.env.DOC_WORKER_URL;
+  return base ? base.replace(/\/$/, "") : null;
+}
+
+/**
+ * Convert one document through the worker and hand back the worker's response unread, so a large result streams to the
+ * browser without being held in memory or hitting the platform's response size limit. Never throws: a worker that is
+ * down, slow or unconfigured becomes `{ ok:false, status, error }` so the caller can answer the user plainly.
+ */
+export async function convertViaDocWorker(bytes: Buffer, filename: string, format: "pdf" | "docx", timeoutMs = 110_000):
+  Promise<{ ok: true; response: Response } | { ok: false; status: number; error: string }> {
+  const base = docWorkerBase();
+  if (!base) return { ok: false, status: 501, error: "The exact-layout converter is not set up on this deployment." };
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (process.env.DOC_WORKER_TOKEN) headers["Authorization"] = `Bearer ${process.env.DOC_WORKER_TOKEN}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${base}/render`, { method: "POST", headers, signal: controller.signal,
+      body: JSON.stringify({ engine: "libreoffice", source: bytes.toString("base64"), filename, format }) });
+    if (!res.ok) {
+      const msg = await res.json().then((j: any) => String(j?.error ?? "")).catch(() => "");
+      // 4xx from the worker is about the document (unsupported, empty); anything else is the converter's problem.
+      return { ok: false, status: res.status === 429 ? 429 : res.status >= 400 && res.status < 500 ? 422 : 502, error: msg.slice(0, 300) || "The converter could not convert this file." };
+    }
+    return { ok: true, response: res };
+  } catch (e: any) {
+    return { ok: false, status: e?.name === "AbortError" ? 504 : 502, error: e?.name === "AbortError" ? "The converter took too long." : "The converter is not reachable right now." };
+  } finally {
+    clearTimeout(timer);
+  }
+}

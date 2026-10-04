@@ -4,7 +4,7 @@ The high-fidelity rendering sidecar for §C of the tooling expansion. It runs th
 binaries that **cannot** run on Vercel serverless, and the Anker app calls it over HTTP:
 
 - **tectonic** — LaTeX → PDF (white-paper-class typesetting)
-- **LibreOffice** — docx/odt/xlsx → PDF or docx
+- **LibreOffice** — Word/ODF/RTF → PDF, and PDF → Word (docx). See `docs/architecture/40-exact-layout-conversion.md`
 
 Everything else in Anker (branded `docx` via the `docx` lib, PDF via `pdf-lib`) is
 serverless-native and needs no worker. Stand this up **only** when you need LaTeX-fidelity
@@ -26,7 +26,9 @@ POST /render
 GET /health → { "ok": true }
 ```
 
-Auth: if `DOC_WORKER_TOKEN` is set, requests must send `Authorization: Bearer <token>`.
+Auth: requests must send `Authorization: Bearer <token>`. The worker refuses to start without `DOC_WORKER_TOKEN` (set `DOC_WORKER_ALLOW_NO_AUTH=1` for local development only).
+
+Supported conversions: `docx doc odt rtf txt` → `pdf`; `pdf` → `docx`. Errors: 400 unsupported combination, 401, 413 too large, 422 the converter could not read it, 429 busy, 504 timed out.
 
 ## Run
 
@@ -37,6 +39,7 @@ node server.mjs
 # Container (bundles both binaries):
 docker build -t anker-doc-worker services/doc-worker
 docker run -p 8080:8080 -e DOC_WORKER_TOKEN=change-me anker-doc-worker
+# Tests (no LibreOffice needed): node --test services/doc-worker/server.test.mjs
 ```
 
 Deploy the container anywhere that runs a long-lived process — Fly.io, Railway, Render, a
@@ -72,6 +75,20 @@ curl -s -X POST http://localhost:8080/render \
 |---|---|---|
 | `PORT` | `8080` | Listen port |
 | `DOC_WORKER_TOKEN` | *(none)* | Bearer token; when set, required on `/render` |
-| `DOC_WORKER_MAX_BODY_BYTES` | `8388608` | Max request body (8 MB) |
+| `DOC_WORKER_MAX_BODY_BYTES` | `50331648` | Max request body (48 MB; a 25 MB file is about 34 MB as base64) |
+| `DOC_WORKER_CONCURRENCY` | `2` | Conversions at once (each LibreOffice needs about 400 MB) |
+| `DOC_WORKER_MAX_QUEUE` | `8` | Waiting requests before a 429 |
 | `DOC_WORKER_RENDER_TIMEOUT_MS` | `90000` | Per-render kill timeout |
 | `TECTONIC_CACHE_DIR` | `/var/cache/tectonic` | LaTeX package cache |
+
+## Fonts and fidelity
+
+The image carries Carlito, Caladea, Liberation and DejaVu. Carlito and Caladea are metric-compatible with Calibri and Cambria, Liberation with Arial, Times New Roman and Courier New, so documents set in those paginate exactly as in Word. Any other font is replaced by the closest installed one and line breaks can move: copy the font files into `/usr/share/fonts` in the image to be exact. No CJK font is installed (add `fonts-noto-cjk`).
+
+## Resources and network
+
+About 1 GB of memory per container is comfortable (LibreOffice peaks near 400 MB per conversion). Give the container no route to your internal services and no secrets beyond `DOC_WORKER_TOKEN`: a document can ask LibreOffice to fetch a URL. The image is non-root.
+
+## Build options
+
+`--build-arg LO_PACKAGES="libreoffice-writer libreoffice-calc libreoffice-impress"` adds spreadsheets and presentations (about 300 MB). `--build-arg WITH_TECTONIC=1` installs the LaTeX engine (not packaged in Debian bookworm, so it is downloaded as a release binary).

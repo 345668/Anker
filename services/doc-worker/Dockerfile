@@ -1,29 +1,42 @@
-# Anker doc/compute worker — Node + tectonic (LaTeX) + LibreOffice.
+# Anker doc worker: Node + LibreOffice (Word/ODF/RTF to PDF, PDF to Word), optional tectonic (LaTeX).
 # Build:  docker build -t anker-doc-worker services/doc-worker
 # Run:    docker run -p 8080:8080 -e DOC_WORKER_TOKEN=secret anker-doc-worker
+#
+# Fidelity depends on fonts. Carlito and Caladea are metric-compatible with Calibri and Cambria, Liberation with
+# Arial, Times New Roman and Courier New, so a document set in those looks the same as it does in Word. Fonts that are
+# not here fall back to the closest one and the line breaks can shift: add them to /usr/share/fonts to be exact.
+#
+# Spreadsheets and presentations: build with  --build-arg LO_PACKAGES="libreoffice-writer libreoffice-calc libreoffice-impress"
+# (about 300 MB more). The default is Writer only, which is all Word to PDF and PDF to Word need.
+# LaTeX: tectonic is not in Debian bookworm. Build with --build-arg WITH_TECTONIC=1 to install a release binary.
 FROM node:22-bookworm-slim
 
-# tectonic compiles LaTeX → PDF and fetches packages on demand (cached in the volume
-# below). libreoffice-core + writer cover docx/odt → pdf/docx conversion. fontconfig +
-# a couple of font families keep typeset output looking right.
+ARG LO_PACKAGES="libreoffice-writer"
+ARG WITH_TECTONIC=0
+ARG TECTONIC_VERSION=0.15.0
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      tectonic \
-      libreoffice-core libreoffice-writer libreoffice-calc \
-      fontconfig fonts-liberation fonts-dejavu \
-      ca-certificates \
+      libreoffice-core ${LO_PACKAGES} \
+      fontconfig fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea fonts-dejavu-core \
+      ca-certificates curl \
+    && if [ "$WITH_TECTONIC" = "1" ]; then \
+         arch="$(uname -m)"; \
+         curl -fsSL "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}/tectonic-${TECTONIC_VERSION}-${arch}-unknown-linux-musl.tar.gz" | tar -xz -C /usr/local/bin tectonic; \
+       fi \
+    && fc-cache -f \
+    && apt-get purge -y curl && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY package.json server.mjs ./
 
-# tectonic caches downloaded LaTeX packages here; mount a volume to persist across runs.
 ENV TECTONIC_CACHE_DIR=/var/cache/tectonic
 RUN mkdir -p /var/cache/tectonic
 
 ENV PORT=8080
 EXPOSE 8080
 
-# Non-root for safety; the temp dirs the server uses live under /tmp.
+# Non-root; every conversion works in its own directory under /tmp.
 RUN useradd -m worker && chown -R worker /app /var/cache/tectonic
 USER worker
 

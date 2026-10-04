@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { mergePdfs, pdfToWord, wordToPdf } from "@/lib/tools/doc-engines"
 import { humanBytes } from "@/lib/uploads/limits"
+import { convertExact, exactAvailable } from "@/lib/tools/convert-client"
 
 const btn = "h-10 rounded-md px-5 text-sm font-medium disabled:opacity-50"
 const primary = { background: "var(--primary)", color: "var(--primary-foreground)" }
@@ -29,6 +30,27 @@ function Frame({ children, limits, selfTest }: { children: React.ReactNode; limi
         {check && <p className="mt-2 font-mono text-xs" data-testid="selftest">{check}</p>}
       </details>
     </div>
+  )
+}
+
+type Mode = "exact" | "browser"
+
+/** Whether the exact-layout converter is set up, and the caller's upload folder for it. */
+function useExact() {
+  const [state, setState] = useState<{ available: boolean; prefix: string } | null>(null)
+  useEffect(() => { exactAvailable().then(setState) }, [])
+  return state
+}
+
+function ModePicker({ exact, mode, setMode, exactText, browserText }: { exact: { available: boolean } | null; mode: Mode; setMode: (m: Mode) => void; exactText: string; browserText: string }) {
+  if (!exact) return null
+  if (!exact.available) return <p className="mb-4 text-xs text-muted-foreground">Exact-layout conversion is not set up on this deployment, so this tool uses the in-browser converter.</p>
+  const row = "flex items-start gap-2 rounded-md border border-border p-3 text-sm cursor-pointer"
+  return (
+    <fieldset className="mb-4 grid gap-2 sm:grid-cols-2">
+      <label className={`${row} ${mode === "exact" ? "border-[var(--accent)]" : ""}`}><input type="radio" checked={mode === "exact"} onChange={() => setMode("exact")} className="mt-1" /><span><b>Exact layout</b><br /><span className="text-xs text-muted-foreground">{exactText}</span></span></label>
+      <label className={`${row} ${mode === "browser" ? "border-[var(--accent)]" : ""}`}><input type="radio" checked={mode === "browser"} onChange={() => setMode("browser")} className="mt-1" /><span><b>Private, in your browser</b><br /><span className="text-xs text-muted-foreground">{browserText}</span></span></label>
+    </fieldset>
   )
 }
 
@@ -85,11 +107,20 @@ export function PdfMergeTool() {
 // ── Word to PDF ─────────────────────────────────────────────────────────
 
 export function WordToPdfTool() {
+  const exact = useExact()
+  const [mode, setMode] = useState<Mode>("exact")
+  const useExactMode = !!exact?.available && mode === "exact"
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [out, setOut] = useState<{ file: File; pages: number; images: number } | null>(null)
 
-  async function run(f: File) { setBusy(true); setError(null); setOut(null); try { setOut(await wordToPdf(f)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
+  async function run(f: File) {
+    setBusy(true); setError(null); setOut(null)
+    try {
+      if (useExactMode) { const file = await convertExact(f, "word-to-pdf", exact!.prefix); setOut({ file, pages: 0, images: 0 }) }
+      else setOut(await wordToPdf(f))
+    } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+  }
   async function selfTest() {
     const d = await import("docx")
     const doc = new d.Document({ sections: [{ children: [
@@ -106,13 +137,14 @@ export function WordToPdfTool() {
   }
 
   return (
-    <Frame limits="Keeps headings, paragraphs, bold and italic, lists, simple tables and pictures. Does not reproduce headers and footers, columns, text boxes or exact fonts; for a pixel-perfect copy use Word's Save as PDF." selfTest={selfTest}>
-      <label className="block text-sm font-medium">Word document (.docx)
-        <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={busy} className="mt-2 block w-full text-sm" onChange={(e) => { const f = e.target.files?.[0]; if (f) run(f) }} />
+    <Frame limits={useExactMode ? "Exact layout sends the file to Anker's own converter, which deletes it as soon as the PDF is made. Calibri, Cambria, Arial and Times New Roman documents match Word; other fonts are replaced by the closest one." : "Keeps headings, paragraphs, bold and italic, lists, simple tables and pictures. Does not reproduce headers and footers, columns, text boxes or exact fonts."} selfTest={selfTest}>
+      <ModePicker exact={exact} mode={mode} setMode={setMode} exactText="Headers, footers, columns, tables and fonts as in Word. The file goes to Anker's converter and is deleted straight after. Up to 25 MB." browserText="Nothing leaves your computer. Text, headings, lists, simple tables and pictures; no headers, footers or columns." />
+      <label className="block text-sm font-medium">Word document ({useExactMode ? ".docx, .doc, .odt, .rtf" : ".docx"})
+        <input type="file" accept={useExactMode ? ".docx,.doc,.odt,.rtf" : ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"} disabled={busy} className="mt-2 block w-full text-sm" onChange={(e) => { const f = e.target.files?.[0]; if (f) run(f) }} />
       </label>
       {busy && <p className="mt-3 text-sm text-muted-foreground">Converting…</p>}
       {error && <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>}
-      {out && <Download file={out.file} note={`${out.pages} page${out.pages === 1 ? "" : "s"}${out.images ? `, ${out.images} picture${out.images === 1 ? "" : "s"}` : ""}.`} />}
+      {out && <Download file={out.file} note={out.pages ? `${out.pages} page${out.pages === 1 ? "" : "s"}${out.images ? `, ${out.images} picture${out.images === 1 ? "" : "s"}` : ""}.` : "Converted with the exact-layout converter."} />}
     </Frame>
   )
 }
@@ -120,6 +152,9 @@ export function WordToPdfTool() {
 // ── PDF to Word ─────────────────────────────────────────────────────────
 
 export function PdfToWordTool() {
+  const exact = useExact()
+  const [mode, setMode] = useState<Mode>("exact")
+  const useExactMode = !!exact?.available && mode === "exact"
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -127,7 +162,10 @@ export function PdfToWordTool() {
 
   async function run(f: File) {
     setBusy(true); setError(null); setOut(null)
-    try { setOut(await pdfToWord(f, (p, n) => setProgress(`Page ${p} of ${n}…`))) } catch (e) { setError((e as Error).message) } finally { setBusy(false); setProgress(null) }
+    try {
+      if (useExactMode) { setProgress("Converting on the server, this can take up to a minute for a long document…"); const file = await convertExact(f, "pdf-to-word", exact!.prefix); setOut({ file, pages: 0, paragraphs: 0 }) }
+      else setOut(await pdfToWord(f, (p, n) => setProgress(`Page ${p} of ${n}…`)))
+    } catch (e) { setError((e as Error).message) } finally { setBusy(false); setProgress(null) }
   }
   async function selfTest() {
     const { PDFDocument, StandardFonts } = await import("pdf-lib")
@@ -146,13 +184,14 @@ export function PdfToWordTool() {
   }
 
   return (
-    <Frame limits="Recovers the text in reading order with headings and lists. It does not rebuild the page layout, and cannot read a scanned PDF or a deck made of images (that needs OCR)." selfTest={selfTest}>
+    <Frame limits={useExactMode ? "Exact layout keeps every line where it sits on the page, as positioned text, so it looks like the PDF but is awkward to re-flow when you edit. Scanned pages come through as pictures (no OCR)." : "Recovers the text in reading order with headings and lists. It does not rebuild the page layout, and cannot read a scanned PDF or a deck made of images (that needs OCR)."} selfTest={selfTest}>
+      <ModePicker exact={exact} mode={mode} setMode={setMode} exactText="Looks like the PDF: text boxes placed where they are on each page. Harder to edit as flowing text. The file goes to Anker's converter and is deleted straight after. Up to 25 MB." browserText="Nothing leaves your computer. Clean, editable text in reading order with headings and lists; no page layout." />
       <label className="block text-sm font-medium">PDF
         <input type="file" accept="application/pdf,.pdf" disabled={busy} className="mt-2 block w-full text-sm" onChange={(e) => { const f = e.target.files?.[0]; if (f) run(f) }} />
       </label>
       {progress && <p className="mt-3 text-sm text-muted-foreground">{progress}</p>}
       {error && <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>}
-      {out && <Download file={out.file} note={`${out.pages} page${out.pages === 1 ? "" : "s"}, ${out.paragraphs} paragraphs of text recovered.`} />}
+      {out && <Download file={out.file} note={out.pages ? `${out.pages} page${out.pages === 1 ? "" : "s"}, ${out.paragraphs} paragraphs of text recovered.` : "Converted with the exact-layout converter."} />}
     </Frame>
   )
 }

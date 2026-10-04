@@ -1,0 +1,60 @@
+# 40. Exact-layout document conversion (LibreOffice worker)
+
+Status: built and tested 2026-10-04; inert until the worker is deployed and `DOC_WORKER_URL` / `DOC_WORKER_TOKEN` are set.
+Builds on the seam described in `docs/anker-agent-tooling-expansion.md` §C (`lib/docworker/client.ts`, `services/doc-worker`).
+
+## 1. Why
+
+The in-browser Word to PDF and PDF to Word tools (`lib/tools/doc-engines.ts`) are private and instant but text-first: no headers,
+footers, columns, text boxes or exact fonts. A converter that renders the way Word does needs LibreOffice, a native binary that cannot run
+on Vercel. It runs in a small container (the doc worker) that the app calls over HTTP.
+
+## 2. What it does
+
+| Direction | Engine | Result |
+| --- | --- | --- |
+| Word (`.docx` `.doc` `.odt` `.rtf`) to PDF | LibreOffice Writer | Layout, headers, footers, columns, tables and fonts as in Word. Calibri, Cambria, Arial, Times New Roman and Courier New are matched by metric-compatible fonts (Carlito, Caladea, Liberation). |
+| PDF to Word | LibreOffice Writer PDF import, saved as Word | Every line kept where it sits on the page, as positioned text. Looks like the PDF; awkward to re-flow when editing. No OCR: a scan comes through as pictures. |
+
+Honest limit: no open-source converter turns an arbitrary PDF into a cleanly flowing Word document. The in-browser option remains the
+"clean editable text" path, and the two are offered side by side.
+
+## 3. Path of a conversion
+
+```
+browser ─ upload straight to private Blob (tools-convert/<workspace>/…, token route, 25 MB, 10 min) ─▶
+POST /api/tools/convert {direction, blobUrl, filename}   signed-in workspace member, rate limited (20 an hour)
+   ├─ the blob URL must be in the caller's own folder of our store
+   ├─ read the bytes, then delete the upload (always, success or failure)
+   ├─ POST {DOC_WORKER_URL}/render  (bearer token, base64 source)   ── worker: own temp dir and LibreOffice profile (macros off,
+   │                                                                   links not updated), non-root, timeout, concurrency cap, queue then 429
+   └─ stream the worker's response back to the browser (no size limit, nothing held in memory)
+```
+
+The page asks `GET /api/tools/convert` for `{available, prefix}` and shows the exact-layout option only when the worker is configured; otherwise it says
+so and uses the in-browser converter.
+
+## 4. Security
+
+The worker opens untrusted files. Mitigations in the worker: refuses to start without `DOC_WORKER_TOKEN` (constant-time compare); one throwaway directory and one
+LibreOffice profile per conversion with macro execution disabled and linked content never fetched; the filename is reduced to a safe name and never reaches an
+argument; kill on timeout (90 s); at most `DOC_WORKER_CONCURRENCY` (2) at once; body cap 48 MB. Mitigations that belong to the deployment: run it as non-root (the image
+does), give it a network with **no route to internal services** and no secrets in its environment, and keep it off the public internet except through the token.
+The file is sent to our own converter only, never to a third party, and the privacy line on the page says so.
+
+## 5. Deploy
+
+See `services/doc-worker/README.md`. Needs a host that runs a container with about 1 GB of memory (LibreOffice is heavy): Fly.io, Railway, Render, Cloud Run or a small VPS. Then, on
+the app (Vercel): `DOC_WORKER_URL` and `DOC_WORKER_TOKEN`, and redeploy. Nothing else changes.
+
+## 6. Tested
+
+Worker protocol (node:test, fake converter): auth, validation, argument plan, filename safety, body cap, timeout, concurrency and queue. App route (vitest): direction and
+file-type planning, the caller-folder check, cleanup on every path, error pass-through. Against the real container (LibreOffice 7.4, built locally): a two-column
+Word document with header, footer, table, Calibri and Cambria converted to a 2-page A4 PDF with the fonts embedded (Carlito, Caladea) in about 5 s; a real 14-page investor deck PDF
+converted to Word in about 18 s. Not covered: CJK text (no CJK font in the image; add `fonts-noto-cjk` if needed).
+
+## 7. Not done
+
+Spreadsheet and presentation conversion (build with `LO_PACKAGES="libreoffice-writer libreoffice-calc libreoffice-impress"` and add tool pages); OCR for scanned PDFs; a per-tenant usage meter
+on conversions; LaTeX in the image (tectonic is optional, see the Dockerfile).
