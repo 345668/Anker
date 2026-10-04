@@ -60,7 +60,9 @@ export async function compressPdf(file: File, opts: { targetBytes: number; onPro
         canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height)
         const ctx = canvas.getContext("2d", { alpha: false })!
         ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height)
-        await page.render({ canvas, canvasContext: ctx, viewport }).promise
+        // intent "print" renders without requestAnimationFrame, which a hidden browser tab never fires: the default intent
+        // stalls forever when the user switches tabs during a long compression.
+        await page.render({ canvas, canvasContext: ctx, viewport, intent: "print" }).promise
         const blob: Blob = await new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new CompressError("The browser could not encode a page"))), "image/jpeg", steps[a].quality))
         const img = await out.embedJpg(new Uint8Array(await blob.arrayBuffer()))
         const p = out.addPage([natural.width, natural.height])
