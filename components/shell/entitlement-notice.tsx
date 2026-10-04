@@ -8,7 +8,7 @@ export function EntitlementBanner({ e }: { e: Effective }) {
     : e.state === "offboarding" ? "This workspace is being closed. You can sign in and export your data; AI runs and sending are switched off."
     : null
   if (!text) return null
-  return <div role="status" className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm text-amber-900 dark:text-amber-200">{text}</div>
+  return <div role="status" className="sticky top-0 z-30 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm text-amber-900 dark:text-amber-200">{text}</div>
 }
 
 /** Shown in place of a module the workspace's plan does not include. */

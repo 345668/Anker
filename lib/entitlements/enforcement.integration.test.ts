@@ -49,7 +49,7 @@ describe("resolution from the database", () => {
 describe("lifecycle and modules", () => {
   it("a paused workspace is refused for AI with a 403 and a plain reason, and resumes cleanly", async () => {
     await state("o1", "paused")
-    const r = await refused(assertAllowed("o1", "ai")); expect(r).toBeInstanceOf(EntitlementRefusal); expect(r).toMatchObject({ code: "paused", status: 403 }); expect(r!.message).toMatch(/paused/)
+    const r = await refused(assertAllowed("o1", "ai")); expect(r).toBeInstanceOf(EntitlementRefusal); expect(r!.name).toBe("EntitlementRefusal"); expect(r).toMatchObject({ code: "paused", status: 403 }); expect(r!.message).toMatch(/paused/)
     await state("o1", "active"); expect(await refused(assertAllowed("o1", "ai"))).toBeNull()
   })
   it("a module the plan lacks is refused", async () => {

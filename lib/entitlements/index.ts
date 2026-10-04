@@ -60,7 +60,7 @@ export async function limitOf(orgId: string, key: LimitKey): Promise<number | nu
 
 /** What a refusal looks like to the routes: a WorkspaceError (they already answer those) carrying our code. 402 for a used-up allowance, 503 for maintenance. */
 export class EntitlementRefusal extends WorkspaceError {
-  constructor(readonly code: EntitlementError["code"], message: string) { super(message, code === "limit" ? 402 : code === "maintenance" ? 503 : 403) }
+  constructor(readonly code: EntitlementError["code"], message: string) { super(message, code === "limit" ? 402 : code === "maintenance" ? 503 : 403); this.name = "EntitlementRefusal" }
 }
 const toRefusal = (r: EntitlementError) => new EntitlementRefusal(r.code, r.message)
 

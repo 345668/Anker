@@ -113,11 +113,12 @@ export async function POST(req: NextRequest) {
       turnsRemaining: Math.max(0, OBSERVE_MAX_TURNS_PER_CALL - used),
     }, { headers: { "Cache-Control": "no-store" } })
   } catch (error) {
+    const refused = (error as Error)?.name === "EntitlementRefusal"
     const known = error instanceof CallError
-    if (!known) console.error("[calls/agent] failed", error)
+    if (!known && !refused) console.error("[calls/agent] failed", error)
     return NextResponse.json(
-      { error: known ? error.message : "The assistant is unavailable. Your call is unaffected." },
-      { status: known ? error.status : 503, headers: { "Cache-Control": "no-store" } },
+      { error: known || refused ? (error as Error).message : "The assistant is unavailable. Your call is unaffected." },
+      { status: known ? error.status : refused ? (error as any).status : 503, headers: { "Cache-Control": "no-store" } },
     )
   }
 }
