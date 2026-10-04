@@ -54,8 +54,8 @@ export default async function DashboardLayout({
         user={user}
         isAdmin={isAdmin}
         persona={persona}
+        banner={entitlements ? <EntitlementBanner e={entitlements} /> : null}
       >
-        {entitlements && <EntitlementBanner e={entitlements} />}
         {blocked ? <ModuleNotIncluded feature={blocked} /> : children}
       </NavModeShell>
 
