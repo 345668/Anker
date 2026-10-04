@@ -317,7 +317,9 @@ interface TabProps {
 
 // Account Tab Component
 function AccountTab({ user, settings, onSave, saving, saved }: TabProps & { user: User }) {
-  const [userType, setUserType] = useState<'founder' | 'vc'>(settings?.user_type || 'founder')
+  // Read-only and derived on every render: the settings arrive after the first paint, and a state copy of them stayed on the default.
+  const userType: 'founder' | 'vc' = settings?.user_type === 'vc' ? 'vc' : 'founder'
+  const setUserType = (_t: 'founder' | 'vc') => {}
   const [senderName, setSenderName] = useState(settings?.sender_name || user.user_metadata?.full_name || "")
   const [senderEmail, setSenderEmail] = useState(settings?.sender_email || user.email || "")
   const firstName = user.user_metadata?.first_name || ""
