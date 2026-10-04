@@ -42,7 +42,12 @@ describe("the erasure registry covers every workspace-keyed table", () => {
     const missing = [...keyedTables()].filter(([t]) => !known.has(t) && !(t in (SNAPSHOT.tables as Record<string, string[]>))).map(([t, k]) => `${t} (${k.join(", ")})`)
     expect(missing, `Classify these in lib/tenant/registry.ts:\n${missing.join("\n")}`).toEqual([])
   })
-  it("every rule names a table that really exists in the live schema (a typo would silently match nothing)", () => {
+  it("every rule names a real BASE table in the live schema: not a view (cannot be deleted from) and not a typo (would silently match nothing)", () => {
+    const base = new Set((SNAPSHOT as any).baseTables as string[])
+    expect(base.size).toBeGreaterThan(100)
+    expect(RULES.filter((r) => !base.has(r.table)).map((r) => r.table)).toEqual([])
+  })
+  it("every keyed rule table is in the keyed snapshot too", () => {
     const live = new Set(Object.keys(SNAPSHOT.tables))
     // Child and member tables are keyed by a parent or user id, not by a workspace key, so only the keyed ones can be checked here.
     const unknownKeyed = RULES.filter((r) => r.scope !== "member" && !live.has(r.table) && !CHILD_TABLES.has(r.table)).map((r) => r.table)

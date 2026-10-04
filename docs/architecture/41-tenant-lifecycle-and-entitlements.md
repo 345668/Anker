@@ -93,3 +93,16 @@ Verified on production with Summit Venture Studio (then restored): paused gave t
 Finding: with the placeholder catalogue, Starter excludes `fund_ops`, which blocks a fund's own deal pipeline. The catalogue needs a design pass (what each plan includes for a founder, a fund and an LP) before any real workspace is put on a plan; nothing is restricted until an operator assigns one.
 
 Phase B (export and erasure executor, request queue with deadline clock, step-up two-factor) is not built.
+
+## 11. Phase B built and verified, 2026-10-04
+
+**Registry** (`lib/tenant/registry.ts`): 129 rules, each table classified as workspace, fund or member scope, in erasure order (children first; the workspace, its fund and memberships last); billing records are exported but retained by law; `ai_calls` is anonymised, not deleted;
+secrets (tokens, API keys) are left out of exports; the investor directory, the do-not-contact lists and consent records are in EXCLUDED and can never be erased. Guards: a CI test compares the registry with a snapshot of the live schema (and fails on a table that is in neither the
+rules nor the exclusions, on a rule naming a view or a typo, or on a literal id), and the nightly dependency check does the same against the live database ("Erasure registry").
+**Flow** (`lib/tenant/requests.ts`): export (built, stored privately, owners emailed a sign-in-protected link valid 14 days, then deleted); erasure = dry run, typed workspace name, a fresh two-factor code (SAIL), scheduled seven days out with the owners emailed and a cancel path, executed by the
+cron (`/api/cron/tenant-requests`, every 30 minutes) only after the guards and a drift check pass again, then a tombstone with no customer content. Blockers: not in offboarding, legal hold, protected list, a platform owner is a member, a live subscription. Failure partway keeps what was deleted and retries; five failures stop for a person.
+**Surfaces**: SAIL `/organizations/<id>/requests` (counts and status only; superadmin starts and schedules, admins export and cancel); Anker `POST /api/admin/tenants/<org>/requests` (portal service principal only, so a signed-in admin cannot bypass SAIL's step-up).
+
+Verified against production (not just PGlite): all 129 rules are valid SQL on the live schema and name real base tables (two real defects found and fixed this way: several `fund_id` and `user_id` columns are uuid, so every comparison casts to text; `crm_migration_plan` is a view); a dry run and an export of the Winner Capital workspace
+returned exactly its four rows; a throwaway workspace with rows in twelve tables (including a fund, a deal with an evaluation, a journal entry and an LP) was erased end to end, the global row count of every registry table was unchanged afterwards except the one anonymised cost row, and the tombstone was written. Everything the test created was removed.
+Not verified: the HTTP routes and SAIL screens (they need the service token and a signed-in staff session with two-factor), the blob deletion against a real store, and the emails. Member-scope tables were not exercised in production (the test member had no outreach or chat rows).

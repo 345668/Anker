@@ -87,7 +87,7 @@ export async function blobRefs(s: Scope): Promise<{ label: string; refs: string[
 /** The deal-document prefixes of this fund's deals: `deal-documents/<dealId>/`. */
 export async function dealDocPrefixes(s: Scope): Promise<string[]> {
   if (!s.fundId) return []
-  try { return (await q("SELECT id FROM deal_opportunities WHERE fund_id = $1", [s.fundId])).map((r) => `deal-documents/${r.id}/`) } catch { return [] }
+  try { return (await q("SELECT id FROM deal_opportunities WHERE fund_id::text = $1", [s.fundId])).map((r) => `deal-documents/${r.id}/`) } catch { return [] }
 }
 
 export interface DryRun { takenAt: string; counts: TableCount[]; blobs: { label: string; count: number }[]; toDelete: number; toAnonymize: number; retained: number; digest: string }
