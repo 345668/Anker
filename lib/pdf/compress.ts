@@ -45,34 +45,45 @@ export async function compressPdf(file: File, opts: { targetBytes: number; onPro
   const task = pdfjs.getDocument({ data: data.slice() })
   const src = await task.promise
   const first = startStep(file.size, opts.targetBytes)
-  const steps = LADDER.slice(first)
+  const total = LADDER.length - first
   let best: Uint8Array | null = null
+  let attemptNo = 0
+  const attempt = async (step: Step): Promise<Uint8Array> => {
+    attemptNo++
+    const out = await PDFDocument.create()
+    for (let i = 1; i <= src.numPages; i++) {
+      if (opts.signal?.aborted) throw new CompressError("Cancelled")
+      opts.onProgress?.({ page: i, pages: src.numPages, attempt: attemptNo, attempts: total + 1 })
+      const page = await src.getPage(i)
+      const natural = page.getViewport({ scale: 1 })
+      const viewport = page.getViewport({ scale: pageScale(natural.width, natural.height, step) })
+      const canvas = document.createElement("canvas")
+      canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height)
+      const ctx = canvas.getContext("2d", { alpha: false })!
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height)
+      // intent "print" renders without requestAnimationFrame, which a hidden browser tab never fires: the default intent
+      // stalls forever when the user switches tabs during a long compression.
+      await page.render({ canvas, canvasContext: ctx, viewport, intent: "print" }).promise
+      const blob: Blob = await new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new CompressError("The browser could not encode a page"))), "image/jpeg", step.quality))
+      const img = await out.embedJpg(new Uint8Array(await blob.arrayBuffer()))
+      const p = out.addPage([natural.width, natural.height])
+      p.drawImage(img, { x: 0, y: 0, width: natural.width, height: natural.height })
+      canvas.width = 0; canvas.height = 0 // release the bitmap now, a long deck would otherwise hold hundreds of them
+      page.cleanup()
+    }
+    return out.save({ useObjectStreams: true })
+  }
   try {
-    for (let a = 0; a < steps.length; a++) {
-      const out = await PDFDocument.create()
-      for (let i = 1; i <= src.numPages; i++) {
-        if (opts.signal?.aborted) throw new CompressError("Cancelled")
-        opts.onProgress?.({ page: i, pages: src.numPages, attempt: a + 1, attempts: steps.length })
-        const page = await src.getPage(i)
-        const natural = page.getViewport({ scale: 1 })
-        const viewport = page.getViewport({ scale: pageScale(natural.width, natural.height, steps[a]) })
-        const canvas = document.createElement("canvas")
-        canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height)
-        const ctx = canvas.getContext("2d", { alpha: false })!
-        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height)
-        // intent "print" renders without requestAnimationFrame, which a hidden browser tab never fires: the default intent
-        // stalls forever when the user switches tabs during a long compression.
-        await page.render({ canvas, canvasContext: ctx, viewport, intent: "print" }).promise
-        const blob: Blob = await new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new CompressError("The browser could not encode a page"))), "image/jpeg", steps[a].quality))
-        const img = await out.embedJpg(new Uint8Array(await blob.arrayBuffer()))
-        const p = out.addPage([natural.width, natural.height])
-        p.drawImage(img, { x: 0, y: 0, width: natural.width, height: natural.height })
-        canvas.width = 0; canvas.height = 0 // release the bitmap now, a long deck would otherwise hold hundreds of them
-        page.cleanup()
-      }
-      const bytes = await out.save({ useObjectStreams: true })
+    let landed = -1
+    for (let r = first; r < LADDER.length; r++) {
+      const bytes = await attempt(LADDER[r])
       if (!best || bytes.length < best.length) best = bytes
-      if (bytes.length <= opts.targetBytes) break
+      if (bytes.length <= opts.targetBytes) { landed = r; best = bytes; break }
+    }
+    // Landed well under the target on a rung below the gentlest: one try a rung up, keep it if it still fits. Sharper pages read better.
+    if (landed > 0 && best && best.length < opts.targetBytes * 0.55) {
+      const sharper = await attempt(LADDER[landed - 1])
+      if (sharper.length <= opts.targetBytes) best = sharper
     }
   } finally { await task.destroy() }
   if (!best) throw new CompressError("Nothing to compress")
