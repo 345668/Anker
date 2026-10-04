@@ -15,6 +15,8 @@
 
 import { useRef, useState } from "react"
 import { upload } from "@vercel/blob/client"
+import { prepareUpload, type Progress } from "@/lib/pdf/compress"
+import { MAX_DOCUMENT_BYTES } from "@/lib/uploads/limits"
 import {
   Check, X, Undo2, RotateCcw, Plus, Trash2, Star, Upload, FileText,
   Loader2, UserPlus, ChevronDown,
@@ -357,14 +359,21 @@ export function DataRoomSection({
   const [category, setCategory] = useState<DealDocCategory>("deck")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+  const [progress, setProgress] = useState<Progress | null>(null)
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setBusy(true); setError(null)
+    const picked = e.target.files?.[0]
+    if (!picked) return
+    setBusy(true); setError(null); setNote(null)
     try {
       // Direct client → private Blob upload (bypasses the 4.5 MB body limit),
       // authorized by the token-broker route.
+      // A PDF over the ceiling is compressed in the browser first; anything else over it is refused with a clear message.
+      const prepared = await prepareUpload(picked, MAX_DOCUMENT_BYTES, setProgress)
+      setProgress(null)
+      const file = prepared.file
+      if (prepared.compressed) setNote(`${picked.name} was ${humanSize(prepared.from)}; uploaded a ${humanSize(file.size)} copy (image-based, text not selectable).`)
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-")
       // Path prefix must be deal-documents/<dealId>/ — the broker enforces it.
       const blob = await upload(`deal-documents/${dealId}/${safeName}`, file, {
@@ -387,7 +396,7 @@ export function DataRoomSection({
     } catch (e: any) {
       setError(e?.message ?? "Upload failed")
     } finally {
-      setBusy(false)
+      setBusy(false); setProgress(null)
       if (inputRef.current) inputRef.current.value = ""
     }
   }
@@ -427,6 +436,8 @@ export function DataRoomSection({
         )}
       </div>
 
+      {progress && <p className="mb-3 text-sm text-muted-foreground">Making the file smaller: page {progress.page} of {progress.pages}{progress.attempts > 1 ? ` (pass ${progress.attempt})` : ""}…</p>}
+      {note && <p className="mb-3 text-sm text-muted-foreground">{note}</p>}
       {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
 
       {documents.length === 0 ? (

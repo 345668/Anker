@@ -19,7 +19,8 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
 
 export const runtime = "nodejs"
 
-const MAX_BYTES = 25 * 1024 * 1024
+import { MAX_DOCUMENT_BYTES } from "@/lib/uploads/limits"
+const MAX_BYTES = MAX_DOCUMENT_BYTES
 const ALLOWED = [
   "application/pdf",
   "application/msword",

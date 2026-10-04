@@ -2,7 +2,9 @@
 
 import { useState } from "react"
 import { STAGES, type FormConfig } from "@/lib/intake/model"
-import { PENDING_PREFIX } from "@/lib/campaign/submission-files"
+import { INTAKE_PENDING_PREFIX, INTAKE_MAX_BYTES } from "@/lib/intake/files"
+import { prepareUpload, CompressError, type Progress } from "@/lib/pdf/compress"
+import { humanBytes } from "@/lib/uploads/limits"
 
 const INLINE_MAX = 3 * 1024 * 1024
 const field = "mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
@@ -12,22 +14,30 @@ export function IntakeForm({ slug, fundName, headline, intro, form }: { slug: st
   const [done, setDone] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [deckName, setDeckName] = useState<string | null>(null)
+  const [progress, setProgress] = useState<Progress | null>(null)
+  const [note, setNote] = useState<string | null>(null)
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setBusy(true); setError(null)
     const fd = new FormData(e.currentTarget)
     try {
-      const deck = fd.get("pitch_deck")
-      if (deck instanceof File && deck.size > INLINE_MAX) {
-        const { upload } = await import("@vercel/blob/client")
-        const b = await upload(`${PENDING_PREFIX}${crypto.randomUUID()}/${deck.name.replace(/[^\w.\- ]/g, "_")}`, deck, { access: "private" as any, handleUploadUrl: "/api/public/submit/upload", contentType: deck.type || undefined })
-        fd.delete("pitch_deck"); fd.set("deck_blob_url", b.url)
+      const picked = fd.get("pitch_deck")
+      if (picked instanceof File && picked.size > 0) {
+        // Over the ceiling: a PDF is compressed here in the browser first. Under it: sent as is.
+        const prepared = await prepareUpload(picked, INTAKE_MAX_BYTES, setProgress)
+        setProgress(null)
+        if (prepared.compressed) setNote(`Your deck was ${humanBytes(prepared.from)}; we made a ${humanBytes(prepared.file.size)} copy to send.`)
+        if (prepared.file.size > INLINE_MAX) {
+          const { upload } = await import("@vercel/blob/client")
+          const b = await upload(`${INTAKE_PENDING_PREFIX}${crypto.randomUUID()}/${prepared.file.name.replace(/[^\w.\- ]/g, "_")}`, prepared.file, { access: "private" as any, handleUploadUrl: "/api/public/intake-upload", contentType: prepared.file.type || undefined })
+          fd.delete("pitch_deck"); fd.set("deck_blob_url", b.url)
+        } else if (prepared.compressed) { fd.set("pitch_deck", prepared.file) }
       }
       const r = await fetch(`/api/public/intake/${encodeURIComponent(slug)}`, { method: "POST", body: fd })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || "Something went wrong. Please try again.")
       setDone(d.publicRef)
-    } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+    } catch (err) { setError(err instanceof CompressError ? err.message : (err as Error).message) } finally { setBusy(false); setProgress(null) }
   }
 
   if (done) return (
@@ -67,9 +77,11 @@ export function IntakeForm({ slug, fundName, headline, intro, form }: { slug: st
           {q.long ? <textarea name={`q_${q.id}`} rows={3} required={q.required} maxLength={1500} className={field} /> : <input name={`q_${q.id}`} required={q.required} maxLength={1500} className={field} />}
         </label>
       ))}
-      <label className="block"><L>Pitch deck (PDF or PowerPoint, up to 25 MB)</L>
+      <label className="block"><L>Pitch deck (PDF or PowerPoint, any size: large PDFs are shrunk on your computer before sending)</L>
         <input name="pitch_deck" type="file" accept=".pdf,.ppt,.pptx" onChange={(e) => setDeckName(e.target.files?.[0]?.name ?? null)} className="mt-1 block w-full text-sm" />
         {deckName && <span className="text-xs text-muted-foreground">{deckName}</span>}
+        {progress && <span className="block text-xs text-muted-foreground">Making your deck smaller: page {progress.page} of {progress.pages}{progress.attempts > 1 ? ` (pass ${progress.attempt})` : ""}…</span>}
+        {note && <span className="block text-xs text-muted-foreground">{note}</span>}
       </label>
       <label className="flex items-start gap-2 text-xs text-muted-foreground">
         <input type="checkbox" name="terms_accepted" value="1" required className="mt-0.5" />

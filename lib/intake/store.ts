@@ -6,6 +6,7 @@ import "server-only"
 import { sql } from "@/lib/db"
 import { configSchema, defaultConfig, type EngineResult, type IntakeConfig, type Submission } from "./model"
 import { assess } from "./engine"
+import { MAX_AUTO_READ_BYTES } from "@/lib/uploads/limits"
 import { createDeal, hasDealTables, upsertEvaluation } from "@/lib/portfolio/deal-pipeline"
 import { DEAL_CRITERIA, type ScoreMap } from "@/lib/portfolio/deal-constants"
 
@@ -82,6 +83,7 @@ async function readDeck(deckUrl: string | null, name: string, email: string): Pr
     const { extractStartupProfile } = await import("@/lib/matching/v2/document-extractor")
     const bytes = await readBlobBytes(deckUrl)
     if (!bytes) return null
+    if (bytes.length > MAX_AUTO_READ_BYTES) { console.warn(`[intake] deck of ${bytes.length} bytes is too large to read automatically; assessing from the form answers`); return null }
     const e = await extractStartupProfile({ name: deckUrl.split("/").pop() || "deck.pdf", contentType: "application/pdf", base64: bytes.toString("base64") }, [], { startupName: name, founderEmail: email })
     return e.pitchDeckSummary || null
   } catch (err) {

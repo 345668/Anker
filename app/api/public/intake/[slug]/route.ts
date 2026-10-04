@@ -10,7 +10,8 @@ import { createHash, randomBytes } from "node:crypto"
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit"
 import { getPublicIntake, createSubmission, processSubmission } from "@/lib/intake/store"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
-import { parseBlobUrls, nameFromBlobUrl, MAX_FILE_BYTES } from "@/lib/campaign/submission-files"
+import { nameFromBlobUrl } from "@/lib/campaign/submission-files"
+import { isIntakeBlobUrl, INTAKE_MAX_BYTES } from "@/lib/intake/files"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -66,7 +67,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
   if (!(await turnstileOk(str(form, "turnstile_token", 4000), ip))) return NextResponse.json({ error: "Bot verification failed. Please try again." }, { status: 403 })
 
   // Deck: inline when small, otherwise the URL of a blob the browser uploaded straight to private storage.
-  const blobUrl = parseBlobUrls([form.get("deck_blob_url")])[0] ?? null
+  const rawBlob = form.get("deck_blob_url")
+  const blobUrl = isIntakeBlobUrl(rawBlob) ? rawBlob : null
   const file = form.get("pitch_deck")
   const deck = file instanceof File && file.size > 0 ? file : null
   let deckUrl: string | null = null
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ slug: stri
     const { head } = await import("@vercel/blob")
     const meta = await head(blobUrl).catch(() => null)
     if (!meta) return NextResponse.json({ error: "The uploaded deck could not be found. Please attach it again." }, { status: 400 })
-    if (meta.size > MAX_FILE_BYTES) return NextResponse.json({ error: "The deck exceeds 25 MB." }, { status: 413 })
+    if (meta.size > INTAKE_MAX_BYTES) return NextResponse.json({ error: "The deck exceeds 100 MB." }, { status: 413 })
     deckUrl = blobUrl
   } else if (deck) {
     if (deck.size > MAX_INLINE) return NextResponse.json({ error: "Please attach larger decks through the upload button." }, { status: 413 })
