@@ -84,6 +84,7 @@
     "expo-asset": "latest",
     "expo-file-system": "latest",
     "expo-gl": "latest",
+    "fflate": "^0.8.3",
     "framer-motion": "^12.38.0",
     "geist": "1.7.0",
     "googleapis": "^173.0.0",

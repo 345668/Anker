@@ -1,0 +1,280 @@
+{
+  "takenAt": "2026-10-04",
+  "tables": {
+    "ai_calls": [
+      "workspace_id"
+    ],
+    "billing_credit_ledger": [
+      "org_id"
+    ],
+    "billing_customers": [
+      "org_id"
+    ],
+    "billing_subscriptions": [
+      "org_id"
+    ],
+    "call_sync_devices": [
+      "org_id"
+    ],
+    "capital_calls": [
+      "fund_id"
+    ],
+    "compliance_deadlines": [
+      "fund_id"
+    ],
+    "compliance_fund_settings": [
+      "fund_id"
+    ],
+    "crm_activities": [
+      "org_id"
+    ],
+    "crm_boards": [
+      "org_id"
+    ],
+    "crm_companies": [
+      "org_id"
+    ],
+    "crm_deals": [
+      "org_id"
+    ],
+    "crm_entries": [
+      "org_id"
+    ],
+    "crm_migration_plan": [
+      "org_id"
+    ],
+    "crm_migration_report": [
+      "org_id"
+    ],
+    "crm_people": [
+      "org_id"
+    ],
+    "crm_saved_views": [
+      "org_id"
+    ],
+    "crm_tasks": [
+      "org_id"
+    ],
+    "data_room_document_views": [
+      "fund_id"
+    ],
+    "data_room_documents": [
+      "fund_id"
+    ],
+    "data_room_requests": [
+      "fund_id"
+    ],
+    "deal_documents": [
+      "fund_id"
+    ],
+    "deal_opportunities": [
+      "fund_id"
+    ],
+    "decks": [
+      "fund_id"
+    ],
+    "discovery_exports": [
+      "org_id"
+    ],
+    "discovery_saved_searches": [
+      "org_id"
+    ],
+    "distributions": [
+      "fund_id"
+    ],
+    "document_extractions": [
+      "org_id"
+    ],
+    "fee_accruals": [
+      "fund_id"
+    ],
+    "fee_schedules": [
+      "fund_id"
+    ],
+    "financial_reports": [
+      "fund_id"
+    ],
+    "folk_import_runs": [
+      "workspace_id"
+    ],
+    "folk_workspaces": [
+      "workspace_id"
+    ],
+    "forecast_scenarios": [
+      "fund_id"
+    ],
+    "founder_match_exclusions": [
+      "org_id"
+    ],
+    "founder_match_runs": [
+      "org_id"
+    ],
+    "founder_match_sessions": [
+      "org_id"
+    ],
+    "fund_analytics_snapshots": [
+      "fund_id"
+    ],
+    "fund_assessment_history": [
+      "fund_id"
+    ],
+    "fund_compliance_profile": [
+      "fund_id"
+    ],
+    "fund_intake_configs": [
+      "fund_id"
+    ],
+    "fund_investments": [
+      "fund_id"
+    ],
+    "fund_lps": [
+      "fund_id"
+    ],
+    "fund_profiles": [
+      "org_id"
+    ],
+    "fundraising_rounds": [
+      "org_id"
+    ],
+    "impersonation_grants": [
+      "org_id"
+    ],
+    "intake_submissions": [
+      "fund_id"
+    ],
+    "investments": [
+      "fund_id"
+    ],
+    "investor_calls": [
+      "org_id"
+    ],
+    "investor_updates": [
+      "org_id"
+    ],
+    "journal_entries": [
+      "fund_id"
+    ],
+    "kyc_cases": [
+      "fund_id"
+    ],
+    "legal_documents": [
+      "fund_id"
+    ],
+    "legal_entities": [
+      "fund_id"
+    ],
+    "linkedin_connections": [
+      "owner_user_id"
+    ],
+    "lp_capital_calls": [
+      "fund_id"
+    ],
+    "lp_commitment_events": [
+      "fund_id"
+    ],
+    "lp_commitments": [
+      "fund_id"
+    ],
+    "lp_distributions": [
+      "fund_id"
+    ],
+    "lp_information_sharing": [
+      "fund_id"
+    ],
+    "lp_portal_tokens": [
+      "fund_id"
+    ],
+    "lp_positions": [
+      "fund_id"
+    ],
+    "lp_quarterly_reports": [
+      "fund_id"
+    ],
+    "lp_reports": [
+      "fund_id"
+    ],
+    "lp_statement_imports": [
+      "fund_id"
+    ],
+    "mc_actuals": [
+      "fund_id"
+    ],
+    "mc_budget_lines": [
+      "fund_id"
+    ],
+    "mcp_tokens": [
+      "workspace_id"
+    ],
+    "memberships": [
+      "org_id"
+    ],
+    "notifications": [
+      "org_id"
+    ],
+    "onboarding_drafts": [
+      "workspace_id"
+    ],
+    "organizations": [
+      "fund_id",
+      "owner_user_id"
+    ],
+    "planning_scenarios": [
+      "org_id"
+    ],
+    "portfolio_companies": [
+      "fund_id",
+      "owner_user_id"
+    ],
+    "portfolio_kpi_extractions": [
+      "fund_id"
+    ],
+    "portfolio_metrics": [
+      "fund_id"
+    ],
+    "private_artifacts": [
+      "org_id"
+    ],
+    "startup_profiles": [
+      "org_id"
+    ],
+    "startups": [
+      "org_id"
+    ],
+    "studio_projects": [
+      "fund_id"
+    ],
+    "tasks": [
+      "org_id"
+    ],
+    "tenant_entitlements": [
+      "org_id"
+    ],
+    "tenant_lifecycle": [
+      "org_id"
+    ],
+    "tenant_lifecycle_events": [
+      "org_id"
+    ],
+    "tenant_requests": [
+      "org_id"
+    ],
+    "valuation_snapshots": [
+      "fund_id"
+    ],
+    "waterfall_runs": [
+      "fund_id"
+    ],
+    "workspace_access_events": [
+      "org_id"
+    ],
+    "workspace_decks": [
+      "org_id"
+    ],
+    "workspace_invitations": [
+      "org_id"
+    ],
+    "workspace_ownership_transfers": [
+      "org_id"
+    ]
+  }
+}

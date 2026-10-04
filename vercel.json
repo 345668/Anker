@@ -34,6 +34,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/tenant-requests",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/cron/intake-assessment",
       "schedule": "*/15 * * * *"
     },
