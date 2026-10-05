@@ -166,6 +166,8 @@ export async function runExecution(id: string, deps: Deps = defaultDeps, opts: {
 /** The cron: start every scheduled run that is due, then resume anything queued or stale. */
 export async function dispatch(deps: Deps = defaultDeps, opts: { max?: number; deadlineAt?: number } = {}) {
   const now = deps.now(), max = opts.max ?? 20
+  // Housekeeping: a proposal nobody decided within its two weeks is closed, so nothing waits forever on a person who never looks.
+  await sql`UPDATE action_proposals SET status = 'expired' WHERE status = 'pending' AND expires_at < now()`
   const started: string[] = [], resumed: string[] = []
   const enabled = (await sql`SELECT org_id, agent_id, enabled_by FROM agent_settings WHERE enabled = true`) as any[]
   for (const s of enabled) {
