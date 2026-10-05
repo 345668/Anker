@@ -2,7 +2,7 @@
 import { sql } from "@/lib/db"
 import { recordChange } from "@/lib/audit/record-change"
 import { CAPABILITIES, ActionError, type Scope } from "./capabilities"
-import { idempotencyKey, mayAutoCommit, type RiskClass, type SourceTrust } from "./model"
+import { idempotencyKey, mayAutoCommit, mayPropose, type RiskClass, type SourceTrust } from "./model"
 
 export interface Proposal {
   id: string; org_id: string; capability: string; input: any; summary: string; diff: any[]; evidence: any; risk_class: RiskClass
@@ -34,9 +34,12 @@ export async function propose(scope: Scope & { persona?: string | null }, capabi
   const key = idempotencyKey(ctx.runId, capability, input)
   const existing = (await sql`SELECT * FROM action_proposals WHERE org_id = ${scope.orgId} AND idempotency_key = ${key}`) as any[]
   if (existing[0]) return { proposal: existing[0] as Proposal, applied: existing[0].status === "applied", message: null as string | null, existing: true }
+  const refusal = mayPropose(cap.risk, ctx.trust)
+  if (refusal) throw new ActionError(refusal)
   const plan = await cap.plan(scope, input)
+  const stored = { ...input, ...(plan.bind ?? {}) }
   const [row] = (await sql`INSERT INTO action_proposals (org_id, persona, requested_by, capability, input, summary, diff, evidence, risk_class, run_id, chat_id, source_trust, idempotency_key, agent_id, execution_id)
-    VALUES (${scope.orgId}, ${scope.persona ?? null}, ${scope.userId}, ${capability}, ${JSON.stringify(input)}::jsonb, ${plan.summary}, ${JSON.stringify(plan.diff)}::jsonb, ${JSON.stringify(plan.evidence)}::jsonb,
+    VALUES (${scope.orgId}, ${scope.persona ?? null}, ${scope.userId}, ${capability}, ${JSON.stringify(stored)}::jsonb, ${plan.summary}, ${JSON.stringify(plan.diff)}::jsonb, ${JSON.stringify(plan.evidence)}::jsonb,
             ${cap.risk}, ${ctx.runId}, ${ctx.chatId ?? null}, ${ctx.trust}, ${key}, ${ctx.agentId ?? null}, ${ctx.executionId ?? null})
     ON CONFLICT (org_id, idempotency_key) DO NOTHING RETURNING *`) as any[]
   if (!row) { const [again] = (await sql`SELECT * FROM action_proposals WHERE org_id = ${scope.orgId} AND idempotency_key = ${key}`) as any[]; return { proposal: again as Proposal, applied: again.status === "applied", message: null, existing: true } }
@@ -49,7 +52,7 @@ export async function propose(scope: Scope & { persona?: string | null }, capabi
 }
 
 /** Approve (apply once), reject or undo. A repeat of the same decision returns the stored result and changes nothing. */
-export async function decide(orgId: string, id: string, decision: "approve" | "reject" | "undo", by: Actor, opts: { auto?: boolean } = {}): Promise<{ proposal: Proposal; message: string }> {
+export async function decide(orgId: string, id: string, decision: "approve" | "reject" | "undo", by: Actor, opts: { auto?: boolean; typedCount?: number | null } = {}): Promise<{ proposal: Proposal; message: string }> {
   const [cur] = (await sql`SELECT * FROM action_proposals WHERE id = ${id} AND org_id = ${orgId}`) as any[]
   if (!cur) throw new ActionError("Proposal not found.")
   const scope: Scope = { orgId, userId: cur.requested_by }
@@ -67,12 +70,14 @@ export async function decide(orgId: string, id: string, decision: "approve" | "r
   }
   if (decision === "approve") {
     if (cur.status === "applied") return { proposal: cur, message: "Already applied." }
+    // Preconditions that must leave the proposal pending when they fail (the approver, a typed count, a changed batch).
+    if (cap.precheck) await cap.precheck(scope, cur.input, { agentId: cur.agent_id, approverUserId: by.userId, typedCount: opts.typedCount ?? null, proposalId: id })
     // The claim: only the caller that flips pending to applied performs the write, so a double click or a retry applies once.
     const [claimed] = (await sql`UPDATE action_proposals SET status = 'applied', decided_by = ${by.userId}, decided_at = now(), auto_committed = ${!!opts.auto}
       WHERE id = ${id} AND org_id = ${orgId} AND status = 'pending' RETURNING *`) as any[]
     if (!claimed) throw new ActionError(`This proposal is ${cur.status} and cannot be approved.`)
     try {
-      const out = await cap.apply(scope, cur.input, { agentId: cur.agent_id })
+      const out = await cap.apply(scope, cur.input, { agentId: cur.agent_id, approverUserId: by.userId, typedCount: opts.typedCount ?? null, proposalId: id })
       const [done] = (await sql`UPDATE action_proposals SET applied_at = now(), undo = ${JSON.stringify(out.undo)}::jsonb WHERE id = ${id} RETURNING *`) as any[]
       await audit(orgId, by, opts.auto ? "auto_committed" : "applied", done, { capability: cur.capability, proposal_id: id })
       return { proposal: done, message: out.message }
@@ -89,7 +94,7 @@ export async function decide(orgId: string, id: string, decision: "approve" | "r
   const [claimed] = (await sql`UPDATE action_proposals SET status = 'undone', undone_at = now() WHERE id = ${id} AND org_id = ${orgId} AND status = 'applied' RETURNING *`) as any[]
   if (!claimed) throw new ActionError("This change was already undone.")
   try {
-    const message = await cap.undo(scope, cur.input, cur.undo)
+    const message = await cap.undo(scope, cur.input, cur.undo, { byUserId: by.userId })
     await audit(orgId, by, "undone", claimed, { proposal_id: id })
     return { proposal: claimed, message }
   } catch (e: any) {

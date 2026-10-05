@@ -3,7 +3,7 @@
  * `staticCases` need no database and run in the test suite that gates the build. `liveCases` run nightly against production and only ever SELECT counts and ids, never tenant content.
  */
 import { sql } from "@/lib/db"
-import { mayAutoCommit, type RiskClass } from "@/lib/actions/model"
+import { mayAutoCommit, mayPropose, bulkApprovable, type RiskClass } from "@/lib/actions/model"
 import { CAPABILITIES } from "@/lib/actions/capabilities"
 import { DEFINITIONS } from "@/lib/agents/runtime/definitions"
 import { parseSchedule, withinCeiling } from "@/lib/agents/runtime/model"
@@ -23,11 +23,22 @@ export const staticCases: EvalCase[] = [
     for (const r of ["R1", "R2", "R3"] as RiskClass[]) if (mayAutoCommit(r, "trusted", { R0: true, R1: true, R2: true, R3: true })) return fail(`${r} auto-committed`)
     return pass() } },
   { name: "a run that read outside content never auto-commits, whatever the switch", run: () => mayAutoCommit("R0", "untrusted", { R0: true }) ? fail("untrusted R0 auto-committed") : pass() },
-  { name: "every capability has a known risk class; none reaches a third party, and R1 is limited to the reviewed set", run: () => {
+  { name: "every capability has a known risk class; R1 and R2 are limited to the reviewed sets; nothing above R2 exists", run: () => {
     const REVIEWED_R1 = ["outreach_save_drafts"] // saves drafts only; sending is a separate, gated path
+    const REVIEWED_R2 = ["outreach_send_batch"] // emails third parties: approved by the sender only, executed under a send authorization (doc 46)
     const bad = Object.values(CAPABILITIES).filter((c) => !["R0", "R1", "R2", "R3"].includes(c.risk)).map((c) => c.name)
-    const above = Object.values(CAPABILITIES).filter((c) => c.risk === "R2" || c.risk === "R3" || (c.risk === "R1" && !REVIEWED_R1.includes(c.name))).map((c) => c.name)
+    const above = Object.values(CAPABILITIES).filter((c) => c.risk === "R3" || (c.risk === "R2" && !REVIEWED_R2.includes(c.name)) || (c.risk === "R1" && !REVIEWED_R1.includes(c.name))).map((c) => c.name)
     return bad.length ? fail(`unknown risk: ${bad}`) : above.length ? fail(`capability without a reviewed approval path: ${above}`) : pass() } },
+  { name: "sending email: an untrusted run cannot propose it, nothing auto-commits it, bulk approval skips it, and no agent may propose it", run: () => {
+    if (!mayPropose("R2", "untrusted")) return fail("an untrusted run may propose R2")
+    if (mayPropose("R2", "trusted")) return fail("a trusted run is refused R2")
+    if (mayAutoCommit("R2", "trusted", { R0: true, R1: true, R2: true, R3: true })) return fail("R2 auto-commits")
+    if (bulkApprovable("R2") || bulkApprovable("R3")) return fail("bulk approval covers R2")
+    const agents = Object.values(DEFINITIONS).filter((d) => d.riskCeiling === "R2" || d.riskCeiling === "R3").map((d) => d.id)
+    if (agents.length) return fail(`agent definitions with a send ceiling: ${agents}`)
+    const send = CAPABILITIES.outreach_send_batch
+    if (!send || send.risk !== "R2" || !send.precheck) return fail("the send capability is missing its approver and typed-count precheck")
+    return pass() } },
   { name: "an agent that reads strangers' text marks its proposals untrusted, and a model agent that drafts is off by default", run: () => {
     const d = DEFINITIONS.outreach_drafter
     if (!d?.readsUntrusted) return fail("outreach_drafter does not mark its proposals untrusted")

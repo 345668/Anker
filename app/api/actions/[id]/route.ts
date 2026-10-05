@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const b = await req.json().catch(() => ({}))
   if (!["approve", "reject", "undo"].includes(b?.decision)) return NextResponse.json({ error: "decision must be approve, reject or undo." }, { status: 400 })
   try {
-    const r = await decide(who.orgId, (await ctx.params).id, b.decision, { userId: who.userId, email: who.email })
+    const r = await decide(who.orgId, (await ctx.params).id, b.decision, { userId: who.userId, email: who.email }, { typedCount: Number.isInteger(b.typedCount) ? b.typedCount : null })
     return NextResponse.json({ proposal: r.proposal, message: r.message })
   } catch (e) {
     if (e instanceof ActionError) return NextResponse.json({ error: e.message }, { status: 409 })

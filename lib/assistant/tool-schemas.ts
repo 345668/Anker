@@ -130,6 +130,8 @@ export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
   crm_add_task: obj({ title: str(), entryId: str(), dueAt: str({ description: "YYYY-MM-DD" }) }, ["title"]),
   memory_recall: obj({ entryId: str() }, ["entryId"]),
   memory_remember: obj({ entryId: str(), key: str({ description: "lowercase_with_underscores, e.g. follow_up_paused" }), value: str(), validUntil: str({ description: "YYYY-MM-DD, optional" }) }, ["entryId", "key", "value"]),
+  outreach_drafts: obj({ limit: num({ minimum: 1, maximum: 25 }) }),
+  outreach_send_batch: obj({ messageIds: arr(str()), provider: str({ enum: ["resend", "gmail"] }), sendAfter: str({ description: "ISO date-time, optional" }) }, ["messageIds"]),
   deal_pipeline: NO_INPUT,
   network_intro_paths: obj({ person: str({ description: "name or linkedin.com/in/… URL" }) }, ["person"]),
   outreach_inbox: NO_INPUT,

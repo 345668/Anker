@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 
-interface P { id: string; summary: string; diff: Array<{ label: string; before: string | null; after: string | null }>; risk_class: string; run_id: string | null; agent_id: string | null; source_trust: string
+interface P { id: string; capability: string; evidence: { count?: number; blocked?: number; requiresTypedCount?: boolean; mailbox?: string; note?: string } | null; summary: string; diff: Array<{ label: string; before: string | null; after: string | null }>; risk_class: string; run_id: string | null; agent_id: string | null; source_trust: string
   status: string; created_at: string; decided_at: string | null; auto_committed: boolean; failure: string | null }
 interface Data { proposals: P[]; autonomy: Record<string, boolean>; canDecide: boolean; canSetAutonomy: boolean }
 
@@ -20,9 +20,10 @@ export function ActionsInbox() {
   }, [tab])
   useEffect(() => { void load() }, [load])
 
-  async function decide(id: string, decision: string) {
+  const [typed, setTyped] = useState<Record<string, string>>({})
+  async function decide(id: string, decision: string, typedCount?: number) {
     setBusy(id); setNote(null)
-    const r = await fetch(`/api/actions/${id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ decision }) })
+    const r = await fetch(`/api/actions/${id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ decision, typedCount }) })
     const j = await r.json().catch(() => ({}))
     setNote(j.message ?? j.error ?? null); setBusy(null); await load()
   }
@@ -59,11 +60,11 @@ export function ActionsInbox() {
         <p className="rounded-lg border border-dashed border-foreground/15 p-8 text-center text-sm text-muted-foreground">{tab === "pending" ? "Nothing is waiting. Ask the assistant to move contacts or add follow-ups and the proposal will appear here." : "No decided actions yet."}</p>
       ) : groups.map(([key, items]) => (
         <section key={key} className="mb-5 rounded-lg border border-foreground/10">
-          {tab === "pending" && items.length > 1 && data.canDecide && (
+          {tab === "pending" && items.filter((i) => i.risk_class === "R0" || i.risk_class === "R1").length > 1 && data.canDecide && (
             <div className="flex items-center justify-between border-b border-foreground/10 px-4 py-2 text-sm">
-              <span className="text-muted-foreground">{items.length} changes from one request</span>
+              <span className="text-muted-foreground">{items.filter((i) => i.risk_class === "R0" || i.risk_class === "R1").length} changes from one request</span>
               <span className="flex gap-2">
-                <button disabled={busy === key} onClick={() => bulk(items.map((i) => i.id), "approve", key)} className="rounded-md bg-foreground px-3 py-1 text-background disabled:opacity-50">Approve all</button>
+                <button disabled={busy === key} onClick={() => bulk(items.filter((i) => i.risk_class === "R0" || i.risk_class === "R1").map((i) => i.id), "approve", key)} className="rounded-md bg-foreground px-3 py-1 text-background disabled:opacity-50">Approve all</button>
                 <button disabled={busy === key} onClick={() => bulk(items.map((i) => i.id), "reject", key)} className="rounded-md border border-foreground/15 px-3 py-1 disabled:opacity-50">Reject all</button>
               </span>
             </div>
@@ -77,8 +78,9 @@ export function ActionsInbox() {
                     {p.diff.map((d, i) => (
                       <p key={i} className="mt-1 text-xs text-muted-foreground">{d.label}: {d.before != null && <><s>{d.before}</s> → </>}<span className="text-foreground">{d.after}</span></p>
                     ))}
+                    {p.evidence?.note && p.risk_class === "R2" && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{p.evidence.note}</p>}
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {p.agent_id && `Proposed by ${AGENT_NAMES[p.agent_id] ?? p.agent_id} · `}{p.risk_class === "R0" ? "Low risk · reversible" : p.risk_class === "R1" ? "Review before approving · reversible" : p.risk_class}
+                      {p.agent_id && `Proposed by ${AGENT_NAMES[p.agent_id] ?? p.agent_id} · `}{p.risk_class === "R0" ? "Low risk · reversible" : p.risk_class === "R1" ? "Review before approving · reversible" : p.risk_class === "R2" ? "Sends real email · cannot be recalled once sent · only the sender can approve" : p.risk_class}
                       {p.source_trust === "untrusted" && " · made after reading outside content, so it always needs your approval"}
                       {tab === "history" && ` · ${STATUS[p.status] ?? p.status}${p.auto_committed ? " automatically" : ""}`}
                       {p.failure && ` · ${p.failure}`}
@@ -87,7 +89,10 @@ export function ActionsInbox() {
                   {data.canDecide && (
                     <div className="flex shrink-0 gap-2 text-sm">
                       {p.status === "pending" && <>
-                        <button disabled={busy === p.id} onClick={() => decide(p.id, "approve")} className="rounded-md bg-foreground px-3 py-1 text-background disabled:opacity-50">Approve</button>
+                        {p.capability === "outreach_send_batch" && p.evidence?.requiresTypedCount && (
+                          <input inputMode="numeric" aria-label={`Type ${p.evidence.count} to confirm`} placeholder={`type ${p.evidence.count}`} value={typed[p.id] ?? ""} onChange={(e) => setTyped((t) => ({ ...t, [p.id]: e.target.value }))} className="w-24 rounded-md border border-foreground/15 bg-background px-2 py-1" />
+                        )}
+                        <button disabled={busy === p.id || (p.capability === "outreach_send_batch" && !!p.evidence?.requiresTypedCount && Number(typed[p.id]) !== p.evidence.count)} onClick={() => decide(p.id, "approve", Number(typed[p.id]) || undefined)} className="rounded-md bg-foreground px-3 py-1 text-background disabled:opacity-50">{p.capability === "outreach_send_batch" ? `Approve and send${p.evidence?.count ? ` ${p.evidence.count}` : ""}` : "Approve"}</button>
                         <button disabled={busy === p.id} onClick={() => decide(p.id, "reject")} className="rounded-md border border-foreground/15 px-3 py-1 disabled:opacity-50">Reject</button>
                       </>}
                       {p.status === "applied" && <button disabled={busy === p.id} onClick={() => decide(p.id, "undo")} className="rounded-md border border-foreground/15 px-3 py-1 disabled:opacity-50">Undo</button>}

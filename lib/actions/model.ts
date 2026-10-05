@@ -26,6 +26,18 @@ export function mayAutoCommit(risk: RiskClass, trust: SourceTrust, autonomy: Par
   return autonomy.R0 === true
 }
 
+/**
+ * A proposal that would email third parties (R2) cannot come from a run that read outside content: a stranger's text must not be able to queue mail to people, so the
+ * refusal is at creation, not only at approval. Returns the reason, or null. docs/architecture/46 §6.
+ */
+export function mayPropose(risk: RiskClass, trust: SourceTrust): string | null {
+  if ((risk === "R2" || risk === "R3") && trust !== "trusted") return "This conversation has read outside content (a web page, an upload or an inbound reply), so it cannot propose sending email. Ask again in a new conversation."
+  return null
+}
+
+/** "Approve all" in the inbox never covers sending: each batch is read and approved on its own. */
+export const bulkApprovable = (risk: RiskClass): boolean => risk === "R0" || risk === "R1"
+
 /** Roles that may approve, reject or undo. LPs and read-only tokens never reach here as they have no write access. */
 export const DECIDER_ROLES = ["workspace_owner", "admin", "member"]
 /** Roles that may change the autonomy switch. */

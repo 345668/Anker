@@ -8,16 +8,23 @@ import type { DiffLine, RiskClass } from "./model"
 import { emit } from "@/lib/agents/runtime/events"
 
 export interface Scope { orgId: string; userId: string }
-export interface Plan { summary: string; diff: DiffLine[]; evidence: Record<string, unknown> }
+export interface Plan {
+  summary: string; diff: DiffLine[]; evidence: Record<string, unknown>
+  /** Facts fixed at proposal time and stored with the input (for a send batch, the digest of exactly what was previewed). */
+  bind?: Record<string, unknown>
+}
+export interface ApplyMeta { agentId?: string | null; approverUserId?: string | null; typedCount?: number | null; proposalId?: string | null }
 export interface Capability {
   name: string
   risk: RiskClass
   /** Throws a plain message for an input that is malformed. */
   check(input: any): { [k: string]: any }
   plan(scope: Scope, input: any): Promise<Plan>
-  /** `meta.agentId` is set when an agent made the proposal, so memory can record who wrote it. */
-  apply(scope: Scope, input: any, meta?: { agentId?: string | null }): Promise<{ undo: Record<string, unknown>; message: string }>
-  undo(scope: Scope, input: any, undo: Record<string, any>): Promise<string>
+  /** Checks that must hold before the proposal is claimed, so a refusal leaves it pending (a missing typed count must not kill a send proposal). Throws ActionError. */
+  precheck?(scope: Scope, input: any, meta: ApplyMeta): Promise<void>
+  /** `meta.agentId` is set when an agent made the proposal, so memory can record who wrote it; `meta.approverUserId` is the person who approved. */
+  apply(scope: Scope, input: any, meta?: ApplyMeta): Promise<{ undo: Record<string, unknown>; message: string }>
+  undo(scope: Scope, input: any, undo: Record<string, any>, meta?: { byUserId?: string | null }): Promise<string>
 }
 
 export const STAGES = ["queued", "contacted", "responded", "meeting", "in_diligence", "committed", "passed"]
@@ -227,5 +234,71 @@ const saveDrafts: Capability = {
   },
 }
 
-export const CAPABILITIES: Record<string, Capability> = { crm_update_stage: stageMove, crm_add_task: addTask, memory_remember: remember, outreach_save_drafts: saveDrafts }
+/**
+ * Send a batch of outreach emails: the R2 capability (docs/architecture/46 §6). The proposal is only a preview of exactly which messages go to whom from which mailbox;
+ * approving it (a signed-in person, who must be the sender) authorizes that batch and the send executor carries it out within the caps. It never auto-commits, an
+ * untrusted run cannot create it, an agent has no ceiling that allows it, and "Approve all" never covers it. Sent mail cannot be recalled: undo stops what has not gone.
+ */
+const sendBatch: Capability = {
+  name: "outreach_send_batch",
+  risk: "R2",
+  check(input) {
+    const ids = Array.isArray(input?.messageIds) ? input.messageIds.map((x: unknown) => String(x ?? "").trim()).filter(Boolean) : []
+    const unique = [...new Set<string>(ids)].sort() // order does not matter, so the same set is the same proposal
+    if (!unique.length) throw new ActionError("messageIds is required: the draft messages to send.")
+    if (unique.length > 100) throw new ActionError("At most 100 messages per proposal. Propose in batches.")
+    const provider = input?.provider === "gmail" ? "gmail" : input?.provider === "resend" ? "resend" : null
+    let sendAfter: string | null = null
+    if (input?.sendAfter) { const d = new Date(String(input.sendAfter)); if (Number.isNaN(d.getTime())) throw new ActionError("sendAfter is not a valid date."); sendAfter = d.toISOString() }
+    return { messageIds: unique, provider, accountId: input?.accountId ? String(input.accountId) : null, sendAfter }
+  },
+  async plan(scope, input) {
+    const i = this.check(input)
+    const { buildPreview } = await import("@/lib/outreach/send-auth/preview")
+    const p = await buildPreview({ orgId: scope.orgId, userId: scope.userId, messageIds: i.messageIds, provider: i.provider ?? undefined, accountId: i.accountId, sendAfter: i.sendAfter })
+    if (p.error) throw new ActionError(p.error)
+    if (!p.count) throw new ActionError(`Nothing in this batch can be sent. ${p.blocked[0] ? `${p.blocked[0].name}: ${(await import("@/lib/outreach/send-auth/verdicts")).VERDICT_TEXT[p.blocked[0].verdict.code]}.` : ""}`.trim())
+    const { VERDICT_TEXT } = await import("@/lib/outreach/send-auth/verdicts")
+    const from = p.provider === "gmail" ? (p.accountEmail ?? "your Gmail") : "Resend (Anker's sending address)"
+    const lines = p.sendable.slice(0, 12).map((s) => ({ label: `To ${s.name} <${s.to}>${s.cc.length ? ` (cc ${s.cc.join(", ")})` : ""}`, before: null as string | null, after: s.subject }))
+    if (p.sendable.length > 12) lines.push({ label: `…and ${p.sendable.length - 12} more`, before: null, after: "" })
+    if (p.blocked.length) lines.push({ label: `Not sent (${p.blocked.length})`, before: null, after: p.blocked.slice(0, 6).map((b) => `${b.name || b.to}: ${VERDICT_TEXT[b.verdict.code]}`).join("; ") + (p.blocked.length > 6 ? `; and ${p.blocked.length - 6} more` : "") })
+    return {
+      summary: `Send ${p.count} email${p.count === 1 ? "" : "s"} from ${from}${i.sendAfter ? ` after ${i.sendAfter.slice(0, 16).replace("T", " ")} UTC` : ""}`,
+      diff: lines,
+      evidence: { mailbox: from, count: p.count, blocked: p.blocked.length, countries: p.countries, cap: p.cap, requiresTypedCount: p.requiresTypedCount,
+        note: "Approving sends real email to these people. Sent email cannot be recalled; what has not gone yet can be stopped." },
+      bind: { digest: p.digest, count: p.count, requiresTypedCount: p.requiresTypedCount },
+    }
+  },
+  async precheck(scope, input, meta) {
+    // The approver must be the sender: the drafts and the mailbox are theirs.
+    if (!meta.approverUserId || meta.approverUserId !== scope.userId) throw new ActionError("Only the person whose drafts and mailbox these are can approve sending them.")
+    if (input.requiresTypedCount && meta.typedCount !== input.count) throw new ActionError(`To approve more than 25 messages, type the number (${input.count}) to confirm.`)
+    const i = this.check(input)
+    const { buildPreview } = await import("@/lib/outreach/send-auth/preview")
+    const p = await buildPreview({ orgId: scope.orgId, userId: scope.userId, messageIds: i.messageIds, provider: i.provider ?? undefined, accountId: i.accountId, sendAfter: i.sendAfter })
+    if (p.error) throw new ActionError(p.error)
+    if (p.digest !== input.digest) throw new ActionError("This batch changed since it was proposed (a draft was edited, someone opted out, or a contact replied). Ask again to get a fresh proposal.")
+  },
+  async apply(scope, input, meta) {
+    const i = this.check(input)
+    const { confirmAuthorization } = await import("@/lib/outreach/send-auth/store")
+    const { runExecutor } = await import("@/lib/outreach/send-auth/executor")
+    const r = await confirmAuthorization({ orgId: scope.orgId, userId: scope.userId, messageIds: i.messageIds, provider: i.provider ?? undefined, accountId: i.accountId, sendAfter: i.sendAfter,
+      digest: String(input.digest ?? ""), typedCount: meta?.typedCount ?? undefined, source: "proposal", proposalId: meta?.proposalId ?? null }, { userId: meta?.approverUserId ?? scope.userId })
+    const now = !i.sendAfter || new Date(i.sendAfter).getTime() <= Date.now()
+    const stats = now ? await runExecutor(undefined, { authorizationId: r.authorizationId, max: 25 }) : null
+    const waiting = r.authorized - (stats?.sent ?? 0)
+    return { undo: { authorizationId: r.authorizationId, authorized: r.authorized }, message: `${r.authorized} approved${stats ? `: ${stats.sent} sent now` : ""}${stats?.paused ? ". Sending is paused for the whole platform, so they will go out when it resumes" : waiting > 0 ? `; ${waiting} will go out as your daily cap allows` : ""}${r.blocked ? `. ${r.blocked} left out` : ""}.` }
+  },
+  async undo(scope, _input, u, meta) {
+    const { revokeAuthorization } = await import("@/lib/outreach/send-auth/store")
+    const r = await revokeAuthorization(scope.orgId, String(u.authorizationId), { userId: meta?.byUserId ?? scope.userId }, "Stopped from the Actions inbox")
+    if (!r.revoked) throw new ActionError(`Nothing left to stop: ${r.alreadySent ? `all ${r.alreadySent} had already been sent` : "nothing is waiting"}. Sent email cannot be recalled.`)
+    return `${r.revoked} not yet sent were stopped.${r.alreadySent ? ` ${r.alreadySent} had already gone and cannot be recalled.` : ""}`
+  },
+}
+
+export const CAPABILITIES: Record<string, Capability> = { crm_update_stage: stageMove, crm_add_task: addTask, memory_remember: remember, outreach_save_drafts: saveDrafts, outreach_send_batch: sendBatch }
 export const isProposeCapability = (name: string) => Object.hasOwn(CAPABILITIES, name)

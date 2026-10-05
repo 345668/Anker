@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireDecider } from "@/lib/actions/session"
 import { decide } from "@/lib/actions/store"
+import { sql } from "@/lib/db"
+import { bulkApprovable } from "@/lib/actions/model"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -14,7 +16,11 @@ export async function POST(req: NextRequest) {
   if (!["approve", "reject"].includes(b?.decision)) return NextResponse.json({ error: "decision must be approve or reject." }, { status: 400 })
   const results: Array<{ id: string; ok: boolean; message: string }> = []
   for (const id of b.ids as string[]) {
-    try { const r = await decide(who.orgId, id, b.decision, { userId: who.userId, email: who.email }); results.push({ id, ok: r.proposal.status !== "failed", message: r.message }) }
+    try {
+      // Sending is never approved in bulk: each batch is read and approved on its own (docs/architecture/46 §6).
+      const [p] = (await sql`SELECT risk_class FROM action_proposals WHERE id = ${id} AND org_id = ${who.orgId}`) as any[]
+      if (p && !bulkApprovable(p.risk_class) && b.decision === "approve") { results.push({ id, ok: false, message: "Sending is approved one batch at a time. Open it and approve it on its own." }); continue }
+      const r = await decide(who.orgId, id, b.decision, { userId: who.userId, email: who.email }); results.push({ id, ok: r.proposal.status !== "failed", message: r.message }) }
     catch (e: any) { results.push({ id, ok: false, message: String(e?.message ?? e) }) }
   }
   return NextResponse.json({ results })

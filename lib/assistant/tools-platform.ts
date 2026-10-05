@@ -142,6 +142,32 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     run: async () => { throw new Error("memory_remember is a governed action: it must go through the proposal path (lib/actions)."); },
   },
 
+  outreach_drafts: {
+    name: "outreach_drafts",
+    description: "List this user's draft outreach emails in the active workspace (message id, contact, subject, whether it is ready or why not), so a batch can be chosen for outreach_send_batch. Read-only.",
+    params: '{ "limit"?: number(<=25) }',
+    run: async (inp, ctx) => {
+      const scope = await needWorkspace(ctx);
+      const limit = Math.max(1, Math.min(25, Number(inp?.limit) || 15));
+      const rows = await sql`
+        SELECT m.id, m.kind, m.step_number, m.subject, e.display_name, e.display_email, e.stage
+        FROM outreach_messages m JOIN crm_entries e ON e.id = m.crm_entry_id
+        WHERE e.org_id = ${scope.orgId} AND m.user_id = ${scope.userId} AND m.channel = 'email' AND m.status = 'draft'
+        ORDER BY e.display_score DESC NULLS LAST, m.step_number ASC, m.id LIMIT ${limit}
+      ` as Array<Record<string, any>>;
+      if (!rows.length) return { observation: "No draft emails in this workspace for this user." };
+      return { observation: rows.map((r) => `${r.id} · ${r.display_name ?? "?"} <${r.display_email ?? "no email"}> · step ${r.step_number} (${r.kind}) · "${String(r.subject ?? "").slice(0, 70)}" · stage=${r.stage}`).join("\n") };
+    },
+  },
+
+  // Governed write (docs/architecture/46 §6): becomes an R2 proposal only a signed-in person can approve; never sends from here.
+  outreach_send_batch: {
+    name: "outreach_send_batch",
+    description: "Propose sending a batch of draft emails (message ids from outreach_drafts). It creates a proposal in the Actions inbox showing exactly who would receive what from which mailbox; nothing is sent until the user approves it there. Never say the emails were sent.",
+    params: '{ "messageIds": string[], "provider"?: "resend"|"gmail", "sendAfter"?: ISO date-time }',
+    run: async () => { throw new Error("outreach_send_batch is a governed action: it must go through the proposal path (lib/actions)."); },
+  },
+
   deal_pipeline: {
     name: "deal_pipeline",
     description: "The fund's deal-flow board: counts per stage, proposed-check total, and the active deals (company, stage, round, check).",
