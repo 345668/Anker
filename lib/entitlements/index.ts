@@ -94,6 +94,21 @@ export async function assertWithinLimit(orgId: string, key: "ai_spend_usd_month"
 export { EntitlementError }
 
 /**
+ * Emails a workspace's members sent to third parties today, from every place that records one: outreach messages, investor-update deliveries, and single sends
+ * (which leave an audit event, not a message row). The daily allowance used to count only outreach messages, so an investor update to hundreds of people did not
+ * use it up and was not stopped by it (docs/architecture/46 section 1.3). Each source counts independently: a table that is not there yet counts as zero.
+ */
+export async function sentToday(org: string): Promise<number> {
+  const one = async (q: Promise<unknown>) => { try { return Number(((await q) as any[])[0]?.n ?? 0) } catch { return 0 } }
+  const [messages, updates, singles] = await Promise.all([
+    one(sql`SELECT count(*)::int AS n FROM outreach_messages WHERE sent_at >= date_trunc('day', now()) AND user_id IN (SELECT user_id FROM memberships WHERE org_id = ${org})`),
+    one(sql`SELECT count(*)::int AS n FROM investor_update_recipients WHERE delivery_status = 'sent' AND sent_at >= date_trunc('day', now()) AND user_id IN (SELECT user_id FROM memberships WHERE org_id = ${org})`),
+    one(sql`SELECT count(*)::int AS n FROM audit_events WHERE action = 'outreach.email_sent_single' AND scope_key = ${"org:" + org} AND created_at >= date_trunc('day', now())`),
+  ])
+  return messages + updates + singles
+}
+
+/**
  * May this person send outreach? A sender can belong to several workspaces; they may send if ANY of their workspaces allows it
  * (not paused, outreach on, under the daily limit). Platform senders and people with no workspace are not restricted here.
  */
@@ -108,7 +123,7 @@ export async function assertSenderMayContact(userId: string | null | undefined):
         const e = await assertAllowed(org, "send", "outreach")
         const cap = e.limits.outreach_sends_day
         if (cap !== null) {
-          const n = Number(((await sql`SELECT count(*)::int AS n FROM outreach_messages WHERE sent_at >= date_trunc('day', now()) AND user_id IN (SELECT user_id FROM memberships WHERE org_id = ${org})`) as any[])[0].n)
+          const n = await sentToday(org)
           if (n >= cap) throw new EntitlementRefusal("limit", "Today's sending allowance for your plan is used up. It resets tomorrow, or contact support to raise it.")
         }
         return

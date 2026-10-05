@@ -26,6 +26,7 @@ import { sendGmail, loadGmailAccount, isGmailOAuthConfigured } from "@/lib/email
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
 import { randomUUID } from "node:crypto"
 import { parseBulkSelection, checkCount } from "@/lib/outreach/bulk-selection"
+import { describeDropped } from "@/lib/email/send-errors"
 import { recordChange } from "@/lib/audit/record-change"
 
 export const runtime = "nodejs"
@@ -40,6 +41,7 @@ interface SendResult {
   error?: string
   dryRun?: boolean
   resendId?: string
+  dropped?: Array<{ email: string; field: "cc" | "bcc"; reason: "suppressed" | "country_gated" }>
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -210,6 +212,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             finalFrom: g.result.finalFrom,
             finalSubject: g.result.finalSubject,
             dryRun: false,
+            droppedRecipients: g.result.droppedRecipients,
           }
         } else {
           result = await sendEmail({
@@ -258,7 +261,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
         results.push({
           memberId: row.member_id, messageId: msgId, name, email,
-          status: "sent", dryRun: result.dryRun, resendId: result.resendId,
+          status: "sent", dryRun: result.dryRun, resendId: result.resendId, dropped: result.droppedRecipients ?? [],
         })
         sent++
       } catch (e: any) {
@@ -273,9 +276,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     // The send is on record: who sent how many, from which campaign (the per-message rows hold the rest).
     await recordChange({ actor: { userId: user.id, email: user.email ?? null }, scope: { type: "org", id: crmScope.orgId }, action: "outreach.bulk_send", target: { type: "outreach_campaign", id: campaignId },
       before: null, after: { sent, failed, skipped, requested: memberRows.length, provider: bulkProvider }, context: { selection: selection.kind } })
+    // Which cc and bcc addresses were left out of which sends (opted out, or needing consent): the sender sees it instead of assuming the copies went.
+    const droppedAll = results.flatMap((r) => (r.dropped ?? []).map((d) => ({ ...d, member: r.name })))
     return NextResponse.json({
       ok: failed === 0,
       sent, failed, skipped,
+      dropped: droppedAll,
+      note: droppedAll.length ? `${describeDropped(droppedAll.slice(0, 5))}${droppedAll.length > 5 ? ` and ${droppedAll.length - 5} more.` : ""}` : null,
       providerConfigured: isResendConfigured(),
       results,
     })

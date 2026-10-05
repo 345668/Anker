@@ -6,6 +6,7 @@ import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { isEmailSuppressed } from "@/lib/outreach/deliverability"
 import { sendRequest, type SendSnapshot } from "@/lib/updates/send-contract"
 import { randomUUID } from "node:crypto"
+import { classifySendError } from "@/lib/email/send-errors"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     claimed = true
     snapshot = update.delivery_snapshot as SendSnapshot
     const started = Date.now()
+    let stopped: string | null = null // the sender is held (paused, plan or daily allowance): the rest wait, they are not marked failed
     for (const r of snapshot.recipients) {
       if (Date.now() - started > 230000) break
       const [lease] = await sql`UPDATE investor_updates SET send_lease_until = now() + interval '2 minutes'
@@ -70,9 +72,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         await sql`UPDATE investor_update_recipients SET delivery_status = 'sent', resend_id = ${result.resendId}, sent_at = now(), last_error = NULL
           WHERE update_id = ${id} AND lower(email) = ${r.email}`
       } catch (e) {
-        const error = e instanceof Error ? e.message.slice(0, 400) : "Delivery failed"
-        await sql`UPDATE investor_update_recipients SET delivery_status = 'failed', last_error = ${error}
-          WHERE update_id = ${id} AND lower(email) = ${r.email} AND delivery_status <> 'sent'`
+        // A recipient who opted out, or who needs recorded consent, is skipped with the reason (it was retried as a "failure" forever before);
+        // a held sender stops the loop and leaves the rest pending; only a real delivery error is a failure to retry (lib/email/send-errors.ts).
+        const c = classifySendError(e)
+        if (c.kind === "skip") {
+          await sql`UPDATE investor_update_recipients SET delivery_status = 'skipped', last_error = ${c.reason}, sent_at = NULL
+            WHERE update_id = ${id} AND lower(email) = ${r.email} AND delivery_status <> 'sent'`
+        } else if (c.kind === "stop") {
+          stopped = c.reason
+          break
+        } else {
+          await sql`UPDATE investor_update_recipients SET delivery_status = 'failed', last_error = ${c.message}
+            WHERE update_id = ${id} AND lower(email) = ${r.email} AND delivery_status <> 'sent'`
+        }
       }
     }
     const [counts] = await sql`SELECT count(*) FILTER (WHERE delivery_status = 'sent')::int AS sent,
@@ -80,11 +92,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const sent = Number(counts.sent), skipped = Number(counts.skipped)
     const remaining = snapshot.recipients.length - sent - skipped
     const complete = remaining === 0 && sent > 0
-    const note = complete ? null : remaining ? `${remaining} deliveries need retry.` : "No messages sent. All recipients were suppressed."
+    const note = complete ? null : stopped ? `Sending stopped: ${stopped} ${remaining} not sent yet; retry when it is resolved.` : remaining ? `${remaining} deliveries need retry.` : "No messages sent. Every recipient was skipped; the reason is shown against each one."
     await sql`UPDATE investor_updates SET status = ${complete ? "sent" : "partial"}, send_token = NULL, send_lease_until = NULL,
       sent_at = CASE WHEN ${complete} THEN now() ELSE sent_at END, last_error = ${note}, updated_at = now()
       WHERE id = ${id} AND org_id = ${scope.orgId} AND send_token = ${token}`
-    return NextResponse.json({ ok: complete, sent, skipped, remaining, error: note }, { status: complete ? 200 : 502 })
+    return NextResponse.json({ ok: complete, sent, skipped, remaining, stopped, error: note }, { status: complete ? 200 : 502 })
   } catch (e) {
     if (claimed) await sql`UPDATE investor_updates SET status = 'partial', send_token = NULL, send_lease_until = NULL,
       last_error = 'Delivery interrupted. Retry uses the original content and recipients.', updated_at = now()

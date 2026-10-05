@@ -27,6 +27,7 @@ import { sendGmail, loadGmailAccount, isGmailOAuthConfigured } from "@/lib/email
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
 import { isEmailSuppressed } from "@/lib/outreach/deliverability"
 import { randomUUID } from "node:crypto"
+import { describeDropped } from "@/lib/email/send-errors"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -110,6 +111,7 @@ export async function POST(req: NextRequest) {
       resendId: string; messageId: string; trackingId: string;
       finalFrom: string; finalReplyTo: string; finalSubject: string;
       finalHtml: string; finalText: string; finalCc: string[]; finalBcc: string[];
+      droppedRecipients?: Array<{ email: string; field: "cc" | "bcc"; reason: "suppressed" | "country_gated" }>;
     }
 
     if (sendVia === "gmail") {
@@ -155,6 +157,7 @@ export async function POST(req: NextRequest) {
         finalText: gmail.result.finalText,
         finalCc: gmail.result.finalCc,
         finalBcc: gmail.result.finalBcc,
+        droppedRecipients: gmail.result.droppedRecipients,
       }
     } else {
       result = await sendEmail({
@@ -202,6 +205,9 @@ export async function POST(req: NextRequest) {
       trackingId: result.trackingId,
       from: result.finalFrom,
       providerConfigured: sendVia === "gmail" ? isGmailOAuthConfigured() : isResendConfigured(),
+      // cc and bcc addresses left out (opted out, or needing consent), so the sender is told rather than left to assume the copy went.
+      dropped: result.droppedRecipients ?? [],
+      note: describeDropped(result.droppedRecipients),
     })
   } catch (e: any) {
     console.error("[outreach/send-email] error:", e)

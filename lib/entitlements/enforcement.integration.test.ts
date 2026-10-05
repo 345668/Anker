@@ -19,6 +19,8 @@ beforeAll(async () => {
   await db.exec(`CREATE TABLE memberships (org_id text, user_id text, org_role text DEFAULT 'workspace_owner');
     CREATE TABLE ai_calls (workspace_id text, cost_usd numeric, created_at timestamptz DEFAULT now());
     CREATE TABLE outreach_messages (user_id text, sent_at timestamptz);
+    CREATE TABLE investor_update_recipients (user_id text, delivery_status text, sent_at timestamptz);
+    CREATE TABLE audit_events (action text, scope_key text, created_at timestamptz DEFAULT now());
     CREATE TABLE organizations (id text PRIMARY KEY, fund_id text);
     CREATE TABLE intake_submissions (fund_id text, created_at timestamptz DEFAULT now());`)
   await db.exec(readFileSync("scripts/migrations/2026-10-04c-tenant-control.sql", "utf8"))
@@ -27,7 +29,7 @@ beforeAll(async () => {
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => {
-  await db.exec("DELETE FROM tenant_entitlements; DELETE FROM tenant_lifecycle; DELETE FROM memberships; DELETE FROM ai_calls; DELETE FROM outreach_messages; UPDATE platform_flags SET enabled=false")
+  await db.exec("DELETE FROM tenant_entitlements; DELETE FROM tenant_lifecycle; DELETE FROM memberships; DELETE FROM ai_calls; DELETE FROM outreach_messages; DELETE FROM investor_update_recipients; DELETE FROM audit_events; UPDATE platform_flags SET enabled=false")
   clearEntitlementCache()
 })
 
@@ -116,5 +118,16 @@ describe("enforcement points", () => {
     for (let i = 0; i < 50; i++) await db.query("INSERT INTO outreach_messages (user_id, sent_at) VALUES ('s4', now())")
     await expect(assertSenderMayContact("s3")).rejects.toMatchObject({ code: "limit", status: 402 })
     h.sql.mockRejectedValueOnce(new Error("db down")); await expect(assertSenderMayContact("s3")).resolves.toBeUndefined()
+  })
+  it("the daily allowance counts investor-update deliveries and single sends, not just outreach messages (doc 46 section 1.3)", async () => {
+    await db.query("INSERT INTO memberships (org_id, user_id) VALUES ('d','s5')"); await set("d", "founder_raise"); clearEntitlementCache()
+    for (let i = 0; i < 30; i++) await db.query("INSERT INTO outreach_messages (user_id, sent_at) VALUES ('s5', now())")
+    for (let i = 0; i < 15; i++) await db.query("INSERT INTO investor_update_recipients (user_id, delivery_status, sent_at) VALUES ('s5', 'sent', now())")
+    await db.query("INSERT INTO investor_update_recipients (user_id, delivery_status, sent_at) VALUES ('s5', 'skipped', now()), ('s5', 'failed', NULL)") // not sent: not counted
+    for (let i = 0; i < 4; i++) await db.query("INSERT INTO audit_events (action, scope_key) VALUES ('outreach.email_sent_single', 'org:d')")
+    await db.query("INSERT INTO audit_events (action, scope_key) VALUES ('outreach.email_sent_single', 'org:other'), ('outreach.bulk_send', 'org:d')") // another workspace, another action
+    await expect(assertSenderMayContact("s5")).resolves.toBeUndefined() // 30 + 15 + 4 = 49 of 50
+    await db.query("INSERT INTO audit_events (action, scope_key) VALUES ('outreach.email_sent_single', 'org:d')")
+    await expect(assertSenderMayContact("s5")).rejects.toMatchObject({ code: "limit" }) // 50 of 50
   })
 })

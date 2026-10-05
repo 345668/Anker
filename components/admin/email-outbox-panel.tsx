@@ -67,6 +67,7 @@ export function EmailOutboxPanel() {
   const [loading, startLoad] = useTransition()
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [syncState, setSyncState] = useState<SyncState | null>(null)
   const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -99,7 +100,7 @@ export function EmailOutboxPanel() {
     }
     const ok = confirm(`Send to ${row.partnerEmail}?\n\nSubject: ${row.subject}\n\n${row.body.slice(0, 200)}${row.body.length > 200 ? "…" : ""}`)
     if (!ok) return
-    setBusy(`send:${row.id}`); setError(null)
+    setBusy(`send:${row.id}`); setError(null); setNotice(null)
     try {
       const res = await fetch("/api/outreach/send-email", {
         method: "POST",
@@ -108,6 +109,8 @@ export function EmailOutboxPanel() {
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json?.error ?? `Failed (${res.status})`)
+      // A cc or bcc left out (opted out, or needs consent) is said plainly, not hidden.
+      if (json?.note) setNotice(json.note)
       // refresh
       load(bucket)
     } catch (e: any) { setError(e?.message ?? "Send failed") }
@@ -223,6 +226,13 @@ export function EmailOutboxPanel() {
         <div className="flex items-start gap-2 p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 rounded-md text-xs">
           <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <span className="text-rose-700 dark:text-rose-400">{error}</span>
+        </div>
+      )}
+
+      {notice && (
+        <div role="status" className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md text-xs">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <span className="text-amber-800 dark:text-amber-300">{notice}</span>
         </div>
       )}
 

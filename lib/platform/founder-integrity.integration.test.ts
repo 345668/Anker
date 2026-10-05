@@ -138,6 +138,45 @@ it("rejects a simultaneous send and never labels an all-suppressed update sent",
   expect(session.send).not.toHaveBeenCalled()
   expect((await db.query('SELECT status,sent_at FROM investor_updates')).rows[0]).toEqual({status:'partial',sent_at:null})
 })
+it("a recipient who opted out or needs consent is skipped with the reason, so the rest can complete (doc 46 section 13)", async () => {
+  await seedUpdate()
+  session.send.mockImplementation(async (input: any) => {
+    if (input.to === "one@example.test") throw Object.assign(new Error("Not sent: DE recipients need prior express consent. Record that consent."), { code: "country_gated" })
+    return { resendId: "ok" }
+  })
+  const r = await sendUpdate(request('/api/updates/update/send','POST',sendBody),deckParams('update'))
+  expect(r.status).toBe(200)
+  expect(await r.json()).toMatchObject({ ok: true, sent: 1, skipped: 1, remaining: 0 })
+  expect((await db.query("SELECT email, delivery_status, last_error FROM investor_update_recipients ORDER BY email")).rows).toEqual([
+    { email: "one@example.test", delivery_status: "skipped", last_error: expect.stringMatching(/prior express consent/) },
+    { email: "two@example.test", delivery_status: "sent", last_error: null }])
+  expect((await db.query("SELECT status FROM investor_updates")).rows[0]).toEqual({ status: "sent" })
+  // A retry does not try the skipped one again.
+  session.send.mockClear(); await db.exec("UPDATE investor_updates SET status='partial'")
+  await sendUpdate(request('/api/updates/update/send','POST',{ revision: 1 }),deckParams('update'))
+  expect(session.send).not.toHaveBeenCalled()
+})
+it("a global opt-out thrown by the gate is a skip, not a failure to retry", async () => {
+  await seedUpdate()
+  session.send.mockImplementation(async (input: any) => { if (input.to === "two@example.test") throw Object.assign(new Error("Recipient has opted out."), { code: "recipient_suppressed" }); return { resendId: "ok" } })
+  expect(await (await sendUpdate(request('/api/updates/update/send','POST',sendBody),deckParams('update'))).json()).toMatchObject({ ok: true, sent: 1, skipped: 1 })
+  expect((await db.query("SELECT last_error FROM investor_update_recipients WHERE email='two@example.test'")).rows[0]).toEqual({ last_error: expect.stringMatching(/Opted out/) })
+})
+it("a held sender (paused, plan or daily allowance) stops the loop and leaves the rest pending, not failed", async () => {
+  await seedUpdate()
+  session.send.mockImplementation(async (input: any) => {
+    if (input.to === "two@example.test") throw Object.assign(new Error("Today's sending allowance for your plan is used up."), { name: "EntitlementRefusal", code: "limit" })
+    return { resendId: "ok" }
+  })
+  const r = await sendUpdate(request('/api/updates/update/send','POST',sendBody),deckParams('update'))
+  expect(r.status).toBe(502)
+  expect(await r.json()).toMatchObject({ ok: false, sent: 1, remaining: 1, stopped: expect.stringMatching(/allowance/), error: expect.stringMatching(/Sending stopped/) })
+  expect((await db.query("SELECT email, delivery_status FROM investor_update_recipients ORDER BY email")).rows).toEqual([{ email: "one@example.test", delivery_status: "sent" }, { email: "two@example.test", delivery_status: "pending" }])
+  // Once it is resolved a retry sends only the one that waited.
+  session.send.mockReset(); session.send.mockResolvedValue({ resendId: "later" })
+  expect((await sendUpdate(request('/api/updates/update/send','POST',{ revision: 1 }),deckParams('update'))).status).toBe(200)
+  expect(session.send).toHaveBeenCalledTimes(1); expect(session.send.mock.calls[0][0].to).toBe("two@example.test")
+})
 it("the new migration can run again without losing data", async () => {
   await seedUpdate();await db.exec(migration('2026-09-13-workspace-team-shared-records.sql'))
   expect((await db.query<{ n: number }>('SELECT count(*)::int AS n FROM investor_updates')).rows[0].n).toBe(1)

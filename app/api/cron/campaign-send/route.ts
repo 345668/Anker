@@ -76,7 +76,7 @@ async function handle(req: NextRequest) {
       await sql`UPDATE founder_submissions SET status='outreaching', updated_at=NOW() WHERE id=${sub.id}`
     }
 
-    let sent = 0, failed = 0
+    let sent = 0, failed = 0, droppedCopies = 0
     for (const e of queue as any[]) {
       if (!e.investor_email) {
         await sql`UPDATE campaign_crm_entries SET send_error='no email', updated_at=NOW() WHERE id=${e.id}`
@@ -94,6 +94,8 @@ async function handle(req: NextRequest) {
           bcc: [...ANKER_BCC, sub.founder_email].filter(Boolean),
           noTracking: true, // keep one-click interest/deck links pristine
         })
+        // A bcc left out (opted out) is counted and logged: the founder's own copy not arriving is worth knowing.
+        if (res.droppedRecipients?.length) { droppedCopies += res.droppedRecipients.length; console.warn("[campaign-send] left out of", e.id, res.droppedRecipients.map((d) => `${d.field}:${d.reason}`).join(",")) }
         await sql`
           UPDATE campaign_crm_entries
           SET stage='contacted', contacted_at=NOW(), sent_at=NOW(),
@@ -144,7 +146,7 @@ async function handle(req: NextRequest) {
       }
     }
 
-    summary.push({ submission: sub.public_ref, campaignId, sent, failed, remaining: Number(remaining), completed })
+    summary.push({ submission: sub.public_ref, campaignId, sent, failed, droppedCopies, remaining: Number(remaining), completed })
   }
 
   return NextResponse.json({

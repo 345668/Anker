@@ -103,7 +103,7 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
       await mutate();
       if (!res.ok) throw new Error(result.error || "Request failed.");
       if (kind !== "sync") { setTitle(null); setBody(null); setAsks(null); setEditRevision(null); }
-      setNotice(kind === "save" ? "Edits saved." : kind === "send" ? `${result.sent} sent, ${result.skipped} suppressed.` : result.skipped ? "Delivery tracking is unavailable." : "Delivery status refreshed.");
+      setNotice(kind === "save" ? "Edits saved." : kind === "send" ? `${result.sent} sent${result.skipped ? `, ${result.skipped} skipped (opted out, or needs recorded consent; the reason is shown against each)` : ""}.` : result.skipped ? "Delivery tracking is unavailable." : "Delivery status refreshed.");
     } catch (e) { setActionError(e instanceof Error ? e.message : "Request failed. Your edits are still here."); }
     finally { setBusy(false); }
   }
@@ -128,7 +128,7 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
       <section><h2 className="mb-3 font-serif text-xl">Review recipients ({chosen.length} selected)</h2>
         <div className="max-h-64 overflow-y-auto space-y-2">{recommended.map(r => <label key={r.crmEntryId} className="flex items-center gap-3 rounded border p-3 text-sm"><input type="checkbox" disabled={busy || !r.email} checked={!!r.email && picked[r.crmEntryId] !== false} onChange={e => setPicked(p => ({ ...p, [r.crmEntryId]: e.target.checked }))} /><span>{r.name} <span className="text-muted-foreground">{r.email || "No email"}</span></span></label>)}</div>
         {!recommended.length && <p className="text-sm text-muted-foreground">No engaged investors with email addresses found. Update your CRM first.</p>}
-        <p className="my-3 text-sm text-muted-foreground">Send saves and delivers exactly the content above to the selected recipients. Suppressed addresses are skipped.</p>
+        <p className="my-3 text-sm text-muted-foreground">Send saves and delivers exactly the content above to the selected recipients. Anyone who has opted out, or who needs recorded consent, is skipped and the reason is shown against them.</p>
         <button disabled={busy || !data.canSend || !chosen.length || !content.title.trim() || !content.body.trim()} onClick={() => void act("send")} className="rounded-lg bg-primary px-5 py-3 text-sm text-primary-foreground disabled:opacity-50">{busy ? "Processing…" : `Save and send to ${chosen.length}`}</button>
       </section>
     </>}
