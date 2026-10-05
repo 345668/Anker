@@ -105,45 +105,20 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     },
   },
 
+  // Governed writes (doc 43): executeTool turns these into proposals a person decides, and lib/actions/capabilities.ts performs the write on approval.
+  // They never write from here, so a path that reaches run() directly cannot bypass the inbox.
   crm_update_stage: {
     name: "crm_update_stage",
-    description: "Move a CRM contact to a new stage (queued|contacted|responded|meeting|in_diligence|committed|passed). Use crm_search first to get the id.",
+    description: "Propose moving a CRM contact to a new stage (queued|contacted|responded|meeting|in_diligence|committed|passed). Use crm_search first to get the id. The change waits in the Actions inbox for a person to approve; it is not applied by this call.",
     params: '{ "entryId": string, "stage": string }',
-    run: async (inp, ctx) => {
-      const userId = needUser(ctx);
-      const scope = await needWorkspace(ctx, true);
-      const allowed = ["queued", "contacted", "responded", "meeting", "in_diligence", "committed", "passed"];
-      const stage = String(inp?.stage ?? "");
-      if (!allowed.includes(stage)) throw new Error(`stage must be one of ${allowed.join("|")}`);
-      const rows = await sql`
-        update crm_entries set stage = ${stage}, updated_at = now()
-        where id = ${String(inp?.entryId ?? "")} and org_id = ${scope.orgId}
-        returning display_name
-      ` as Array<{ display_name: string }>;
-      if (!rows.length) throw new Error("Entry not found.");
-      return { observation: `${rows[0].display_name} moved to ${stage}.` };
-    },
+    run: async () => { throw new Error("crm_update_stage is a governed action: it must go through the proposal path (lib/actions)."); },
   },
 
   crm_add_task: {
     name: "crm_add_task",
-    description: "Create a follow-up task/reminder, optionally attached to a CRM contact (get the id via crm_search) and with a due date.",
+    description: "Propose a follow-up task/reminder, optionally attached to a CRM contact (get the id via crm_search) and with a due date. The task waits in the Actions inbox for a person to approve; it is not created by this call.",
     params: '{ "title": string, "entryId"?: string, "dueAt"?: "YYYY-MM-DD" }',
-    run: async (inp, ctx) => {
-      const userId = needUser(ctx);
-      const scope = await needWorkspace(ctx, true);
-      const title = String(inp?.title ?? "").trim().slice(0, 300);
-      if (!title) throw new Error("title required");
-      const dueAt = inp?.dueAt ? new Date(String(inp.dueAt)) : null;
-      if (dueAt && Number.isNaN(dueAt.getTime())) throw new Error("Invalid dueAt");
-      if (inp?.entryId) await requireCrmEntry(scope.orgId, String(inp.entryId));
-      await sql`
-        insert into crm_tasks (org_id, user_id, crm_entry_id, title, due_at)
-        values (${scope.orgId}, ${userId}, ${inp?.entryId ? String(inp.entryId) : null}, ${title},
-                ${dueAt ? dueAt.toISOString() : null})
-      `;
-      return { observation: `Task created: "${title}"${dueAt ? ` due ${dueAt.toISOString().slice(0, 10)}` : ""}. Visible in the CRM's Today queue.` };
-    },
+    run: async () => { throw new Error("crm_add_task is a governed action: it must go through the proposal path (lib/actions)."); },
   },
 
   deal_pipeline: {

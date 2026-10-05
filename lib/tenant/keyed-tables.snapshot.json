@@ -1,7 +1,8 @@
 {
-  "takenAt": "2026-10-04",
+  "takenAt": "2026-10-05",
   "baseTables": [
     "accelerated_match_jobs",
+    "action_proposals",
     "activities",
     "activity_logs",
     "agent_runs",
@@ -279,11 +280,15 @@
     "vector_embeddings",
     "waterfall_runs",
     "workspace_access_events",
+    "workspace_autonomy",
     "workspace_decks",
     "workspace_invitations",
     "workspace_ownership_transfers"
   ],
   "tables": {
+    "action_proposals": [
+      "org_id"
+    ],
     "ai_calls": [
       "workspace_id"
     ],
@@ -551,6 +556,9 @@
       "fund_id"
     ],
     "workspace_access_events": [
+      "org_id"
+    ],
+    "workspace_autonomy": [
       "org_id"
     ],
     "workspace_decks": [

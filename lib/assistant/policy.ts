@@ -3,7 +3,9 @@ import { TOOL_SCHEMAS } from "./tool-schemas"
 import type { AiPrincipal } from "./context"
 
 // These mutations require a separate human-reviewed administrative/action workflow.
-const BLOCKED = new Set(["enrich_db_from_xlsx","enrich_firms","build_investor_profile","crm_update_stage","crm_add_task"])
+const BLOCKED = new Set(["enrich_db_from_xlsx","enrich_firms","build_investor_profile"])
+// Governed writes: these do not run, they become proposals a person decides (lib/actions, doc 43). Only a member who can write may propose.
+const PROPOSE = new Set(["crm_update_stage","crm_add_task"])
 const READ_ONLY = new Set(["web_search","web_crawl","query_investors","crm_overview","crm_search","deal_pipeline","network_intro_paths","outreach_inbox","fund_performance","planning_snapshot","call_intelligence","lp_overview","analyze_image","ocr_image","translate_text"])
 const FUND_READS = new Set(["fund_performance","deal_pipeline","portfolio_kpi_rollup"])
 export function canUseTool(p: AiPrincipal, name: string) {
@@ -11,6 +13,7 @@ export function canUseTool(p: AiPrincipal, name: string) {
   if (p.readonly && !READ_ONLY.has(name)) return false
   if (p.allowedTools && !p.allowedTools.includes(name)) return false
   if (FUND_READS.has(name) && (p.persona !== "vc" || !["workspace_owner","admin"].includes(p.membership?.orgRole ?? ""))) return false
+  if (PROPOSE.has(name) && (p.readonly || !p.canWrite)) return false
   if (name === "send_outreach" && (p.readonly || !p.canWrite)) return false
   // Saves the startup profile and the run, so a read-only or non-writing member cannot run it.
   if (name === "match_investors" && (p.readonly || !p.canWrite)) return false

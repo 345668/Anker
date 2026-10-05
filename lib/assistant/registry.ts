@@ -4,7 +4,9 @@ import { PLATFORM_TOOLS } from "./tools-platform"
 import { MODELING_TOOLS } from "./tools-modeling"
 import { CONTEXT_TOOLS } from "./tools-context"
 import { canUseTool, validateToolInput } from "./policy"
-import { checkAiBudget, currentRunId, type AiPrincipal } from "./context"
+import { checkAiBudget, currentRunId, markRunUntrusted, runIsUntrusted, type AiPrincipal } from "./context"
+import { isProposeCapability } from "@/lib/actions/capabilities"
+import { UNTRUSTED_SOURCES } from "@/lib/actions/model"
 import { logEvent } from "@/lib/observability/log"
 export const ALL_TOOLS: Record<string,ToolDef>={...TOOLS,...FO_TOOLS,...PLATFORM_TOOLS,...MODELING_TOOLS,...CONTEXT_TOOLS}
 export function toolsFor(p:AiPrincipal) {return Object.fromEntries(Object.entries(ALL_TOOLS).filter(([name])=>canUseTool(p,name)))}
@@ -24,7 +26,20 @@ export async function executeTool(p:AiPrincipal,name:string,input:unknown,refs:A
   const startedAt=Date.now(),runId=currentRunId()
   logEvent("tool.start",{tool:name},runId)
   try {
+    // Attachments are strangers' content too; so is whatever a reading tool returns (marked after it runs, below).
+    if(refs.length)markRunUntrusted()
+    if(isProposeCapability(name)){
+      // Not a write: a proposal, applied only by a person (or by an owner-enabled policy for trusted R0 work). doc 43.
+      const {propose}=await import("@/lib/actions/store")
+      if(!p.orgId)throw new Error("Select a workspace to propose changes.")
+      const r=await propose({orgId:p.orgId,userId:p.userId,persona:p.persona},name,input,{runId,trust:runIsUntrusted()?"untrusted":"trusted"})
+      const note=r.applied?`Done (applied by your workspace's auto-apply setting): ${r.message??r.proposal.summary}`
+        :`Proposed, not applied: ${r.proposal.summary}. It is waiting in the Actions inbox (/dashboard/actions) for a person to approve${r.proposal.source_trust==="untrusted"?" (this run read outside content, so it always needs a person)":""}. Tell the user it is awaiting approval; do not say it was done.`
+      logEvent("tool.end",{tool:name,ok:true,proposal:r.proposal.id,status:r.proposal.status,ms:Date.now()-startedAt,obs_chars:note.length},runId)
+      return {observation:note}
+    }
     const result=await ALL_TOOLS[name].run(resolve(input),{userId:p.userId})
+    if(UNTRUSTED_SOURCES.has(name))markRunUntrusted()
     logEvent("tool.end",{tool:name,ok:true,ms:Date.now()-startedAt,obs_chars:result.observation?.length??0},runId)
     return result
   } catch(e:any) {

@@ -35,11 +35,15 @@ export interface AiRunBudget {
 /** The most recent typed AI failure in this run (doc 35). Set by provider.ts, read by
  *  whoever has to explain a run that produced nothing. */
 export type AiRunFailure = import("@/lib/ai/failure").AiFailure
-const context = new AsyncLocalStorage<{runId: string; principal: AiPrincipal; signal?: AbortSignal; deadline: number; modelCalls: number; batch?: boolean; sourceText?: string; scoredBatches?: import("./score-merge").ScoredBatches; budget: AiRunBudget; lastFailure?: AiRunFailure}>()
+const context = new AsyncLocalStorage<{runId: string; principal: AiPrincipal; signal?: AbortSignal; deadline: number; modelCalls: number; batch?: boolean; sourceText?: string; scoredBatches?: import("./score-merge").ScoredBatches; budget: AiRunBudget; lastFailure?: AiRunFailure; untrusted?: boolean}>()
 export const currentAiContext = () => context.getStore()
 
 /** The id of the run this code is executing inside, or null outside a run. Stamped on AI calls and log lines. */
 export const currentRunId = (): string | null => context.getStore()?.runId ?? null
+
+/** This run has read content a stranger wrote (a web page, an attachment, an inbound reply). Sticky for the rest of the run; the action layer caps what such a run may do (doc 43 §5). */
+export const markRunUntrusted = () => { const c = context.getStore(); if (c) c.untrusted = true }
+export const runIsUntrusted = (): boolean => !!context.getStore()?.untrusted
 
 /** Milliseconds this request has left (Infinity outside a run). */
 export const remainingMs = (): number => { const c = context.getStore(); return c ? c.deadline - Date.now() : Infinity }
