@@ -1,6 +1,6 @@
 # 46. The R2 sending approval layer: send authorizations
 
-Status: design 2026-10-05; **P0 (§13) and P1 (§15) built**; P2 to P4 not built. Completes [43](43-action-layer-and-approval-inbox.md) (risk class R2: "external to a third party") and answers the open item in [45](45-agent-runtime-completion.md) §9. Written from a read of every code path that can email a third party (§1); where the code surprised me it says so.
+Status: design 2026-10-05; **P0 (§13), P1 (§15) and P2 (§16) built**; P3 and P4 not built. Completes [43](43-action-layer-and-approval-inbox.md) (risk class R2: "external to a third party") and answers the open item in [45](45-agent-runtime-completion.md) §9. Written from a read of every code path that can email a third party (§1); where the code surprised me it says so.
 
 ## 0. The goal, stated so it can be tested
 
@@ -216,4 +216,27 @@ Found, not fixed: **228 of the owner's drafts belong to a legacy account id (`us
 **Correction to 15.1 on the slowness.** Measured afterwards in Chrome: the browser tab the automation uses is hidden (`document.visibilityState` is `hidden`), and a hidden tab does not paint or run its page effects promptly. In that tab first paint came 28.9 seconds after the document had finished loading (scripts were all in by 0.75 s) and the outbox request started at 28.8 s, so most of the "25 seconds, froze the tab" seen in testing was the hidden tab, not the 200 cards. The paging and collapsing are still right (25 cards instead of 200 long ones is far less to render, and the data is unchanged), but the speed-up for a person looking at the page in a foreground tab was not measured and may be smaller than 15.1 implied. Measured here: moving to the next page takes 0.77 s including the request, and every message starts collapsed.
 
 **Migration check.** In the "Anker" workspace the preview now finds the moved drafts (it said "not found" before). The two checked are university drafts with no email address, so the preview refuses them for that reason ("No email address"), which is correct.
+
+## 16. P2 built, 2026-10-06
+
+**Superseded drafts (done before P2, at the founder's instruction).** The 337 May 2026 drafts left on the legacy account (217 email, 120 LinkedIn; superseded by the June and July drafts on the same contacts) were marked `cancelled`: off the drafts lists, still on file, original status in `legacy_drafts_cancel_backup_20261006`, audited as `data.superseded_drafts_cancelled`. The Send Center now counts 251 email drafts (240 current plus the 11 migrated).
+
+**Capability `outreach_send_batch` (R2).** `lib/actions/capabilities.ts`, with the rules in `lib/actions/model.ts` and `store.ts`:
+- **The proposal is the preview.** Its diff lists who receives what (first 12, then a count), what is left out and why, the mailbox, and the digest of exactly that set (stored with the input).
+- **Approval is the sender's and happens before anything is claimed.** A `precheck` runs before the proposal is claimed, so these refusals leave it pending instead of killing it: the approver is not the sender; more than 25 messages and no typed count; the batch changed since it was proposed (a draft edited, an opt-out, a reply). Then `apply` authorizes the batch under `source: 'proposal'` and the executor sends up to 25 now, the rest as the cap allows.
+- **Undo stops what has not gone** (and says honestly that nothing can be done if all of it has).
+- **It never auto-commits** (R2), **a run that read outside content cannot create it** (refused at creation, `mayPropose`), **"Approve all" never covers it** (the inbox hides the group button for it and the bulk route refuses it), and **no agent definition may have an R2 ceiling**.
+- **Evals:** the static build-gate cases now pin the reviewed R1 and R2 sets and the whole send-safety list above; nothing above R2 exists.
+
+**Assistant tools.** `outreach_drafts` (read-only: the user's draft message ids in the active workspace, with contact and subject) and `outreach_send_batch` (governed: creates the proposal, never sends, and its answer to the model says it is awaiting approval and that only the sender can approve). Both are in the founder and VC presets.
+
+**Actions inbox.** An R2 card says plainly that approving sends real email that cannot be recalled and that only the sender can approve; it shows a "type N" box for large batches and an "Approve and send N" button.
+
+**SAIL `/sending`.** Platform pause and resume (admin and above, a reason required, audited through the flag editor; it is the flag the executor already checks), sent today, due and waiting with the oldest age, active approvals, last 7 days by status, and "needs a person" (failed, unresolved or stuck items by workspace name and age). Metadata only: a test plants recipients and reasons and asserts none reach the page data. SAIL's test config now allows 60 s for the in-memory database hook; the full suite had failed intermittently when several files started one at once.
+
+**Tests:** 15 on the capability against PGlite with the real migrations and a stub provider (preview, refusals, untrusted creation, no auto-commit, idempotent proposals, the sender-only approval, the typed count, a changed batch, platform pause, reject, both undo cases) plus the assistant path; the Anker suite passes (1,403 tests) and SAIL's 82.
+**Verified on production** with a throwaway workspace while platform sending was paused (so nothing could be sent; restored afterwards, everything removed): an untrusted run was refused; the trusted proposal listed two recipients and one left out and queued nothing; another approver was refused and the proposal stayed pending; an edited message made the batch refuse; the sender's approval authorized two and sent none because of the pause; undo stopped both and returned the messages to draft; the evals passed.
+**Not verified:** the Actions inbox card and the SAIL `/sending` page in a browser, the assistant raising the proposal in a live conversation (a real model call), and a real send through a proposal.
+
+**Still open:** P3 (move `send-one`, the dashboard send action, investor updates, replies and the platform wave onto authorizations, then enforce once the shadow log has been quiet two weeks) and P4 (dated sequences, LinkedIn).
 
