@@ -83,11 +83,21 @@ export async function buildPreview(input: PreviewInput): Promise<Preview> {
   const live = new Set(((await sql`SELECT message_id FROM send_items WHERE message_id = ANY(${ids}) AND status IN ('approved','sending')`) as any[]).map((r) => r.message_id))
   const paused = new Set(entryIds.length ? ((await sql`SELECT entity_id FROM entity_memory WHERE org_id = ${input.orgId} AND entity_type = 'crm_entry' AND entity_id = ANY(${entryIds}) AND key = 'follow_up_paused' AND (valid_until IS NULL OR valid_until > now())`) as any[]).map((r) => r.entity_id) : [])
 
+  // A draft of the sender's own that sits in another of their workspaces: say which one, instead of "not found". Only the sender's own messages are looked up.
+  const missing = ids.filter((id) => !rows.some((r) => r.id === id))
+  // The label is a courtesy: if it cannot be looked up, the draft is reported as not found, never a failed preview.
+  const elsewhere = new Map<string, string>()
+  if (missing.length) {
+    try {
+      for (const r of (await sql`SELECT m.id, o.name FROM outreach_messages m JOIN crm_entries e ON e.id = m.crm_entry_id JOIN organizations o ON o.id = e.org_id
+        WHERE m.id = ANY(${missing}) AND m.user_id = ${input.userId} AND e.org_id <> ${input.orgId}`) as any[]) elsewhere.set(r.id, String(r.name))
+    } catch { /* leave empty */ }
+  }
   const byId = new Map(rows.map((r) => [r.id, r]))
   const items: PreviewItem[] = []
   for (const id of ids) {
     const r = byId.get(id)
-    if (!r) { items.push({ messageId: id, entryId: null, name: "Unknown", to: "", cc: [], bcc: [], subject: "", kind: "", body: "", step: 0, country: null, verdict: { code: "not_found" }, contentHash: "", droppedSecondary: [] }); continue }
+    if (!r) { const ws = elsewhere.get(id); items.push({ messageId: id, entryId: null, name: ws ? `A draft in "${ws}"` : "Unknown", to: "", cc: [], bcc: [], subject: "", kind: "", body: "", step: 0, country: null, verdict: ws ? { code: "other_workspace", detail: ws } : { code: "not_found" }, contentHash: "", droppedSecondary: [] }); continue }
     const to = String(r.email_to ?? r.display_email ?? "").trim(), subject = String(r.subject ?? "").trim(), body = String(r.body ?? "")
     const cc = copies(r.crm_entry_id, "cc_emails"), bcc = copies(r.crm_entry_id, "bcc_emails")
     let verdict: Verdict = { code: "ok" }, country: string | null = null

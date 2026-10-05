@@ -217,6 +217,7 @@ export function EmailOutboxPanel() {
         </div>
       )}
 
+      <p className="rounded-md border border-foreground/10 bg-foreground/5 p-3 text-xs text-muted-foreground">This list shows drafts from every workspace you own, addressed to real people. Sending works for the workspace selected at the top left: a draft that belongs to another workspace asks you to switch to it, and every send is previewed and approved first.</p>
       <SendAuthorizations refreshKey={authKey} />
       {reviewIds && <SendReview messageIds={reviewIds} onClose={() => setReviewIds(null)} onDone={() => { setAuthKey((k) => k + 1); load(bucket) }} />}
 

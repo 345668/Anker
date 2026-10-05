@@ -45,6 +45,7 @@ beforeAll(async () => {
   await db.exec(`CREATE TABLE crm_entries (id text PRIMARY KEY, org_id text, display_name text, display_email text, stage text, last_contacted_at timestamptz, updated_at timestamptz DEFAULT now());
     CREATE TABLE outreach_messages (id text PRIMARY KEY, user_id text, crm_entry_id text, kind text, step_number int DEFAULT 0, channel text, body text, subject text, email_to text, status text DEFAULT 'draft', scheduled_for timestamptz, sent_at timestamptz,
       bounced_at timestamptz, complained_at timestamptz, tracking_id text, resend_id text, email_message_id text, email_from text, generated_by text, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
+    CREATE TABLE organizations (id text PRIMARY KEY, name text);
     CREATE TABLE outreach_replies (id serial PRIMARY KEY, crm_entry_id text);
     CREATE TABLE outreach_campaigns (id text PRIMARY KEY, cc_emails jsonb, bcc_emails jsonb, default_send_provider text, default_send_account_id text);
     CREATE TABLE outreach_campaign_members (id serial PRIMARY KEY, campaign_id text, user_id text, crm_entry_id text, status text, sent_at timestamptz, updated_at timestamptz);
@@ -59,7 +60,7 @@ beforeAll(async () => {
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => {
-  await db.exec("DELETE FROM send_items; DELETE FROM send_authorizations; DELETE FROM outreach_messages; DELETE FROM crm_entries; DELETE FROM outreach_replies; DELETE FROM outreach_campaign_members; DELETE FROM outreach_campaigns; DELETE FROM email_oauth_accounts; DELETE FROM email_suppressions; DELETE FROM investors; DELETE FROM outreach_consents; DELETE FROM entity_memory; DELETE FROM audit_events; UPDATE platform_flags SET enabled = false")
+  await db.exec("DELETE FROM send_items; DELETE FROM send_authorizations; DELETE FROM outreach_messages; DELETE FROM crm_entries; DELETE FROM outreach_replies; DELETE FROM organizations; DELETE FROM outreach_campaign_members; DELETE FROM outreach_campaigns; DELETE FROM email_oauth_accounts; DELETE FROM email_suppressions; DELETE FROM investors; DELETE FROM outreach_consents; DELETE FROM entity_memory; DELETE FROM audit_events; UPDATE platform_flags SET enabled = false")
   clock = new Date("2026-10-06T09:00:00Z"); remaining = 50; paused = false; syncs = []; sent.length = 0; h.suppressed.clear(); h.audit.mockReset(); h.audit.mockResolvedValue(undefined); delete process.env.OUTREACH_COUNTRY_GATE
   resendImpl = async (i) => ({ resendId: `re_${sent.length}`, messageId: i.messageId ?? "<m>", finalFrom: "me@summit.test", finalSubject: i.subject, droppedRecipients: [] })
   gateImpl = (to, u) => assertOutreachAllowed({ to, senderUserId: u }); _resetShadowLogForTests()
@@ -166,9 +167,12 @@ describe("confirm", () => {
     expect(p.items[0].verdict.code).toBe("in_other_authorization")
     await expect(confirmAuthorization({ orgId: ORG, userId: U, messageIds: ["pm0"], digest: p.digest }, { userId: U })).rejects.toBeInstanceOf(AuthorizationError)
   })
-  it("a workspace cannot authorize another workspace's messages", async () => {
-    await entry("f1", "Foreign", "f@fund.com", { org: "org-b" }); await msg("fm1", "f1")
-    expect((await buildPreview({ orgId: ORG, userId: U, messageIds: ["fm1"] })).items[0].verdict.code).toBe("not_found")
+  it("a workspace cannot authorize another workspace's messages; the sender's own draft elsewhere says which workspace", async () => {
+    await db.query("INSERT INTO organizations VALUES ('org-b', 'Fund Two')")
+    await entry("f1", "Foreign", "f@fund.com", { org: "org-b" }); await msg("fm1", "f1", { user: "u2" }); await msg("fm2", "f1")
+    const [theirs, mine] = (await buildPreview({ orgId: ORG, userId: U, messageIds: ["fm1", "fm2"] })).items
+    expect(theirs.verdict.code).toBe("not_found"); expect(theirs.name).toBe("Unknown") // another person's draft is never described
+    expect(mine.verdict).toEqual({ code: "other_workspace", detail: "Fund Two" }); expect(mine.name).toMatch(/Fund Two/)
   })
 })
 

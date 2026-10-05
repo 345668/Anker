@@ -73,7 +73,7 @@ export function SendReview({ messageIds, provider, onClose, onDone }: { messageI
             {blocked.length > 0 && (
               <div>
                 <p className="font-medium text-amber-700 dark:text-amber-300">{blocked.length} will not be sent</p>
-                <ul className="mt-1 list-disc pl-5 text-muted-foreground">{blocked.slice(0, 8).map((i) => <li key={i.messageId}>{i.name || i.to}: {VERDICT_TEXT[i.verdict.code]}{i.verdict.detail && i.verdict.code === "country_gated" ? ` (${i.verdict.detail})` : ""}</li>)}{blocked.length > 8 && <li>and {blocked.length - 8} more</li>}</ul>
+                <ul className="mt-1 list-disc pl-5 text-muted-foreground">{blocked.slice(0, 8).map((i) => <li key={i.messageId}>{i.name || i.to}: {i.verdict.code === "other_workspace" ? `Belongs to your workspace "${i.verdict.detail}". Switch to it (top left) to send.` : VERDICT_TEXT[i.verdict.code]}{i.verdict.detail && i.verdict.code === "country_gated" ? ` (${i.verdict.detail})` : ""}</li>)}{blocked.length > 8 && <li>and {blocked.length - 8} more</li>}</ul>
                 {blocked.some((b) => b.verdict.code === "country_gated") && <p className="mt-1 text-xs text-muted-foreground">For recipients in gated countries, record their consent or an existing customer relationship first (Outreach, Consent).</p>}
               </div>
             )}

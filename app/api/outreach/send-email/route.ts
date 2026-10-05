@@ -26,7 +26,7 @@ import { VERDICT_TEXT, type VerdictCode } from "@/lib/outreach/send-auth/model"
 export const runtime = "nodejs"
 export const maxDuration = 60
 
-const STATUS: Partial<Record<VerdictCode, number>> = { not_found: 404, wrong_sender: 403, not_email: 400, no_recipient: 400, no_subject: 400, no_body: 400, suppressed: 409, country_gated: 409, bad_address: 400 }
+const STATUS: Partial<Record<VerdictCode, number>> = { not_found: 404, other_workspace: 409, wrong_sender: 403, not_email: 400, no_recipient: 400, no_subject: 400, no_body: 400, suppressed: 409, country_gated: 409, bad_address: 400 }
 
 export async function POST(req: NextRequest) {
   try {
