@@ -95,3 +95,31 @@ export async function assertOutreachAllowed(i: GateInput): Promise<void> {
   const country = await resolveRecipientCountry(i.to, i.recipientCountry)
   if (country && GATED_COUNTRIES.has(country) && !(await hasConsent(i.senderUserId, i.to))) throw new CountryGateError(i.to, country)
 }
+
+export interface DroppedRecipient { email: string; field: "cc" | "bcc"; reason: "suppressed" | "country_gated" }
+
+/**
+ * The cc and bcc addresses of an outreach email are recipients too, and they used to reach the provider unchecked: only `to` passed the gate, so an address on the
+ * do-not-send list, or a country-gated address without recorded consent, could receive a campaign's mail by being on its cc list (docs/architecture/46 §1.3, gap 4).
+ *
+ * The opt-out is absolute for both fields. The country rule applies to cc, which is a visible recipient of the message; a bcc is typically the sender's own or a
+ * platform copy, so it gets the opt-out but not the consent rule (a founder's own copy of their campaign should not vanish because they are in Germany).
+ * A refused address is dropped from the send and reported to the caller; it does not stop mail to the person who is actually being written to.
+ */
+export async function filterSecondaryRecipients(i: { cc?: string[]; bcc?: string[]; senderUserId?: string | null }): Promise<{ cc: string[]; bcc: string[]; dropped: DroppedRecipient[] }> {
+  const dropped: DroppedRecipient[] = []
+  const countryRule = (process.env.OUTREACH_COUNTRY_GATE ?? "on").toLowerCase() !== "off"
+  const keep = async (list: string[] | undefined, field: "cc" | "bcc") => {
+    const out: string[] = []
+    for (const email of list ?? []) {
+      if (await isGloballySuppressed(email)) { dropped.push({ email, field, reason: "suppressed" }); continue }
+      if (field === "cc" && countryRule) {
+        const country = await resolveRecipientCountry(email)
+        if (country && GATED_COUNTRIES.has(country) && !(await hasConsent(i.senderUserId, email))) { dropped.push({ email, field, reason: "country_gated" }); continue }
+      }
+      out.push(email)
+    }
+    return out
+  }
+  return { cc: await keep(i.cc, "cc"), bcc: await keep(i.bcc, "bcc"), dropped }
+}

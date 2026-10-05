@@ -6,9 +6,10 @@ vi.mock("server-only", () => ({}))
 const state = vi.hoisted(() => ({ sql: vi.fn() }))
 vi.mock("@/lib/db", () => ({ sql: state.sql }))
 process.env.SECRET_KEY = "gate-test"
-import { assertOutreachAllowed, recordConsent, countryCode, countryFromEmailDomain, CountryGateError } from "./send-gate"
+import { filterSecondaryRecipients, assertOutreachAllowed, recordConsent, countryCode, countryFromEmailDomain, CountryGateError } from "./send-gate"
 import { suppressGlobally, SuppressedRecipientError } from "./unsubscribe"
 import { sendGmail } from "./gmail"
+import { sendEmail } from "./resend"
 
 let db: PGlite
 beforeAll(async () => {
@@ -75,5 +76,43 @@ describe("the Gmail path no longer bypasses the gate", () => {
     await suppressGlobally("a@fund.com", "unsubscribed", "recipient")
     const r = await sendGmail({ account, to: "a@fund.com", subject: "Hi", text: "Hello" })
     expect(r).toMatchObject({ ok: false })
+  })
+})
+
+describe("cc and bcc are recipients too (docs/architecture/46 section 1.3, gap 4)", () => {
+  it("drops a suppressed cc or bcc, keeps the rest, and reports what it dropped", async () => {
+    await suppressGlobally("gone@fund.com", "unsubscribed", "recipient")
+    const f = await filterSecondaryRecipients({ cc: ["gone@fund.com", "ok@fund.com"], bcc: ["GONE@fund.com", "me@summit.test"], senderUserId: "u1" })
+    expect(f.cc).toEqual(["ok@fund.com"]); expect(f.bcc).toEqual(["me@summit.test"])
+    expect(f.dropped).toEqual([{ email: "gone@fund.com", field: "cc", reason: "suppressed" }, { email: "GONE@fund.com", field: "bcc", reason: "suppressed" }])
+  })
+  it("a country-gated cc needs the sender's recorded consent; a bcc is only held to the opt-out", async () => {
+    const none = await filterSecondaryRecipients({ cc: ["a@fund.de"], bcc: ["copy@fund.de"], senderUserId: "u1" })
+    expect(none.cc).toEqual([]); expect(none.bcc).toEqual(["copy@fund.de"]); expect(none.dropped).toEqual([{ email: "a@fund.de", field: "cc", reason: "country_gated" }])
+    await recordConsent("u1", "a@fund.de", "prior_express_consent")
+    expect((await filterSecondaryRecipients({ cc: ["a@fund.de"], senderUserId: "u1" })).cc).toEqual(["a@fund.de"])
+    expect((await filterSecondaryRecipients({ cc: ["a@fund.de"], senderUserId: "u2" })).cc).toEqual([]) // consent is the sender's own
+    process.env.OUTREACH_COUNTRY_GATE = "off"
+    expect((await filterSecondaryRecipients({ cc: ["x@fund.de"], senderUserId: "u9" })).cc).toEqual(["x@fund.de"])
+  })
+  it("the opt-out holds even when the country rule is off", async () => {
+    process.env.OUTREACH_COUNTRY_GATE = "off"; await suppressGlobally("gone@fund.de", "unsubscribed", "recipient")
+    expect((await filterSecondaryRecipients({ cc: ["gone@fund.de"], senderUserId: "u1" })).dropped).toHaveLength(1)
+  })
+  it("sendEmail leaves a suppressed cc out of what reaches the provider, and still writes to the person it is for", async () => {
+    process.env.RESEND_API_KEY = "re_test"
+    await suppressGlobally("gone@fund.com", "unsubscribed", "recipient")
+    const seen: any[] = []
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init: any) => { seen.push(JSON.parse(init.body)); return { ok: true, json: async () => ({ id: "re_1" }), text: async () => "" } }))
+    const r = await sendEmail({ purpose: "outreach", senderUserId: "u1", to: "target@fund.com", subject: "Hi", text: "Hello", cc: ["gone@fund.com", "ok@fund.com"], bcc: ["gone@fund.com"] })
+    expect(seen[0].to).toEqual(["target@fund.com"]); expect(seen[0].cc).toEqual(["ok@fund.com"]); expect(seen[0].bcc).toBeUndefined()
+    expect(r.droppedRecipients?.map((d) => `${d.field}:${d.reason}`)).toEqual(["cc:suppressed", "bcc:suppressed"])
+    // The primary recipient is still refused outright, as before.
+    await expect(sendEmail({ purpose: "outreach", senderUserId: "u1", to: "gone@fund.com", subject: "Hi", text: "Hello" })).rejects.toBeInstanceOf(SuppressedRecipientError)
+    // Transactional mail is not outreach: no gate on its cc.
+    seen.length = 0
+    await sendEmail({ purpose: "transactional", to: "target@fund.com", subject: "Receipt", text: "x", cc: ["gone@fund.com"] })
+    expect(seen[0].cc).toEqual(["gone@fund.com"])
+    delete process.env.RESEND_API_KEY
   })
 })

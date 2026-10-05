@@ -77,6 +77,8 @@ export interface SendGmailResult {
   finalHtml: string
   finalCc: string[]
   finalBcc: string[]
+  /** cc or bcc addresses left out because they are on the do-not-send list or country-gated without consent. */
+  droppedRecipients?: Array<{ email: string; field: "cc" | "bcc"; reason: "suppressed" | "country_gated" }>
 }
 
 export function isGmailOAuthConfigured(): boolean {
@@ -261,6 +263,12 @@ export async function sendGmail(input: SendGmailInput): Promise<{ ok: true; resu
     if (e?.code === "recipient_suppressed" || e?.code === "country_gated") return { ok: false, error: e.message }
     throw e
   }
+  // cc and bcc are recipients too (docs/architecture/46 §1.3): the opt-out and the country rule apply to them.
+  let droppedRecipients: import("@/lib/email/send-gate").DroppedRecipient[] = []
+  if ((input.cc?.length ?? 0) || (input.bcc?.length ?? 0)) {
+    const f = await (await import("@/lib/email/send-gate")).filterSecondaryRecipients({ cc: input.cc, bcc: input.bcc, senderUserId: input.account.user_id })
+    input = { ...input, cc: f.cc, bcc: f.bcc }; droppedRecipients = f.dropped
+  }
   const footer = unsubscribeFooter(input.to)
   input = { ...input, text: input.text ? input.text + footer.text : input.html ? undefined : footer.text, html: input.html ? input.html + footer.html : undefined }
   const tok = await ensureAccessToken(input.account)
@@ -302,6 +310,7 @@ export async function sendGmail(input: SendGmailInput): Promise<{ ok: true; resu
       finalHtml: input.html ?? "",
       finalCc: input.cc ?? [],
       finalBcc: input.bcc ?? [],
+      droppedRecipients,
     },
   }
 }

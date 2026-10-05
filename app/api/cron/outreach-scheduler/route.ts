@@ -21,16 +21,16 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { scheduledActionOff, SCHEDULED_SENDS_OFF } from "@/lib/outreach/scheduled-sends"
 import { ANKER_SIGNATORY } from "@/lib/email/signature"
-import { trackCron } from "@/lib/cron/track"
+import { trackCron, isCronAuthorised } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
+// Fails closed: with no CRON_SECRET configured nothing is authorized (it used to be everything).
 function authorizedCron(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true
-  return (req.headers.get("authorization") || "") === `Bearer ${secret}`
+  return isCronAuthorised(req)
 }
 
 interface RunResult { scheduleId: string; action: string; ok: boolean; detail: any }
@@ -78,6 +78,8 @@ async function handle(req: NextRequest) {
 
 async function runAction(s: any): Promise<any> {
   const { user_id, campaign_id, action_type } = s
+  // Recorded as failed with the reason, so a row that exists shows why it did nothing (see lib/outreach/scheduled-sends.ts).
+  if (scheduledActionOff(action_type)) throw new Error(SCHEDULED_SENDS_OFF)
 
   if (action_type === "send_batch") {
     const upd = await sql<any[]>`

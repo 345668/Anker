@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { sql } from "@/lib/db"
+import { scheduledActionOff, SCHEDULED_SENDS_OFF } from "@/lib/outreach/scheduled-sends"
 
 export const runtime = "nodejs"
 
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!ACTIONS.has(actionType)) {
     return NextResponse.json({ error: `actionType must be one of ${Array.from(ACTIONS).join(", ")}` }, { status: 400 })
   }
+  if (scheduledActionOff(actionType)) return NextResponse.json({ error: SCHEDULED_SENDS_OFF }, { status: 409 })
   const scheduledAt = new Date(body.scheduledAt)
   if (isNaN(scheduledAt.getTime())) {
     return NextResponse.json({ error: "scheduledAt must be a valid ISO date" }, { status: 400 })

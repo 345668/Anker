@@ -1,6 +1,6 @@
 # 46. The R2 sending approval layer: send authorizations
 
-Status: design 2026-10-05, nothing built. Completes [43](43-action-layer-and-approval-inbox.md) (risk class R2: "external to a third party") and answers the open item in [45](45-agent-runtime-completion.md) §9. Written from a read of every code path that can email a third party (§1); where the code surprised me it says so.
+Status: design 2026-10-05; **P0 built and pushed 2026-10-05 (§13)**, the rest not built. Completes [43](43-action-layer-and-approval-inbox.md) (risk class R2: "external to a third party") and answers the open item in [45](45-agent-runtime-completion.md) §9. Written from a read of every code path that can email a third party (§1); where the code surprised me it says so.
 
 ## 0. The goal, stated so it can be tested
 
@@ -150,3 +150,17 @@ An item is `skipped` (with the reason) and later steps of that contact's sequenc
 ## 12. Non-goals
 
 LinkedIn sending (aligned in P4, not redesigned), SMS or other channels, standing authorizations for tenants (R2 is never autonomous), approving from outside the app (email links to approve are a phishing shape and are excluded), changing the gates themselves, and any change to what the sender's content may say (that is the copywriting and compliance work, not this layer).
+
+## 13. P0 built, 2026-10-05, and the founder's decisions recorded
+
+Decisions taken (from §11): the approver is the sender only, with owner and admin able to revoke; authorizations last 7 days; a batch over 25 recipients requires typing the count; test mode is in v1; the `autoSend` default is off; enforcement (P3) waits until the `send.unauthorized_path` shadow log has been empty for two weeks. These bind P1 to P3; only P0 is built.
+
+P0, one small change, each part with its own regression test:
+1. **Four crons failed open, not two.** `outreach-scheduler`, `outreach-poll`, `market-signals` and `outreach-deliverability` all treated an unset `CRON_SECRET` as authorized. All four now use `isCronAuthorised` and refuse. A test scans every route under `app/api/cron` and fails if one reintroduces the pattern. (Production has `CRON_SECRET` set, so nothing changes there today; the hole was one missing variable away.)
+2. **Bulk send names its recipients.** `lib/outreach/bulk-selection.ts`: an empty or missing selection is refused; `all: true` needs the `expectedCount` the caller saw, and the server refuses with 409 if the drafted count differs; at most 200 per send; `preview: true` returns the count without sending. No screen in the app calls this route today (searched), so nothing breaks; the route is reachable by API and the bulk send now writes an `outreach.bulk_send` audit event.
+3. **cc and bcc are gated.** `filterSecondaryRecipients` (`lib/email/send-gate.ts`), applied in `sendEmail` and `sendGmail` for outreach: an address on the do-not-send list is dropped from cc and bcc; a country-gated cc without the sender's recorded consent is dropped; a bcc is held to the opt-out only (it is usually the sender's own or a platform copy). A dropped address does not stop mail to the person being written to, and is reported in `droppedRecipients` on the result. A refusal of the *primary* recipient is unchanged. Transactional mail is untouched. Callers do not yet surface `droppedRecipients` to the user; that arrives with the preview in P1.
+4. **Scheduled sends refuse honestly.** `send_batch` and `send_openers_nudge` are refused when created (409 with the reason) and, if a row exists, fail with that reason; the wizard's two buttons are disabled with an explanation. `send_openers_nudge` also wrote one fixed text about a past event into every tenant's queue. Production had no scheduled rows, so nothing was lost.
+5. **`autoSend` defaults off,** including when the settings row cannot be read (before, a database error fell back to on). Production's settings row already had `autoSend: false`, so no behaviour changes today; the exposure was the fallback.
+6. **`lp-campaign/send-one` leaves a record and needs permission.** It now requires the workspace sending permission (as `send-email` does), refuses placeholder and unattended addresses, and writes an `outreach.email_sent_single` audit event (who, to whom, subject, size, provider id). The LP Campaign "Send" button shows the route's error message if a member without sending permission clicks it.
+
+Not covered by P0 and still open: the Gmail path's cc/bcc filter is wired but only the filter itself and the Resend path are tested (the Gmail send needs an OAuth token fake); callers do not yet show `droppedRecipients`; the investor-updates send (path 6 in §1.1) has not been reviewed and is the next path to read before P1.

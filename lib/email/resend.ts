@@ -71,6 +71,8 @@ export interface SendEmailResult {
   finalFrom: string
   finalReplyTo: string
   finalSubject: string
+  /** cc or bcc addresses left out of an outreach send because they are on the do-not-send list or country-gated without consent. */
+  droppedRecipients?: Array<{ email: string; field: "cc" | "bcc"; reason: "suppressed" | "country_gated" }>
   finalHtml: string
   finalText: string
   /** Final CC list actually sent (post de-dupe).  [] when no CCs configured. */
@@ -198,8 +200,14 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     }
     return out
   }
-  const cc  = cleanList(input.cc)
-  const bcc = cleanList(input.bcc)
+  let cc  = cleanList(input.cc)
+  let bcc = cleanList(input.bcc)
+  // cc and bcc are recipients: the opt-out and the country rule apply to them too (docs/architecture/46 §1.3).
+  let droppedRecipients: import("@/lib/email/send-gate").DroppedRecipient[] = []
+  if (isOutreach && (cc.length || bcc.length)) {
+    const f = await (await import("@/lib/email/send-gate")).filterSecondaryRecipients({ cc, bcc, senderUserId: input.senderUserId })
+    cc = f.cc; bcc = f.bcc; droppedRecipients = f.dropped
+  }
 
   const key = process.env.RESEND_API_KEY
   if (!key) {
@@ -271,6 +279,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     finalText: text,
     finalCc: cc,
     finalBcc: bcc,
+    droppedRecipients,
   }
 }
 

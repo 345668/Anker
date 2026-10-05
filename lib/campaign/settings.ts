@@ -30,7 +30,8 @@ export const DEFAULT_SETTINGS: CampaignSettings = {
   maxInvestors: Number(process.env.CAMPAIGN_MAX_INVESTORS) || 100,
   waveSize: Number(process.env.CAMPAIGN_WAVE_SIZE) || 20,
   autoAssess: process.env.CAMPAIGN_AUTO_ASSESS !== "false",
-  autoSend: process.env.CAMPAIGN_AUTO_SEND !== "false",
+  // Off unless switched on knowingly. This is also what applies if the settings row cannot be read, so a database error can never turn unattended sending on.
+  autoSend: process.env.CAMPAIGN_AUTO_SEND === "true",
 }
 
 function coerce(raw: any): CampaignSettings {

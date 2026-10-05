@@ -15,15 +15,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pollAllMailboxes } from "@/lib/email/inbox-sync"
 import { autoClassifyPendingReplies } from "@/lib/outreach/reply-actions"
-import { trackCron } from "@/lib/cron/track"
+import { trackCron, isCronAuthorised } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
+// Fails closed: with no CRON_SECRET configured nothing is authorized (it used to be everything).
 function authorizedCron(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true
-  return (req.headers.get("authorization") || "") === `Bearer ${secret}`
+  return isCronAuthorised(req)
 }
 
 async function handle(req: NextRequest) {

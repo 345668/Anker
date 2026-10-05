@@ -562,8 +562,8 @@ function StepDraft(props: {
       <div className="border-t border-foreground/10 pt-6">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Automated schedule</h3>
         <p className="mt-2 text-sm text-muted-foreground">
-          The cron scheduler runs every 10 minutes and executes any due action. Set the initial send
-          + the opener nudge once — cron takes care of firing them.
+          Scheduled sending is switched off while it is rebuilt so that every send is previewed and
+          approved by a person first. Until then, send from the campaign page.
         </p>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -573,7 +573,7 @@ function StepDraft(props: {
                    className="w-full rounded-lg border border-foreground/15 bg-background px-3 py-2 text-sm"/>
             <button
               onClick={() => schedule("send_batch", sendAt)}
-              disabled={props.busy}
+              disabled
               className="w-full rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/85 disabled:opacity-60"
             >
               Schedule initial send
@@ -585,7 +585,7 @@ function StepDraft(props: {
                    className="w-full rounded-lg border border-foreground/15 bg-background px-3 py-2 text-sm"/>
             <button
               onClick={() => schedule("send_openers_nudge", nudgeAt)}
-              disabled={props.busy}
+              disabled
               className="w-full rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/85 disabled:opacity-60"
             >
               Schedule opener nudge

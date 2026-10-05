@@ -25,6 +25,8 @@ import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { sendGmail, loadGmailAccount, isGmailOAuthConfigured } from "@/lib/email/gmail"
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
 import { randomUUID } from "node:crypto"
+import { parseBulkSelection, checkCount } from "@/lib/outreach/bulk-selection"
+import { recordChange } from "@/lib/audit/record-change"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -51,7 +53,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const { id: campaignId } = await ctx.params
 
     const body = await req.json().catch(() => ({}))
-    const memberIds: string[] | undefined = body?.memberIds
+    // A send names its recipients, or says all and the number it saw (lib/outreach/bulk-selection.ts, docs/architecture/46 §1.3).
+    const selection = parseBulkSelection(body)
+    if (selection.kind === "invalid") return NextResponse.json({ error: selection.error }, { status: 400 })
+    const memberIds: string[] | undefined = selection.kind === "explicit" ? selection.ids : undefined
 
     // Verify campaign ownership + pull cc/bcc + provider settings
     const [campaign] = await sql`
@@ -137,6 +142,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           AND m.status IN ('drafted','planned')
         ORDER BY m.added_at ASC
       ` as any[]
+    }
+
+    const tooMany = checkCount(memberRows.length, selection.kind === "all" ? selection.expectedCount : null)
+    if (tooMany) return NextResponse.json({ error: tooMany, count: memberRows.length }, { status: 409 })
+    if (selection.preview) {
+      const sendable = memberRows.filter((r) => String(r.display_email ?? "").trim() && r.msg_id && r.body).length
+      return NextResponse.json({ ok: true, preview: true, count: memberRows.length, sendable, skipped: memberRows.length - sendable })
     }
 
     const results: SendResult[] = []
@@ -258,6 +270,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       await new Promise((r) => setTimeout(r, 150))
     }
 
+    // The send is on record: who sent how many, from which campaign (the per-message rows hold the rest).
+    await recordChange({ actor: { userId: user.id, email: user.email ?? null }, scope: { type: "org", id: crmScope.orgId }, action: "outreach.bulk_send", target: { type: "outreach_campaign", id: campaignId },
+      before: null, after: { sent, failed, skipped, requested: memberRows.length, provider: bulkProvider }, context: { selection: selection.kind } })
     return NextResponse.json({
       ok: failed === 0,
       sent, failed, skipped,

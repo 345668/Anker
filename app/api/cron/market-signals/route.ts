@@ -4,15 +4,14 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { refreshDerivedSignals } from "@/lib/signals/feed"
-import { trackCron } from "@/lib/cron/track"
+import { trackCron, isCronAuthorised } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
 
+// Fails closed: with no CRON_SECRET configured nothing is authorized (it used to be everything).
 function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return true
-  return (req.headers.get("authorization") || "") === `Bearer ${secret}`
+  return isCronAuthorised(req)
 }
 
 async function handle(req: NextRequest) {
