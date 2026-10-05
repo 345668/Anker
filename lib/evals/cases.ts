@@ -133,6 +133,18 @@ export const liveCases: EvalCase[] = [
     const over = await count(sql`SELECT count(*)::int AS n FROM (SELECT a.sender_user_id FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id WHERE i.status = 'sent' AND i.sent_at > now() - interval '7 days' GROUP BY a.sender_user_id, date_trunc('day', i.sent_at) HAVING count(*) > ${cap}) d`)
     const stuck = await count(sql`SELECT count(*)::int AS n FROM send_items WHERE (status = 'sending' AND claimed_at < now() - interval '1 hour') OR (status = 'unknown' AND claimed_at < now() - interval '2 days')`)
     return over || stuck ? fail(`${over} sender-day(s) over ${cap}, ${stuck} stuck or unresolved item(s)`) : pass() } },
+  { name: "every outreach message sent since the click-to-send paths moved went through a send authorization", run: async () => {
+    // From the first inline authorization (P3) on, a message that was sent must have a sent item; before that date the reply path was not yet recorded.
+    const [c] = (await sql`SELECT min(approved_at) AS since FROM send_authorizations WHERE source IN ('direct','reply','platform_wave','investor_update')`) as any[]
+    if (!c?.since) return pass("no inline authorization yet")
+    const n = await count(sql`SELECT count(*)::int AS n FROM outreach_messages m WHERE m.status IN ('sent','delivered','replied','accepted') AND m.sent_at > ${c.since}
+      AND NOT EXISTS (SELECT 1 FROM send_items i WHERE i.message_id = m.id AND i.status = 'sent')`)
+    return n ? fail(`${n} message(s) sent without a send authorization`) : pass() } },
+  { name: "if enforcement is on, no send has skipped authorization since", run: async () => {
+    const [f] = (await sql`SELECT enabled, updated_at FROM platform_flags WHERE key = 'outreach_require_authorization'`) as any[]
+    if (!f?.enabled) return pass("enforcement is off")
+    const n = await count(sql`SELECT count(*)::int AS n FROM audit_events WHERE action = 'send.unauthorized_path' AND created_at > ${f.updated_at}`)
+    return n ? fail(`${n} unauthorized-path send(s) logged since enforcement was switched on`) : pass() } },
   { name: "sends that skipped authorization are known (shadow log for the enforcement date)", run: async () => {
     const rows = (await sql`SELECT target_label, count(*)::int AS n FROM audit_events WHERE action = 'send.unauthorized_path' AND created_at > now() - interval '14 days' GROUP BY 1 ORDER BY 2 DESC`) as any[]
     // Informational: this passes whatever it finds, and the detail is what the enforcement decision reads (docs/architecture/46 section 7, P3).

@@ -7,6 +7,8 @@ import { isEmailSuppressed } from "@/lib/outreach/deliverability"
 import { sendRequest, type SendSnapshot } from "@/lib/updates/send-contract"
 import { randomUUID } from "node:crypto"
 import { classifySendError } from "@/lib/email/send-errors"
+import { openAuthorization, markSending, settleItem, closeAuthorization } from "@/lib/outreach/send-auth/inline"
+import { withSendAuthorization } from "@/lib/outreach/send-auth/context"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -43,6 +45,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!update) return NextResponse.json({ error: "Another request changed or is sending this update. Reload its delivery status." }, { status: 409 })
     claimed = true
     snapshot = update.delivery_snapshot as SendSnapshot
+    // The founder's send of this update is the approval, and it covers exactly the frozen snapshot: one authorization per update, kept across retries, with one item per
+    // recipient (docs/architecture/46 §17). If it cannot be recorded nothing is sent.
+    const updateText = [snapshot.body, snapshot.asks ? `Asks:\n${snapshot.asks}` : ""].filter(Boolean).join("\n\n")
+    const settledAlready = new Set(((await sql`SELECT lower(email) AS email FROM investor_update_recipients WHERE update_id = ${id} AND delivery_status IN ('sent','skipped')`) as any[]).map((x) => x.email))
+    const auth = await openAuthorization({ orgId: scope.orgId, senderUserId: user.id, approvedBy: user.id, source: "investor_update", key: `update:${id}`, expiresHours: 24 * 7, itemStatus: "approved", actor: { userId: user.id },
+      items: snapshot.recipients.filter((r) => !settledAlready.has(r.email.toLowerCase())).map((r) => ({ ref: `update:${id}:${r.trackingId}`, to: r.email, subject: snapshot.title, body: updateText, entryId: r.crmEntryId ?? null })), summary: { updateId: id } })
     const started = Date.now()
     let stopped: string | null = null // the sender is held (paused, plan or daily allowance): the rest wait, they are not marked failed
     for (const r of snapshot.recipients) {
@@ -61,14 +69,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (await isEmailSuppressed(snapshot.senderUserId || current.user_id, r.email)) {
         await sql`UPDATE investor_update_recipients SET delivery_status = 'skipped', last_error = 'Suppressed address', sent_at = NULL
           WHERE update_id = ${id} AND lower(email) = ${r.email}`
+        await settleItem(auth.id, `update:${id}:${r.trackingId}`, { status: "blocked", reason: "Suppressed address" })
         continue
       }
+      const ref = `update:${id}:${r.trackingId}`
+      await markSending(auth.id, ref)
       try {
-        const result = await sendEmail({ purpose: "outreach", via: "investor-update", senderUserId: user.id, to: r.email, subject: snapshot.title,
-          text: [snapshot.body, snapshot.asks ? `Asks:\n${snapshot.asks}` : ""].filter(Boolean).join("\n\n"),
+        const result = await withSendAuthorization(auth.id, () => sendEmail({ purpose: "outreach", via: "investor-update", senderUserId: user.id, to: r.email, subject: snapshot.title,
+          text: updateText,
           trackingId: r.trackingId, messageId: `<${r.trackingId}@an-ker.de>`, idempotencyKey: `investor-update:${id}:${r.trackingId}`,
           signal: AbortSignal.timeout(25000),
-        })
+        }))
+        await settleItem(auth.id, ref, { status: "sent", providerId: result.resendId, providerMessageId: result.messageId })
         await sql`UPDATE investor_update_recipients SET delivery_status = 'sent', resend_id = ${result.resendId}, sent_at = now(), last_error = NULL
           WHERE update_id = ${id} AND lower(email) = ${r.email}`
       } catch (e) {
@@ -78,15 +90,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (c.kind === "skip") {
           await sql`UPDATE investor_update_recipients SET delivery_status = 'skipped', last_error = ${c.reason}, sent_at = NULL
             WHERE update_id = ${id} AND lower(email) = ${r.email} AND delivery_status <> 'sent'`
+          await settleItem(auth.id, ref, { status: "blocked", reason: c.reason })
         } else if (c.kind === "stop") {
           stopped = c.reason
+          await sql`UPDATE send_items SET status = 'approved', claimed_at = NULL WHERE authorization_id = ${auth.id} AND message_id = ${ref} AND status = 'sending'`
           break
         } else {
           await sql`UPDATE investor_update_recipients SET delivery_status = 'failed', last_error = ${c.message}
             WHERE update_id = ${id} AND lower(email) = ${r.email} AND delivery_status <> 'sent'`
+          await settleItem(auth.id, ref, { status: "failed", reason: c.message.slice(0, 300) })
         }
       }
     }
+    if (!stopped) await closeAuthorization(auth.id).catch(() => {})
     const [counts] = await sql`SELECT count(*) FILTER (WHERE delivery_status = 'sent')::int AS sent,
       count(*) FILTER (WHERE delivery_status = 'skipped')::int AS skipped FROM investor_update_recipients WHERE update_id = ${id}`
     const sent = Number(counts.sent), skipped = Number(counts.skipped)

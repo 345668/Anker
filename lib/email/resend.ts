@@ -173,7 +173,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   // (four of eight did) cannot email someone who unsubscribed.
   if (isOutreach) await assertOutreachAllowed({ to: input.to, senderUserId: input.senderUserId, recipientCountry: input.recipientCountry })
   // Until sending requires an authorization (docs/architecture/46 P3), a send without one is recorded so the remaining paths are known, not guessed.
-  if (isOutreach) await (await import("@/lib/outreach/send-auth/context")).shadowLogUnauthorized(input.via)
+  if (isOutreach) await (await import("@/lib/outreach/send-auth/enforce")).checkSendAuthorization(input.via, input.senderUserId)
   let html = input.html ?? (input.text ? textToHtml(input.text) : "")
   if (!input.noTracking && trackViaApp && html) {
     html = rewriteLinks(html, trackingId)

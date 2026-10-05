@@ -16,6 +16,7 @@ export function classifySendError(e: unknown): SendErrorClass {
   const message = String(err?.message ?? "Delivery failed").slice(0, 400)
   if (err?.code === "recipient_suppressed") return { kind: "skip", reason: "Opted out: this address asked not to receive Anker outreach email." }
   if (err?.code === "country_gated") return { kind: "skip", reason: message }
+  if (err?.code === "send_unauthorized") return { kind: "fail", message }
   if (err?.name === "EntitlementRefusal") return { kind: "stop", reason: message }
   return { kind: "fail", message }
 }

@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto"
 import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 import { checkDeliverability } from "@/lib/outreach/send-gate"
 import { recordChange } from "@/lib/audit/record-change"
+import { sendUnderAuthorization } from "@/lib/outreach/send-auth/inline"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -47,15 +48,14 @@ export async function POST(req: NextRequest) {
     if (!addr.ok) return NextResponse.json({ error: addr.reason }, { status: 400 })
 
     const trackingId = randomUUID()
-    const result = await sendEmail({
-      purpose: "outreach",
-      via: "lp-send-one",
-      senderUserId: user.id,
-      to: to.trim(),
-      subject: subject.trim(),
-      text: emailBody,
-      trackingId,
+    // The click is the approval: it is recorded (who, to whom, a hash of the text) before the send, and the send runs under it (docs/architecture/46 §17).
+    const { outcomes } = await sendUnderAuthorization({
+      orgId: scope.orgId, senderUserId: user.id, approvedBy: user.id, source: "direct", actor: { userId: user.id, email: user.email ?? null },
+      items: [{ ref: `direct:${trackingId}`, to: to.trim(), subject: subject.trim(), body: emailBody }],
+      send: async (item) => { const r = await sendEmail({ purpose: "outreach", via: "lp-send-one", senderUserId: user.id, to: item.to, subject: item.subject, text: item.body, trackingId }); return { ...r, providerId: r.resendId, providerMessageId: r.messageId } },
     })
+    if (outcomes[0].status !== "sent") throw outcomes[0].error
+    const result = outcomes[0].value!
 
     await recordChange({
       actor: { userId: user.id, email: user.email ?? null }, scope: { type: "org", id: scope.orgId }, action: "outreach.email_sent_single",

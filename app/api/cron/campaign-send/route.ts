@@ -14,6 +14,12 @@
  * per-campaign wave size for this run.
  */
 import { PLATFORM_SENDER_ID } from "@/lib/email/send-gate"
+import { openAuthorization, markSending, settleItem, closeAuthorization } from "@/lib/outreach/send-auth/inline"
+import { withSendAuthorization } from "@/lib/outreach/send-auth/context"
+import { classifySendError } from "@/lib/email/send-errors"
+
+/** The platform has no workspace; its waves are recorded under this id. */
+const PLATFORM_ORG_ID = "platform:pitch-us"
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { isResendConfigured, sendEmail } from "@/lib/email/resend"
@@ -77,13 +83,21 @@ async function handle(req: NextRequest) {
     }
 
     let sent = 0, failed = 0, droppedCopies = 0
+    // The platform owner's standing decision is the approval for a wave: either the campaign setting `autoSend`, or the owner's release of this submission. Each wave is recorded
+    // as one authorization (who approved it, the exact recipients, a hash of each text) before anything is sent (docs/architecture/46 §17).
+    const bccFor = [...ANKER_BCC, sub.founder_email].filter(Boolean) as string[]
+    const sendable = (queue as any[]).filter((e) => e.investor_email)
+    const auth = sendable.length ? await openAuthorization({ orgId: PLATFORM_ORG_ID, senderUserId: PLATFORM_SENDER_ID, approvedBy: settings.autoSend ? "platform:setting:autoSend" : "platform:owner-release", source: "platform_wave", expiresHours: 6, itemStatus: "approved",
+      items: sendable.map((e) => ({ ref: `wave:${e.id}`, to: e.investor_email, bcc: bccFor, subject: e.draft_subject || `Intro: ${sub.startup_name}`, body: e.draft_body })), summary: { submission: sub.public_ref, campaignId } }) : null
     for (const e of queue as any[]) {
       if (!e.investor_email) {
         await sql`UPDATE campaign_crm_entries SET send_error='no email', updated_at=NOW() WHERE id=${e.id}`
         continue
       }
+      const ref = `wave:${e.id}`
+      if (auth) await markSending(auth.id, ref)
       try {
-        const res = await sendEmail({
+        const res = await withSendAuthorization(auth!.id, () => sendEmail({
           purpose: "outreach",
           via: "platform-wave",
           senderUserId: PLATFORM_SENDER_ID,
@@ -94,7 +108,8 @@ async function handle(req: NextRequest) {
           // BCC the founder on their own outreach + the alt Anker address.
           bcc: [...ANKER_BCC, sub.founder_email].filter(Boolean),
           noTracking: true, // keep one-click interest/deck links pristine
-        })
+        }))
+        await settleItem(auth!.id, ref, { status: "sent", providerId: res.resendId, providerMessageId: res.messageId })
         // A bcc left out (opted out) is counted and logged: the founder's own copy not arriving is worth knowing.
         if (res.droppedRecipients?.length) { droppedCopies += res.droppedRecipients.length; console.warn("[campaign-send] left out of", e.id, res.droppedRecipients.map((d) => `${d.field}:${d.reason}`).join(",")) }
         await sql`
@@ -112,10 +127,13 @@ async function handle(req: NextRequest) {
         sent++
       } catch (err: any) {
         failed++
+        if (auth) await settleItem(auth.id, ref, { status: classifySendError(err).kind === "skip" ? "blocked" : "failed", reason: String(err?.message ?? "send failed").slice(0, 300) }).catch(() => {})
         await sql`UPDATE campaign_crm_entries SET send_error=${String(err?.message ?? "send failed").slice(0, 500)}, updated_at=NOW() WHERE id=${e.id}`
         console.error("[campaign-send] failed for", e.id, err?.message ?? err)
       }
     }
+
+    if (auth) await closeAuthorization(auth.id).catch(() => {})
 
     // Anything still sendable?
     const [{ remaining }] = await sql`

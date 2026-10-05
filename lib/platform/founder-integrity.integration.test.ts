@@ -38,6 +38,8 @@ beforeAll(async () => {
     INSERT INTO memberships(user_id,org_id,org_role,persona) VALUES ('vc','fund-a','workspace_owner','vc'),('vc','fund-b','workspace_owner','vc');
     INSERT INTO investment_firms VALUES ('firm-one','Firm One'); INSERT INTO investors VALUES ('person-one','One','Investor','firm-one');`)
   for (const file of ['2026-05-04-crm-entries.sql','2026-05-25-crm-boards.sql','2026-07-10-crm-powerhouse.sql','2026-08-14-crm-check-size.sql','2026-09-09-fundraising-rounds.sql','2026-09-06-investor-updates.sql','2026-09-11-investor-update-delivery-state.sql','2026-09-12-founder-workflow-integrity.sql']) await db.exec(migration(file))
+  await db.exec("CREATE TABLE IF NOT EXISTS platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text)")
+  for (const f of ["2026-10-06-send-authorizations.sql", "2026-10-06b-send-auth-sources.sql"]) await db.exec(migration(f)) // investor updates now send under a send authorization
   await db.exec(migration("2026-09-20-ai-persona-access.sql"))
   await db.exec(migration("2026-09-13-workspace-team-lifecycle.sql"))
   await db.exec(migration("2026-08-24-linkedin-outreach.sql"))
@@ -53,7 +55,7 @@ beforeEach(async () => {
     DELETE FROM memberships WHERE user_id IN ('invitee','lp');
     INSERT INTO memberships(user_id,org_id,org_role,persona,can_send_outreach) VALUES ('u','a','workspace_owner','founder',true) ON CONFLICT(user_id,org_id) DO UPDATE SET org_role='workspace_owner',can_send_outreach=true;
     UPDATE memberships SET org_role='member',can_send_outreach=false WHERE user_id='other';
-    DELETE FROM workspace_decks; DELETE FROM planning_scenarios; DELETE FROM private_artifacts; DELETE FROM investor_update_recipients; DELETE FROM investor_updates; DELETE FROM fundraising_rounds; DELETE FROM crm_entries; DELETE FROM crm_boards;
+    DELETE FROM workspace_decks; DELETE FROM planning_scenarios; DELETE FROM private_artifacts; DELETE FROM send_items; DELETE FROM send_authorizations; DELETE FROM investor_update_recipients; DELETE FROM investor_updates; DELETE FROM fundraising_rounds; DELETE FROM crm_entries; DELETE FROM crm_boards;
     INSERT INTO crm_boards(id,user_id,name,org_id) VALUES ('board-a','u','Seed','a'),('board-b','u','B round','b');
     INSERT INTO fundraising_rounds(id,user_id,org_id,board_id,name,currency,target) VALUES ('round-a','u','a','board-a','Seed','USD',2000000),('round-b','u','b','board-b','B','EUR',3000000);`)
 })
@@ -176,6 +178,20 @@ it("a held sender (paused, plan or daily allowance) stops the loop and leaves th
   session.send.mockReset(); session.send.mockResolvedValue({ resendId: "later" })
   expect((await sendUpdate(request('/api/updates/update/send','POST',{ revision: 1 }),deckParams('update'))).status).toBe(200)
   expect(session.send).toHaveBeenCalledTimes(1); expect(session.send.mock.calls[0][0].to).toBe("two@example.test")
+})
+it("an investor update sends under one authorization that is kept across retries, with one item per recipient and a hash of the text, and records who approved it (doc 46 section 17)", async () => {
+  await seedUpdate()
+  session.send.mockImplementation(async (input: any) => { if (input.to === "two@example.test") throw new Error("Provider temporary failure"); return { resendId: "one-id", messageId: input.messageId } })
+  await sendUpdate(request('/api/updates/update/send','POST',sendBody),deckParams('update'))
+  const auth = (await db.query("SELECT id, source, approved_by, sender_user_id, status, proposal_id FROM send_authorizations")).rows as any[]
+  expect(auth).toHaveLength(1); expect(auth[0]).toMatchObject({ source: "investor_update", approved_by: "u", sender_user_id: "u", proposal_id: "update:update", status: "completed" })
+  const items = (await db.query("SELECT message_id, status, content_hash FROM send_items ORDER BY message_id")).rows as any[]
+  expect(items.map((i) => i.status).sort()).toEqual(["failed", "sent"]); expect(items.every((i) => /^[0-9a-f]{40}$/.test(i.content_hash))).toBe(true)
+  session.send.mockReset(); session.send.mockResolvedValue({ resendId: "two-id" })
+  await sendUpdate(request('/api/updates/update/send','POST',{ revision: 1 }),deckParams('update'))
+  // The retry opens an authorization for only the recipient that is still owed, and the one already sent is not claimed again.
+  expect((await db.query("SELECT count(*)::int n FROM send_items WHERE status = 'sent'")).rows[0]).toEqual({ n: 2 })
+  expect((await db.query("SELECT count(*)::int n FROM send_items WHERE status IN ('approved','sending')")).rows[0]).toEqual({ n: 0 })
 })
 it("the new migration can run again without losing data", async () => {
   await seedUpdate();await db.exec(migration('2026-09-13-workspace-team-shared-records.sql'))

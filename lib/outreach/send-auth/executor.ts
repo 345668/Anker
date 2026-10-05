@@ -9,6 +9,9 @@ import { classifySendError, describeDropped } from "@/lib/email/send-errors"
 import { withSendAuthorization } from "./context"
 import { backoffMinutes, contentHash, IDEMPOTENCY_SAFE_MS, MAX_ATTEMPTS, PER_TICK, STALE_SENDING_MS, stopReason, type Provider } from "./model"
 
+/** The authorizations the executor sends. The others (a click-to-send path, an investor update, a reply, a platform wave) send inline and only record here. */
+export const EXECUTOR_SOURCES = ["manual_single", "manual_batch", "proposal"]
+
 export interface ExecDeps {
   now: () => Date
   paused: () => Promise<boolean>
@@ -44,9 +47,9 @@ async function expireOld(stats: ExecStats) {
 
 /** An item still `sending` after ten minutes was claimed by a run that died. Resend's idempotency key makes a retry safe for 23 hours; anything else is `unknown`, never guessed. */
 async function recoverStale(now: Date, stats: ExecStats) {
-  const stale = (await sql`SELECT i.id, i.claimed_at, a.provider FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id WHERE i.status = 'sending' AND i.claimed_at < ${new Date(now.getTime() - STALE_SENDING_MS).toISOString()}::timestamptz`) as any[]
+  const stale = (await sql`SELECT i.id, i.claimed_at, a.provider, a.source FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id WHERE i.status = 'sending' AND i.claimed_at < ${new Date(now.getTime() - STALE_SENDING_MS).toISOString()}::timestamptz`) as any[]
   for (const s of stale) {
-    const safe = s.provider === "resend" && now.getTime() - new Date(s.claimed_at).getTime() < IDEMPOTENCY_SAFE_MS
+    const safe = EXECUTOR_SOURCES.includes(s.source) && s.provider === "resend" && now.getTime() - new Date(s.claimed_at).getTime() < IDEMPOTENCY_SAFE_MS
     if (safe) { await sql`UPDATE send_items SET status = 'approved', reason = 'Retrying after an interrupted attempt (the provider will not send it twice).' WHERE id = ${s.id} AND status = 'sending'`; stats.recovered++ }
     else { await sql`UPDATE send_items SET status = 'unknown', reason = 'An attempt was interrupted, so this may or may not have been sent. Check your Sent mail before sending it again.' WHERE id = ${s.id} AND status = 'sending'`; stats.unknown++ }
   }
@@ -160,9 +163,9 @@ export async function runExecutor(deps: ExecDeps = defaultExecDeps, opts: { auth
   await expireOld(stats); await recoverStale(now, stats)
   const due = (opts.authorizationId
     ? await sql`SELECT i.*, a.sender_user_id, a.provider, a.account_id FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id
-        WHERE i.authorization_id = ${opts.authorizationId} AND i.status = 'approved' AND i.send_after <= ${now.toISOString()}::timestamptz AND a.status = 'active' AND a.expires_at > now() ORDER BY i.created_at LIMIT 500`
+        WHERE i.authorization_id = ${opts.authorizationId} AND i.status = 'approved' AND i.send_after <= ${now.toISOString()}::timestamptz AND a.status = 'active' AND a.expires_at > now() AND a.source = ANY(${EXECUTOR_SOURCES}) ORDER BY i.created_at LIMIT 500`
     : await sql`SELECT i.*, a.sender_user_id, a.provider, a.account_id FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id
-        WHERE i.status = 'approved' AND i.send_after <= ${now.toISOString()}::timestamptz AND a.status = 'active' AND a.expires_at > now() ORDER BY a.approved_at, i.created_at LIMIT 500`) as any[]
+        WHERE i.status = 'approved' AND i.send_after <= ${now.toISOString()}::timestamptz AND a.status = 'active' AND a.expires_at > now() AND a.source = ANY(${EXECUTOR_SOURCES}) ORDER BY a.approved_at, i.created_at LIMIT 500`) as any[]
   const bySender = new Map<string, any[]>()
   for (const d of due) bySender.set(d.sender_user_id, [...(bySender.get(d.sender_user_id) ?? []), d])
   for (const [sender, list] of bySender) {

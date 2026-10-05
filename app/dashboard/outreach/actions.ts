@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server"
 import { sql } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
+import { sendUnderAuthorization } from "@/lib/outreach/send-auth/inline"
+import { requireWorkspace } from "@/lib/auth/workspace-context"
 import { buildInvestorProfile } from "@/lib/agents/profile-builder"
 import { generateEmailSequence, generateFollowUpEmail } from "@/lib/ai/email-personalizer"
 import type { FounderContext, PartnerContext } from "@/lib/ai/dm-personalizer"
@@ -97,73 +99,35 @@ export async function sendOutreachEmailAction(data: {
   const subject = data.subject.replace(/\{\{investor_name\}\}/g, data.toName).replace(/\{\{startup_name\}\}/g, startupName)
   const body = data.body.replace(/\{\{investor_name\}\}/g, data.toName).replace(/\{\{startup_name\}\}/g, startupName)
 
-  // ── Resend path (primary) ──
-  if (isResendConfigured()) {
-    try {
-      const res = await sendEmail({
-        purpose: "outreach",
-        via: "dashboard-action",
-        senderUserId: user.id,
-        to: data.to,
-        subject,
-        text: body,
-        inReplyTo: data.inReplyTo,
-      })
-      if (data.outreachId) {
-        // Best-effort status persistence.  Column names vary by schema
-        // revision, so keep it to the minimal stable set and never throw.
-        try {
-          await sql`UPDATE outreaches SET sent_at = NOW(), stage = 'sent' WHERE id = ${data.outreachId}`
-        } catch (e) { console.error("[outreach] status update failed:", e) }
-        try {
-          await sql`UPDATE outreaches SET subject = ${subject}, body = ${body} WHERE id = ${data.outreachId}`
-        } catch { /* optional columns — ignore */ }
-      }
-      revalidatePath("/dashboard/outreach")
-      revalidatePath("/dashboard/crm")
-      return {
-        success: true,
-        messageId: res.resendId,
-        provider: "resend",
-      }
-    } catch (e: any) {
-      return { success: false, error: `Resend send failed: ${e?.message ?? "unknown error"}` }
-    }
-  }
-
-  // ── SendGrid legacy fallback (only if Resend not configured) ──
-  const sendGridKey = data.customSendGridKey || process.env.SENDGRID_API_KEY
-  const senderEmail = data.customSenderEmail || process.env.SENDGRID_SENDER_EMAIL || user.email
-  const senderName = data.customSenderName || process.env.SENDGRID_SENDER_NAME || user.user_metadata?.first_name || "Anker"
-  if (!sendGridKey) {
-    return { success: false, error: "No email provider configured. Set RESEND_API_KEY in .env.local (recommended) or a SendGrid key in Settings." }
-  }
-  if (!senderEmail) return { success: false, error: "Sender email not configured." }
+  // The one outreach path: Resend, through the gates. There used to be a SendGrid fallback here that posted straight to SendGrid with a key and sender the caller could supply,
+  // so it skipped the opt-out, the country rule, the footer and any authorization; it could only run when Resend was not configured, and it has been removed.
+  if (!isResendConfigured()) return { success: false, error: "Email delivery is not configured, so nothing was sent." }
+  let orgId: string
+  try { orgId = (await requireWorkspace(true)).orgId } catch (e: any) { return { success: false, error: e?.message ?? "Select a workspace to send from." } }
   try {
-    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${sendGridKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        personalizations: [{ to: [{ email: data.to, name: data.toName }], subject }],
-        from: { email: senderEmail, name: senderName },
-        content: [{ type: "text/plain", value: body }],
-        tracking_settings: { open_tracking: { enable: true }, click_tracking: { enable: true } },
-      }),
+    // The click is the approval: recorded before the send, and the send runs under it (docs/architecture/46 §17).
+    const { outcomes } = await sendUnderAuthorization({
+      orgId, senderUserId: user.id, approvedBy: user.id, source: "direct", actor: { userId: user.id, email: user.email ?? null },
+      items: [{ ref: `direct:${crypto.randomUUID()}`, to: data.to, subject, body }],
+      send: async (item) => { const r = await sendEmail({ purpose: "outreach", via: "dashboard-action", senderUserId: user.id, to: item.to, subject: item.subject, text: item.body, inReplyTo: data.inReplyTo }); return { ...r, providerId: r.resendId, providerMessageId: r.messageId } },
     })
-    if (!response.ok) {
-      return { success: false, error: `SendGrid failed: ${response.status} ${await response.text()}` }
-    }
-    const messageId = response.headers.get("x-message-id") || crypto.randomUUID()
+    if (outcomes[0].status !== "sent") throw outcomes[0].error
+    const res = outcomes[0].value!
     if (data.outreachId) {
+      // Best-effort status persistence.  Column names vary by schema
+      // revision, so keep it to the minimal stable set and never throw.
       try {
         await sql`UPDATE outreaches SET sent_at = NOW(), stage = 'sent' WHERE id = ${data.outreachId}`
       } catch (e) { console.error("[outreach] status update failed:", e) }
+      try {
+        await sql`UPDATE outreaches SET subject = ${subject}, body = ${body} WHERE id = ${data.outreachId}`
+      } catch { /* optional columns — ignore */ }
     }
     revalidatePath("/dashboard/outreach")
     revalidatePath("/dashboard/crm")
-    return { success: true, messageId, provider: "sendgrid" }
+    return { success: true, messageId: res.resendId, provider: "resend" }
   } catch (e: any) {
-    return { success: false, error: `SendGrid send failed: ${e?.message ?? "unknown error"}` }
+    return { success: false, error: `Resend send failed: ${e?.message ?? "unknown error"}` }
   }
 }
 

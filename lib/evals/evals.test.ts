@@ -11,12 +11,12 @@ import { runCases, store, runAll } from "./runner"
 let db: PGlite
 beforeAll(async () => {
   db = new PGlite()
-  await db.exec("CREATE TABLE memberships (org_id text, user_id text, org_role text); CREATE TABLE audit_events (action text, target_label text, created_at timestamptz DEFAULT now()); CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text);")
-  for (const f of ["2026-10-05-action-proposals", "2026-10-05b-agent-runtime", "2026-10-05c-agents-complete", "2026-10-06-send-authorizations"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
+  await db.exec("CREATE TABLE memberships (org_id text, user_id text, org_role text); CREATE TABLE audit_events (action text, target_label text, created_at timestamptz DEFAULT now()); CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text, updated_at timestamptz DEFAULT now()); CREATE TABLE outreach_messages (id text PRIMARY KEY, status text, sent_at timestamptz);")
+  for (const f of ["2026-10-05-action-proposals", "2026-10-05b-agent-runtime", "2026-10-05c-agents-complete", "2026-10-06-send-authorizations", "2026-10-06b-send-auth-sources"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
   h.sql.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => (await db.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values.map((v) => (Array.isArray(v) ? v : v)))).rows)
 }, 30000)
 afterAll(async () => db.close())
-beforeEach(async () => { await db.exec("DELETE FROM agent_settings; DELETE FROM agent_executions; DELETE FROM action_proposals; DELETE FROM memberships; DELETE FROM eval_runs; DELETE FROM send_items; DELETE FROM send_authorizations; DELETE FROM audit_events") })
+beforeEach(async () => { await db.exec("DELETE FROM agent_settings; DELETE FROM agent_executions; DELETE FROM action_proposals; DELETE FROM memberships; DELETE FROM eval_runs; DELETE FROM send_items; DELETE FROM send_authorizations; DELETE FROM outreach_messages; DELETE FROM audit_events") })
 
 describe("static evals", () => {
   for (const c of staticCases) it(c.name, async () => { const r = await c.run(); expect(r.detail).toBeTruthy(); expect(r.ok, r.detail).toBe(true) })
@@ -48,6 +48,18 @@ describe("live evals", () => {
     expect((await byName("no sender went over the daily cap").run()).ok).toBe(false)
     await db.exec("INSERT INTO audit_events (action, target_label) VALUES ('send.unauthorized_path','investor-update'), ('send.unauthorized_path','investor-update')")
     const shadow = await byName("sends that skipped authorization").run(); expect(shadow.ok).toBe(true); expect(shadow.detail).toMatch(/investor-update 2/)
+  })
+  it("catches a message sent without an authorization after the paths moved, and a send logged after enforcement was switched on", async () => {
+    await db.exec("INSERT INTO send_authorizations (id, org_id, sender_user_id, provider, source, approved_by, digest, expires_at, approved_at) VALUES ('p3','o','u','resend','direct','u','d', now() + interval '1 day', now() - interval '1 hour')")
+    await db.exec("INSERT INTO outreach_messages VALUES ('m-ok','sent', now()), ('m-old','sent', now() - interval '3 hours')")
+    await db.exec("INSERT INTO send_items (authorization_id, org_id, message_id, recipients, content_hash, idempotency_key, status, sent_at) VALUES ('p3','o','m-ok','{}','h','k1','sent', now())")
+    expect((await byName("every outreach message sent since").run()).ok).toBe(true) // m-old was sent before the cutover; m-ok has a sent item
+    await db.exec("INSERT INTO outreach_messages VALUES ('m-bad','sent', now())")
+    expect((await byName("every outreach message sent since").run()).ok).toBe(false)
+    expect((await byName("if enforcement is on").run()).ok).toBe(true) // off
+    await db.exec("INSERT INTO platform_flags (key, enabled, updated_at) VALUES ('outreach_require_authorization', true, now() - interval '1 hour') ON CONFLICT (key) DO UPDATE SET enabled = true, updated_at = now() - interval '1 hour'")
+    await db.exec("INSERT INTO audit_events (action, target_label) VALUES ('send.unauthorized_path','x')")
+    expect((await byName("if enforcement is on").run()).ok).toBe(false)
   })
   it("the schema check names every missing table and column", async () => {
     const r = await byName("every column").run()

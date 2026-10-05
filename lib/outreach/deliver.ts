@@ -13,6 +13,7 @@ import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
 import { isEmailSuppressed } from "@/lib/outreach/deliverability"
 import { randomUUID } from "node:crypto"
+import { sendUnderAuthorization } from "@/lib/outreach/send-auth/inline"
 
 export interface DeliverReplyInput {
   userId: string
@@ -67,7 +68,7 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
   if (!draft) return { ok: false, sent: false, reason: "no draft to send" }
 
   const [entry] = (await sql`
-    SELECT display_email, display_name FROM crm_entries
+    SELECT display_email, display_name, org_id FROM crm_entries
     WHERE id = ${crmEntryId} AND workspace_record_access(${userId},org_id,true,true) LIMIT 1
   `) as any[]
 
@@ -153,7 +154,14 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
   }
 
   try {
-    const result = await sendEmail({ purpose: "outreach", via: "reply", senderUserId: userId, to: toEmail, subject, text: draft, trackingId, inReplyTo, idempotencyKey: `anker-reply/${outreachMessageId}` })
+    // Approving the drafted reply is the approval: recorded before the send, and the send runs under it (docs/architecture/46 §17).
+    const { outcomes } = await sendUnderAuthorization({
+      orgId: String(entry.org_id ?? `user:${userId}`), senderUserId: userId, approvedBy: userId, source: "reply", actor: { userId },
+      items: [{ ref: outreachMessageId, to: toEmail, subject, body: draft, entryId: crmEntryId }],
+      send: async (item) => { const r = await sendEmail({ purpose: "outreach", via: "reply", senderUserId: userId, to: item.to, subject: item.subject, text: item.body, trackingId, inReplyTo, idempotencyKey: `anker-reply/${outreachMessageId}` }); return { ...r, providerId: r.resendId, providerMessageId: r.messageId } },
+    })
+    if (outcomes[0].status !== "sent") throw outcomes[0].error
+    const result = outcomes[0].value!
     await sql`
       UPDATE outreach_messages SET
         tracking_id      = ${result.trackingId},

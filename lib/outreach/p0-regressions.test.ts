@@ -37,3 +37,25 @@ describe("unattended campaign sending is off by default", () => {
   afterEach(() => { if (was === undefined) delete process.env.CAMPAIGN_AUTO_SEND; else process.env.CAMPAIGN_AUTO_SEND = was })
   it("defaults to off, which is also what applies if the settings row cannot be read", () => { expect(DEFAULT_SETTINGS.autoSend).toBe(false) })
 })
+
+describe("every outreach send goes through the provider functions and is labelled (docs/architecture/46 section 17)", () => {
+  const walk = (dir: string, out: string[] = []): string[] => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name)
+      if (e.isDirectory()) { if (!["node_modules", ".next"].includes(e.name)) walk(p, out) } else if (/\.(ts|tsx)$/.test(e.name) && !/\.test\./.test(e.name)) out.push(p)
+    }
+    return out
+  }
+  const files = [...walk("app"), ...walk("lib"), ...walk("components")]
+  it("no code outside the email provider modules posts mail to a provider (a SendGrid fallback that skipped every gate was removed)", () => {
+    const providers = ["api.resend.com/emails", "api.sendgrid.com/v3/mail/send", "gmail/v1/users/me/messages/send"]
+    const offenders = files// Allowed: the two provider modules; resend-sync (it only reads delivery events); and the public contact form, which mails the company's own inbox (not a third party).
+      .filter((f) => !/lib\/email\/(resend|gmail|resend-sync)\.ts$/.test(f) && !/app\/contact\/actions\.ts$/.test(f)).filter((f) => { const t = readFileSync(f, "utf8"); return providers.some((p) => t.includes(p)) })
+    expect(offenders).toEqual([])
+  })
+  it("every file that sends outreach says which path it is (the shadow log and the authorization both depend on it)", () => {
+    const unlabelled = files.filter((f) => { const t = readFileSync(f, "utf8"); return /purpose: "outreach"/.test(t) && !/via: "/.test(t) })
+    expect(unlabelled).toEqual([])
+  })
+})
+
