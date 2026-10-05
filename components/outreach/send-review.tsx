@@ -10,13 +10,13 @@ interface Preview { error: string | null; provider: string; accountEmail: string
  * Review and send (docs/architecture/46 §4): what will be sent, to whom, from which mailbox, what is refused and why, how long a big batch takes. Approving is the
  * person's decision about exactly this set; nothing is sent by looking. Sent mail cannot be recalled, and the dialog says so.
  */
-export function SendReview({ messageIds, provider, onClose, onDone }: { messageIds: string[]; provider?: "resend" | "gmail"; onClose: () => void; onDone?: (r: any) => void }) {
+export function SendReview({ messageIds, provider, initialSequence, onClose, onDone }: { messageIds: string[]; provider?: "resend" | "gmail"; initialSequence?: boolean; onClose: () => void; onDone?: (r: any) => void }) {
   const [p, setP] = useState<Preview | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [typed, setTyped] = useState("")
   const [after, setAfter] = useState("")
-  const [seq, setSeq] = useState(false)
+  const [seq, setSeq] = useState(!!initialSequence)
   const [note, setNote] = useState<string | null>(null)
   const [result, setResult] = useState<any>(null)
   const load = useCallback(async () => {

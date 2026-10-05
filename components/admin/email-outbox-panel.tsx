@@ -74,6 +74,7 @@ export function EmailOutboxPanel() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [reviewIds, setReviewIds] = useState<string[] | null>(null)
+  const [asSequence, setAsSequence] = useState(false)
   const [authKey, setAuthKey] = useState(0)
   const [syncState, setSyncState] = useState<SyncState | null>(null)
   const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null)
@@ -106,8 +107,11 @@ export function EmailOutboxPanel() {
       return
     }
     // Sending is approved in the review dialog (docs/architecture/46): the person sees the recipient, the gates' verdict and the text first.
-    setError(null); setNotice(null); setReviewIds([row.id])
+    setError(null); setNotice(null); setAsSequence(false); setReviewIds([row.id])
   }
+  /** All of a contact's draft steps on this page, approved once as a dated sequence (doc 46 §18). */
+  const stepsOf = (row: Row) => (data?.rows ?? []).filter((r) => r.crmEntryId === row.crmEntryId && r.status === "draft" && r.subject && r.body)
+  function sendSequence(row: Row) { setError(null); setNotice(null); setAsSequence(true); setReviewIds(stepsOf(row).map((r) => r.id)) }
 
   async function triggerSync(opts: { force?: boolean } = {}) {
     setSyncing(true); setError(null)
@@ -224,7 +228,7 @@ export function EmailOutboxPanel() {
 
       <p className="rounded-md border border-foreground/10 bg-foreground/5 p-3 text-xs text-muted-foreground">This list shows drafts from every workspace you own, addressed to real people. Sending works for the workspace selected at the top left: a draft that belongs to another workspace asks you to switch to it, and every send is previewed and approved first.</p>
       <SendAuthorizations refreshKey={authKey} />
-      {reviewIds && <SendReview messageIds={reviewIds} onClose={() => setReviewIds(null)} onDone={() => { setAuthKey((k) => k + 1); load(bucket) }} />}
+      {reviewIds && <SendReview messageIds={reviewIds} initialSequence={asSequence} onClose={() => setReviewIds(null)} onDone={() => { setAuthKey((k) => k + 1); load(bucket) }} />}
 
       {notice && (
         <div role="status" className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md text-xs">
@@ -247,6 +251,8 @@ export function EmailOutboxPanel() {
             row={row}
             busy={busy}
             onSend={() => sendRow(row)}
+            onSendSequence={stepsOf(row).length > 1 && stepsOf(row)[0].id === row.id ? () => sendSequence(row) : undefined}
+            sequenceSteps={stepsOf(row).length}
           />
         ))}
       </div>
@@ -270,7 +276,7 @@ const KIND_LABEL: Record<string, string> = {
   close_loop: "day 14",
 }
 
-function OutboxRow({ row, busy, onSend }: { row: Row; busy: string | null; onSend: () => void }) {
+function OutboxRow({ row, busy, onSend, onSendSequence, sequenceSteps }: { row: Row; busy: string | null; onSend: () => void; onSendSequence?: () => void; sequenceSteps?: number }) {
   const [open, setOpen] = useState(false)
   const draft = row.status === "draft"
   const failed = row.status === "failed"
@@ -353,6 +359,11 @@ function OutboxRow({ row, busy, onSend }: { row: Row; busy: string | null; onSen
           </a>
         )}
         <div className="ml-auto flex items-center gap-2">
+          {draft && onSendSequence && (
+            <button type="button" onClick={onSendSequence} className="px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5" title="Approve every step of this contact once, each going on its own day">
+              Send all {sequenceSteps} steps as a sequence
+            </button>
+          )}
           {draft && (
             <button
               type="button"
