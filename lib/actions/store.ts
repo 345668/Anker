@@ -6,7 +6,7 @@ import { idempotencyKey, mayAutoCommit, type RiskClass, type SourceTrust } from 
 
 export interface Proposal {
   id: string; org_id: string; capability: string; input: any; summary: string; diff: any[]; evidence: any; risk_class: RiskClass
-  run_id: string | null; source_trust: SourceTrust; status: string; requested_by: string; decided_by: string | null
+  run_id: string | null; agent_id: string | null; source_trust: SourceTrust; status: string; requested_by: string; decided_by: string | null
   decided_at: string | null; applied_at: string | null; undone_at: string | null; failure: string | null; auto_committed: boolean; created_at: string; expires_at: string
 }
 export interface Actor { userId: string; email?: string | null }
@@ -27,7 +27,7 @@ export async function setAutonomy(orgId: string, risk: RiskClass, on: boolean, b
 }
 
 /** Make a proposal. Returns the proposal and, when policy allowed it, the applied result. Idempotent per run. */
-export async function propose(scope: Scope & { persona?: string | null }, capability: string, rawInput: unknown, ctx: { runId: string | null; chatId?: string | null; trust: SourceTrust }, actor?: Actor) {
+export async function propose(scope: Scope & { persona?: string | null }, capability: string, rawInput: unknown, ctx: { runId: string | null; chatId?: string | null; trust: SourceTrust; agentId?: string | null; executionId?: string | null }, actor?: Actor) {
   const cap = CAPABILITIES[capability]
   if (!cap) throw new ActionError("Unknown capability.")
   const input = cap.check(rawInput)
@@ -35,9 +35,9 @@ export async function propose(scope: Scope & { persona?: string | null }, capabi
   const existing = (await sql`SELECT * FROM action_proposals WHERE org_id = ${scope.orgId} AND idempotency_key = ${key}`) as any[]
   if (existing[0]) return { proposal: existing[0] as Proposal, applied: existing[0].status === "applied", message: null as string | null, existing: true }
   const plan = await cap.plan(scope, input)
-  const [row] = (await sql`INSERT INTO action_proposals (org_id, persona, requested_by, capability, input, summary, diff, evidence, risk_class, run_id, chat_id, source_trust, idempotency_key)
+  const [row] = (await sql`INSERT INTO action_proposals (org_id, persona, requested_by, capability, input, summary, diff, evidence, risk_class, run_id, chat_id, source_trust, idempotency_key, agent_id, execution_id)
     VALUES (${scope.orgId}, ${scope.persona ?? null}, ${scope.userId}, ${capability}, ${JSON.stringify(input)}::jsonb, ${plan.summary}, ${JSON.stringify(plan.diff)}::jsonb, ${JSON.stringify(plan.evidence)}::jsonb,
-            ${cap.risk}, ${ctx.runId}, ${ctx.chatId ?? null}, ${ctx.trust}, ${key})
+            ${cap.risk}, ${ctx.runId}, ${ctx.chatId ?? null}, ${ctx.trust}, ${key}, ${ctx.agentId ?? null}, ${ctx.executionId ?? null})
     ON CONFLICT (org_id, idempotency_key) DO NOTHING RETURNING *`) as any[]
   if (!row) { const [again] = (await sql`SELECT * FROM action_proposals WHERE org_id = ${scope.orgId} AND idempotency_key = ${key}`) as any[]; return { proposal: again as Proposal, applied: again.status === "applied", message: null, existing: true } }
   await audit(scope.orgId, actor ?? { userId: scope.userId }, "created", row, { capability, risk_class: cap.risk, source_trust: ctx.trust, run_id: ctx.runId })

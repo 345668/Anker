@@ -20,6 +20,7 @@ beforeAll(async () => {
   await db.exec(`CREATE TABLE crm_entries (id text PRIMARY KEY, org_id text, display_name text, stage text, updated_at timestamptz DEFAULT now());
     CREATE TABLE crm_tasks (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id text, user_id text, crm_entry_id text, title text, due_at timestamptz, done_at timestamptz);`)
   await db.exec(readFileSync("scripts/migrations/2026-10-05-action-proposals.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-05b-agent-runtime.sql", "utf8")) // adds agent_id and execution_id to proposals
   h.sql.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => (await db.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values)).rows)
 }, 30000)
 afterAll(async () => db.close())

@@ -1,46 +1,20 @@
-import { crmWorkspaceResponse } from "@/lib/crm/workspace"
-import { isAdminUser } from "@/lib/auth/require-admin"
-/**
- * POST /api/agents/run
- *   { crmEntryId, mode?, founder?, force? }
- *
- * Runs the outreach orchestrator on one CRM entry.
- * Admin OR the entry's owner can trigger.
- */
+/** POST /api/agents/run { agentId, mode: "live" | "dry_run" } — a signed-in person runs an agent now. Never callable by the assistant. */
 import { NextRequest, NextResponse } from "next/server"
-import { sql } from "@/lib/db"
-import { resolveActingUser } from "@/lib/auth/acting-user"
-import { runAgent } from "@/lib/agents/outreach-agent"
+import { requireDecider } from "@/lib/actions/session"
+import { definitionsFor } from "@/lib/agents/runtime/definitions"
+import { createExecution, runExecution } from "@/lib/agents/runtime/engine"
 
 export const runtime = "nodejs"
-export const maxDuration = 300
+export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
-  try {
-    // Signed-in user, or the tenant user the staff portal is acting as.
-    // See lib/auth/acting-user.ts — portal impersonation is explicit, audited,
-    // and grants only that user's privileges (no admin role).
-    const user = await resolveActingUser()
-    if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
-    const crmScope = await crmWorkspaceResponse(true)
-    if (crmScope instanceof NextResponse) return crmScope
-    const body = await req.json()
-    if (!body?.crmEntryId) return NextResponse.json({ error: "crmEntryId required" }, { status: 400 })
-
-    const [entry] = await sql`SELECT user_id FROM crm_entries WHERE org_id = ${crmScope.orgId} AND id = ${body.crmEntryId} LIMIT 1`
-    if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 })
-    const result = await runAgent({
-      crmEntryId: String(body.crmEntryId),
-      mode: body.mode,
-      channel: body.channel,
-      founder: body.founder,
-      force: !!body.force,
-      actorUserId: user.id,
-      trigger: "manual",
-    })
-    return NextResponse.json(result)
-  } catch (e: any) {
-    console.error("[agents/run] error:", e)
-    return NextResponse.json({ error: e?.message ?? "agent failed" }, { status: 500 })
-  }
+  const who = await requireDecider()
+  if (who instanceof NextResponse) return who
+  const b = await req.json().catch(() => ({}))
+  if (!definitionsFor(who.persona).some((d) => d.id === b?.agentId)) return NextResponse.json({ error: "That agent is not available for this workspace." }, { status: 404 })
+  const mode = b?.mode === "dry_run" ? "dry_run" : "live"
+  const id = await createExecution(who.orgId, b.agentId, { trigger: "manual", mode, requestedBy: who.userId })
+  if (!id) return NextResponse.json({ error: "Could not start the run." }, { status: 500 })
+  const run = await runExecution(id, undefined, { deadlineAt: Date.now() + 45_000 })
+  return NextResponse.json({ execution: run })
 }

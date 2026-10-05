@@ -5,7 +5,9 @@
     "action_proposals",
     "activities",
     "activity_logs",
+    "agent_executions",
     "agent_runs",
+    "agent_settings",
     "ai_calls",
     "ai_media_tasks",
     "ai_processing_logs",
@@ -287,6 +289,12 @@
   ],
   "tables": {
     "action_proposals": [
+      "org_id"
+    ],
+    "agent_executions": [
+      "org_id"
+    ],
+    "agent_settings": [
       "org_id"
     ],
     "ai_calls": [

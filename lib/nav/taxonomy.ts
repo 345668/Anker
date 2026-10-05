@@ -6,7 +6,7 @@ import {
   Wallet, Activity, BarChart3, FileStack, Coins, Gauge,
   UserCheck, Receipt, Landmark, Banknote, FileCheck2, Shield, PieChart, Award,
   Scale, Presentation, Flame, Calculator, MessageSquare, Sparkles, Target as TargetIcon,
-  Linkedin, ShieldCheck, Puzzle, Radar, PhoneCall, Mails, ListChecks,
+  Linkedin, ShieldCheck, Puzzle, Radar, PhoneCall, Mails, ListChecks, Bot,
 } from "lucide-react"
 
 /**
@@ -275,6 +275,7 @@ export const APP_NAV: AppNavGroup[] = [
       // other cannot reach them at all.
       { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", desc: "Runs tools on your workspace · research and deliverables", personas: ["founder", "vc", "lp"] },
       { label: "Actions", href: "/dashboard/actions", icon: ListChecks, desc: "Changes the assistant proposes · approve, reject, undo", personas: ["founder", "vc"] },
+      { label: "Agents", href: "/dashboard/agents", icon: Bot, desc: "Scheduled helpers · pipeline keeper · weekly brief", personas: ["founder", "vc"] },
       { label: "Anker AI", href: "/dashboard/anker-ai", icon: Sparkles, badge: "Chat", desc: "Conversation · multi-model · no access to your records" },
     ],
   },

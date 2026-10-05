@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 
-interface P { id: string; summary: string; diff: Array<{ label: string; before: string | null; after: string | null }>; risk_class: string; run_id: string | null; source_trust: string
+interface P { id: string; summary: string; diff: Array<{ label: string; before: string | null; after: string | null }>; risk_class: string; run_id: string | null; agent_id: string | null; source_trust: string
   status: string; created_at: string; decided_at: string | null; auto_committed: boolean; failure: string | null }
 interface Data { proposals: P[]; autonomy: Record<string, boolean>; canDecide: boolean; canSetAutonomy: boolean }
 
+const AGENT_NAMES: Record<string, string> = { pipeline_keeper: "Pipeline keeper", weekly_brief: "Weekly brief" }
 const STATUS: Record<string, string> = { applied: "Applied", rejected: "Rejected", undone: "Undone", expired: "Expired", failed: "Failed", pending: "Waiting" }
 
 export function ActionsInbox() {
@@ -77,7 +78,7 @@ export function ActionsInbox() {
                       <p key={i} className="mt-1 text-xs text-muted-foreground">{d.label}: {d.before != null && <><s>{d.before}</s> → </>}<span className="text-foreground">{d.after}</span></p>
                     ))}
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {p.risk_class === "R0" ? "Low risk · reversible" : p.risk_class}
+                      {p.agent_id && `Proposed by ${AGENT_NAMES[p.agent_id] ?? p.agent_id} · `}{p.risk_class === "R0" ? "Low risk · reversible" : p.risk_class}
                       {p.source_trust === "untrusted" && " · made after reading outside content, so it always needs your approval"}
                       {tab === "history" && ` · ${STATUS[p.status] ?? p.status}${p.auto_committed ? " automatically" : ""}`}
                       {p.failure && ` · ${p.failure}`}
