@@ -67,9 +67,12 @@ const SELECT = `
 export async function listOutbox(opts: {
   bucket?: EmailBucket
   limit?: number
+  /** Rows to skip, for paging. The order of every bucket is stable, so pages do not overlap. */
+  offset?: number
 } = {}): Promise<EmailOutboxRow[]> {
   const bucket = opts.bucket ?? "drafts"
   const cap = Math.max(1, Math.min(500, opts.limit ?? 100))
+  const skip = Math.max(0, Math.floor(opts.offset ?? 0))
   let rows: any[]
   switch (bucket) {
     case "drafts":
@@ -78,8 +81,8 @@ export async function listOutbox(opts: {
         FROM outreach_messages m
         JOIN crm_entries e ON e.id = m.crm_entry_id
         WHERE m.channel = 'email' AND m.status = 'draft'
-        ORDER BY m.crm_entry_id, m.step_number ASC
-        LIMIT ${cap}`
+        ORDER BY m.crm_entry_id, m.step_number ASC, m.id
+        LIMIT ${cap} OFFSET ${skip}`
       break
     case "sent":
       rows = await sql`
@@ -87,8 +90,8 @@ export async function listOutbox(opts: {
         FROM outreach_messages m
         JOIN crm_entries e ON e.id = m.crm_entry_id
         WHERE m.channel = 'email' AND m.status IN ('sent','delivered','replied','accepted')
-        ORDER BY m.sent_at DESC NULLS LAST
-        LIMIT ${cap}`
+        ORDER BY m.sent_at DESC NULLS LAST, m.id
+        LIMIT ${cap} OFFSET ${skip}`
       break
     case "needs_followup":
       rows = await sql`
@@ -96,8 +99,8 @@ export async function listOutbox(opts: {
         FROM outreach_messages m
         JOIN crm_entries e ON e.id = m.crm_entry_id
         WHERE m.channel = 'email' AND m.needs_followup = true
-        ORDER BY m.followup_due_at ASC NULLS LAST
-        LIMIT ${cap}`
+        ORDER BY m.followup_due_at ASC NULLS LAST, m.id
+        LIMIT ${cap} OFFSET ${skip}`
       break
     case "failed":
       rows = await sql`
@@ -105,8 +108,8 @@ export async function listOutbox(opts: {
         FROM outreach_messages m
         JOIN crm_entries e ON e.id = m.crm_entry_id
         WHERE m.channel = 'email' AND m.status = 'failed'
-        ORDER BY m.updated_at DESC
-        LIMIT ${cap}`
+        ORDER BY m.updated_at DESC, m.id
+        LIMIT ${cap} OFFSET ${skip}`
       break
     case "all":
     default:
@@ -115,8 +118,8 @@ export async function listOutbox(opts: {
         FROM outreach_messages m
         JOIN crm_entries e ON e.id = m.crm_entry_id
         WHERE m.channel = 'email'
-        ORDER BY m.updated_at DESC
-        LIMIT ${cap}`
+        ORDER BY m.updated_at DESC, m.id
+        LIMIT ${cap} OFFSET ${skip}`
   }
   return rows.map(serialize)
 }

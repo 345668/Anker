@@ -62,8 +62,12 @@ interface SyncResult {
   durationMs: number
 }
 
+/** Twenty-five rows a page: 200 long message cards took about 25 seconds to draw and froze the tab. */
+const PAGE_SIZE = 25
+
 export function EmailOutboxPanel() {
   const [bucket, setBucket] = useState<Bucket>("drafts")
+  const [page, setPage] = useState(0)
   const [data, setData] = useState<Payload | null>(null)
   const [loading, startLoad] = useTransition()
   const [busy, setBusy] = useState<string | null>(null)
@@ -75,11 +79,11 @@ export function EmailOutboxPanel() {
   const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null)
   const [syncing, setSyncing] = useState(false)
 
-  function load(b: Bucket = bucket) {
+  function load(b: Bucket = bucket, p: number = page) {
     setError(null)
     startLoad(async () => {
       try {
-        const res = await fetch(`/api/admin/email/outbox?bucket=${b}&limit=200`, { cache: "no-store" })
+        const res = await fetch(`/api/admin/email/outbox?bucket=${b}&limit=${PAGE_SIZE}&offset=${p * PAGE_SIZE}`, { cache: "no-store" })
         const json = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(json?.error ?? `Failed (${res.status})`)
         setData(json)
@@ -94,7 +98,7 @@ export function EmailOutboxPanel() {
     } catch {}
   }
 
-  useEffect(() => { load(bucket); loadSyncState() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [bucket])
+  useEffect(() => { load(bucket, page); loadSyncState() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [bucket, page])
 
   async function sendRow(row: Row) {
     if (!row.subject || !row.body || !row.partnerEmail) {
@@ -122,6 +126,7 @@ export function EmailOutboxPanel() {
     finally { setSyncing(false) }
   }
 
+  const total = data?.counts ? (bucket === "all" ? data.counts.total : (data.counts as any)[bucket] ?? 0) : 0
   return (
     <div className="space-y-5">
       {/* Resend events sync */}
@@ -189,7 +194,7 @@ export function EmailOutboxPanel() {
             <button
               key={b}
               type="button"
-              onClick={() => setBucket(b)}
+              onClick={() => { setBucket(b); setPage(0) }}
               className={`px-3 py-1.5 text-xs rounded-md border inline-flex items-center gap-2 ${
                 active ? "bg-foreground text-background border-foreground" : "border-foreground/15 hover:bg-foreground/5"
               }`}
@@ -245,6 +250,15 @@ export function EmailOutboxPanel() {
           />
         ))}
       </div>
+      {data && total > 0 && (
+        <nav aria-label="Pages" className="flex items-center justify-between gap-3 text-xs">
+          <span className="font-mono text-muted-foreground">{page * PAGE_SIZE + 1}–{Math.min(total, page * PAGE_SIZE + (data.rows?.length ?? 0))} of {total}</span>
+          <span className="flex gap-2">
+            <button type="button" disabled={page === 0 || loading} onClick={() => setPage((p) => Math.max(0, p - 1))} className="px-3 py-1.5 rounded-md border border-foreground/15 disabled:opacity-40">Previous</button>
+            <button type="button" disabled={(page + 1) * PAGE_SIZE >= total || loading} onClick={() => setPage((p) => p + 1)} className="px-3 py-1.5 rounded-md border border-foreground/15 disabled:opacity-40">Next</button>
+          </span>
+        </nav>
+      )}
     </div>
   )
 }
@@ -257,6 +271,7 @@ const KIND_LABEL: Record<string, string> = {
 }
 
 function OutboxRow({ row, busy, onSend }: { row: Row; busy: string | null; onSend: () => void }) {
+  const [open, setOpen] = useState(false)
   const draft = row.status === "draft"
   const failed = row.status === "failed"
   return (
@@ -308,7 +323,13 @@ function OutboxRow({ row, busy, onSend }: { row: Row; busy: string | null; onSen
           <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider mb-1">subject</div>
         )}
         {row.subject && <div className="text-sm font-medium mb-2">{row.subject}</div>}
-        <div className="bg-foreground/[0.02] rounded p-3 text-sm whitespace-pre-wrap leading-relaxed">{row.body}</div>
+        <div className="relative">
+          <div className={`bg-foreground/[0.02] rounded p-3 text-sm whitespace-pre-wrap leading-relaxed ${open ? "" : "max-h-28 overflow-hidden"}`}>{row.body}</div>
+          {!open && (row.body?.length ?? 0) > 280 && <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-10 rounded-b bg-gradient-to-t from-background to-transparent" />}
+        </div>
+        {(row.body?.length ?? 0) > 280 && (
+          <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="mt-1 text-[11px] font-mono text-muted-foreground hover:text-foreground">{open ? "Hide full message" : "Show full message"}</button>
+        )}
       </div>
 
       {failed && row.failedReason && (

@@ -21,11 +21,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `Invalid bucket: ${bucket}` }, { status: 400 })
     }
     const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 100))
+    const offset = Math.max(0, Math.floor(Number(url.searchParams.get("offset")) || 0))
     const [rows, counts] = await Promise.all([
-      listOutbox({ bucket, limit }),
+      listOutbox({ bucket, limit, offset }),
       outboxCounts(),
     ])
-    return NextResponse.json({ rows, counts })
+    return NextResponse.json({ rows, counts, offset, limit })
   } catch (e: any) {
     console.error("[admin/email/outbox GET]", e)
     return NextResponse.json({ error: e?.message ?? "Failed" }, { status: 500 })
