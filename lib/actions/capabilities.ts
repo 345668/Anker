@@ -151,5 +151,81 @@ const remember: Capability = {
   },
 }
 
-export const CAPABILITIES: Record<string, Capability> = { crm_update_stage: stageMove, crm_add_task: addTask, memory_remember: remember }
+const KINDS = [{ kind: "email_intro", channel: "email", step: 0 }, { kind: "dm_intro", channel: "linkedin", step: 0 }] as const
+
+/**
+ * Save an intro email and LinkedIn message as DRAFTS for one contact. R1: it is bulk work a person should look at, and what it saves is what they would later send.
+ * Saving a draft never sends: sending stays behind the campaign engine's own approval, suppression, country and sender-cap gates. The drafts travel in the proposal, so
+ * what the person approves is exactly what is saved. Nothing already sent is touched, and undo removes a draft only if nobody has edited it since.
+ */
+const saveDrafts: Capability = {
+  name: "outreach_save_drafts",
+  risk: "R1",
+  check(input) {
+    const entryId = String(input?.entryId ?? "").trim(), subject = String(input?.subject ?? "").trim(), email = String(input?.email ?? "").trim(), dm = String(input?.dm ?? "").trim()
+    if (!entryId) throw new ActionError("entryId is required.")
+    if (!subject || subject.length > 200) throw new ActionError("subject is required and at most 200 characters.")
+    if (email.length < 40 || email.length > 3000) throw new ActionError("email must be 40 to 3000 characters.")
+    if (!dm || dm.length > 600) throw new ActionError("dm is required and at most 600 characters.")
+    return { entryId, subject, email, dm, senderProfileId: input?.senderProfileId ? String(input.senderProfileId) : null }
+  },
+  async plan(scope, input) {
+    const { entryId, subject, email, dm } = this.check(input)
+    const [e] = (await sql`SELECT display_name FROM crm_entries WHERE id = ${entryId} AND org_id = ${scope.orgId}`) as any[]
+    if (!e) throw new ActionError("Contact not found in this workspace.")
+    const prev = (await sql`SELECT kind, body FROM outreach_messages WHERE user_id = ${scope.userId} AND crm_entry_id = ${entryId} AND kind IN ('email_intro','dm_intro') AND call_id IS NULL`) as any[]
+    const was = (k: string) => prev.find((r) => r.kind === k)?.body ?? null
+    const clip = (t: string, n = 220) => (t.length > n ? t.slice(0, n) + "…" : t)
+    return {
+      summary: `Save an intro email and LinkedIn message as drafts for ${e.display_name ?? "a contact"}`,
+      diff: [
+        { label: `${e.display_name ?? entryId}: email (${subject})`, before: was("email_intro") ? clip(was("email_intro")) : null, after: clip(email) },
+        { label: `${e.display_name ?? entryId}: LinkedIn message`, before: was("dm_intro") ? clip(was("dm_intro")) : null, after: clip(dm) },
+      ],
+      evidence: { records: [{ type: "crm_entry", id: entryId, label: e.display_name }], note: "Saved as drafts only. Nothing is sent." },
+    }
+  },
+  async apply(scope, input, meta) {
+    const { entryId, subject, email, dm, senderProfileId } = this.check(input)
+    const [e] = (await sql`SELECT display_email FROM crm_entries WHERE id = ${entryId} AND org_id = ${scope.orgId}`) as any[]
+    if (!e) throw new ActionError("Contact no longer exists in this workspace.")
+    const prev = (await sql`SELECT kind, body, subject, status FROM outreach_messages WHERE user_id = ${scope.userId} AND crm_entry_id = ${entryId} AND kind IN ('email_intro','dm_intro') AND call_id IS NULL`) as any[]
+    // A message that has already gone out is never overwritten, even by an approved draft.
+    const gone = prev.filter((r) => ["sent", "delivered", "replied", "accepted"].includes(r.status)).map((r) => r.kind)
+    const by = meta?.agentId ? `agent:${meta.agentId}` : "assistant"
+    const note = senderProfileId ? `sender:${senderProfileId}` : null
+    const saved: string[] = []
+    if (!gone.includes("email_intro")) {
+      await sql`INSERT INTO outreach_messages (user_id, crm_entry_id, kind, step_number, channel, body, subject, email_to, status, generated_by, model_notes, created_at, updated_at)
+        VALUES (${scope.userId}, ${entryId}, 'email_intro', 0, 'email', ${email}, ${subject}, ${e.display_email ?? null}, 'draft', ${by}, ${note}, NOW(), NOW())
+        ON CONFLICT (user_id, crm_entry_id, kind) WHERE call_id IS NULL DO UPDATE SET body = EXCLUDED.body, subject = EXCLUDED.subject, email_to = EXCLUDED.email_to, status = 'draft', generated_by = EXCLUDED.generated_by, model_notes = EXCLUDED.model_notes, updated_at = NOW()`
+      saved.push("email_intro")
+    }
+    if (!gone.includes("dm_intro")) {
+      await sql`INSERT INTO outreach_messages (user_id, crm_entry_id, kind, step_number, channel, body, status, generated_by, created_at, updated_at)
+        VALUES (${scope.userId}, ${entryId}, 'dm_intro', 0, 'linkedin', ${dm}, 'draft', ${by}, NOW(), NOW())
+        ON CONFLICT (user_id, crm_entry_id, kind) WHERE call_id IS NULL DO UPDATE SET body = EXCLUDED.body, status = 'draft', generated_by = EXCLUDED.generated_by, updated_at = NOW()`
+      saved.push("dm_intro")
+    }
+    if (!saved.length) throw new ActionError("Not saved: both messages have already been sent for this contact.")
+    return { undo: { entryId, saved, email, dm, prev: prev.map((r) => ({ kind: r.kind, body: r.body, subject: r.subject })) }, message: `Saved ${saved.length === 2 ? "an email and a LinkedIn message" : "a draft"} for review in Outreach. Nothing was sent.` }
+  },
+  async undo(scope, _input, u) {
+    const was = (k: string) => (u.prev as any[]).find((r) => r.kind === k)
+    let undone = 0
+    for (const k of u.saved as string[]) {
+      const applied = k === "email_intro" ? u.email : u.dm
+      const before = was(k)
+      // Only if nobody has edited or sent it since: undo never overwrites later work.
+      const rows = before
+        ? (await sql`UPDATE outreach_messages SET body = ${before.body}, subject = ${before.subject ?? null}, updated_at = NOW() WHERE user_id = ${scope.userId} AND crm_entry_id = ${String(u.entryId)} AND kind = ${k} AND call_id IS NULL AND status = 'draft' AND body = ${applied} RETURNING id`) as any[]
+        : (await sql`DELETE FROM outreach_messages WHERE user_id = ${scope.userId} AND crm_entry_id = ${String(u.entryId)} AND kind = ${k} AND call_id IS NULL AND status = 'draft' AND body = ${applied} RETURNING id`) as any[]
+      undone += rows.length
+    }
+    if (!undone) throw new ActionError("Not undone: the drafts were edited or sent since, and undo will not overwrite later work.")
+    return `Removed the saved draft${undone === 1 ? "" : "s"}.`
+  },
+}
+
+export const CAPABILITIES: Record<string, Capability> = { crm_update_stage: stageMove, crm_add_task: addTask, memory_remember: remember, outreach_save_drafts: saveDrafts }
 export const isProposeCapability = (name: string) => Object.hasOwn(CAPABILITIES, name)

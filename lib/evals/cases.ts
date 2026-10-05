@@ -23,10 +23,16 @@ export const staticCases: EvalCase[] = [
     for (const r of ["R1", "R2", "R3"] as RiskClass[]) if (mayAutoCommit(r, "trusted", { R0: true, R1: true, R2: true, R3: true })) return fail(`${r} auto-committed`)
     return pass() } },
   { name: "a run that read outside content never auto-commits, whatever the switch", run: () => mayAutoCommit("R0", "untrusted", { R0: true }) ? fail("untrusted R0 auto-committed") : pass() },
-  { name: "every registered capability has a known risk class, and today's are all R0", run: () => {
+  { name: "every capability has a known risk class; none reaches a third party, and R1 is limited to the reviewed set", run: () => {
+    const REVIEWED_R1 = ["outreach_save_drafts"] // saves drafts only; sending is a separate, gated path
     const bad = Object.values(CAPABILITIES).filter((c) => !["R0", "R1", "R2", "R3"].includes(c.risk)).map((c) => c.name)
-    const above = Object.values(CAPABILITIES).filter((c) => c.risk !== "R0").map((c) => c.name)
-    return bad.length ? fail(`unknown risk: ${bad}`) : above.length ? fail(`non-R0 capability without a reviewed approval path: ${above}`) : pass() } },
+    const above = Object.values(CAPABILITIES).filter((c) => c.risk === "R2" || c.risk === "R3" || (c.risk === "R1" && !REVIEWED_R1.includes(c.name))).map((c) => c.name)
+    return bad.length ? fail(`unknown risk: ${bad}`) : above.length ? fail(`capability without a reviewed approval path: ${above}`) : pass() } },
+  { name: "an agent that reads strangers' text marks its proposals untrusted, and a model agent that drafts is off by default", run: () => {
+    const d = DEFINITIONS.outreach_drafter
+    if (!d?.readsUntrusted) return fail("outreach_drafter does not mark its proposals untrusted")
+    if (d.defaults.useModel !== false) return fail("outreach_drafter is on by default")
+    return pass() } },
   { name: "agent definitions are well formed", run: () => {
     const problems: string[] = []
     for (const d of Object.values(DEFINITIONS)) {
@@ -56,7 +62,30 @@ export const staticCases: EvalCase[] = [
 ]
 
 const count = async (q: ReturnType<typeof sql>) => Number(((await q) as any[])[0]?.n ?? 0)
+/** Columns the agents' and capabilities' SQL reads or writes. A test database built from our own migrations once hid a column production does not have; this checks the real schema. */
+export const RELIED_ON_COLUMNS: Record<string, string[]> = {
+  crm_entries: ["id", "org_id", "display_name", "display_title", "display_type", "display_location", "display_email", "display_linkedin", "display_score", "why_match", "research_summary", "stage", "last_contacted_at", "updated_at", "added_at"],
+  crm_tasks: ["id", "org_id", "user_id", "crm_entry_id", "title", "due_at", "done_at"],
+  sender_profiles: ["id", "user_id", "built_profile", "profile_set", "is_default", "updated_at"],
+  outreach_messages: ["user_id", "crm_entry_id", "kind", "step_number", "channel", "body", "subject", "email_to", "status", "generated_by", "model_notes", "call_id", "updated_at"],
+  deal_opportunities: ["fund_id", "stage"],
+  organizations: ["id", "fund_id"],
+  memberships: ["org_id", "user_id", "org_role"],
+  platform_flags: ["key", "enabled"],
+  action_proposals: ["org_id", "capability", "input", "status", "undo", "agent_id", "execution_id", "expires_at"],
+  agent_executions: ["org_id", "agent_id", "status", "heartbeat_at", "period_key", "trigger", "spend_usd", "state"],
+  agent_settings: ["org_id", "agent_id", "enabled", "config", "enabled_by"],
+  agent_events: ["org_id", "kind", "subject_id", "payload", "processed_at", "created_at"],
+  entity_memory: ["org_id", "entity_type", "entity_id", "key", "value", "valid_until", "pinned", "source"],
+}
 export const liveCases: EvalCase[] = [
+  { name: "every column the agents and capabilities rely on exists in the live schema", run: async () => {
+    const rows = (await sql`SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ANY(${Object.keys(RELIED_ON_COLUMNS)})`) as any[]
+    const have = new Map<string, Set<string>>()
+    for (const r of rows) { if (!have.has(r.table_name)) have.set(r.table_name, new Set()); have.get(r.table_name)!.add(r.column_name) }
+    const missing: string[] = []
+    for (const [t, cols] of Object.entries(RELIED_ON_COLUMNS)) { if (!have.has(t)) { missing.push(`${t} (table)`); continue } for (const c of cols) if (!have.get(t)!.has(c)) missing.push(`${t}.${c}`) }
+    return missing.length ? fail(`missing in production: ${missing.join(", ")}`) : pass(`${Object.keys(RELIED_ON_COLUMNS).length} tables checked`) } },
   { name: "every enabled agent setting names an agent that exists", run: async () => {
     const rows = (await sql`SELECT DISTINCT agent_id FROM agent_settings WHERE enabled = true`) as any[]
     const unknown = rows.map((r) => r.agent_id).filter((id) => !DEFINITIONS[id])

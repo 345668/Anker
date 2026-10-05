@@ -17,7 +17,7 @@ export interface StepCtx {
   /** The run's clock (the dispatcher's, so tests and replays are deterministic). */
   now: () => Date
   /** Model text for a step that is allowed one. Bounded by the definition's maxSpendUsd; throws StepBudget when over. Never available in dry-run beyond the same call (nothing it returns is written). */
-  generate: (prompt: string, opts?: { maxTokens?: number }) => Promise<string>
+  generate: (prompt: string, opts?: { maxTokens?: number; temperature?: number; task?: "agent_brief" | "dm_personalize" }) => Promise<string>
   /** Outputs of steps finished earlier in this run (reloaded after a crash). */
   prev: Record<string, any>
   /** Read the workspace's own data. Always scoped by $1 = org id; the definition writes the SQL, never the caller. */
@@ -37,6 +37,8 @@ export interface AgentDefinition {
   triggers?: Array<{ event: string }>
   /** True if any step calls ctx.generate. The workspace must opt in per agent (config.useModel). */
   usesModel?: boolean
+  /** True if the agent reads content a stranger wrote (a crawled research brief, a reply). Its proposals are then marked untrusted and can never auto-commit (doc 43 §5). */
+  readsUntrusted?: boolean
   defaults: Record<string, number | string | boolean>
   /** What this agent will never do, shown to the person who turns it on. */
   guarantees: string[]

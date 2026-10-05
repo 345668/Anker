@@ -1,6 +1,7 @@
 /** The agents. Plain data and queries: no routes, no model (the tool decides facts, docs/architecture/37 §4). docs/architecture/44 §6. */
 import type { AgentDefinition } from "./model"
 import { narrativeProblem } from "./validate"
+import { buildPrompt, draftProblem, parseDraft, senderBlock } from "@/lib/outreach/draft-intro"
 
 const MAX_PER_RUN = 10
 
@@ -151,5 +152,76 @@ export const replyKeeper: AgentDefinition = {
   finish: (s) => ({ summary: s.check.skip ? `Nothing to do: ${s.check.skip}.` : `Proposed a reply task for ${s.check.entry.name}.`, proposals: s.propose_task.proposals }),
 }
 
-export const DEFINITIONS: Record<string, AgentDefinition> = { pipeline_keeper: pipelineKeeper, weekly_brief: weeklyBrief, reply_keeper: replyKeeper }
+/**
+ * The draft step of the old outreach tick agent, as a governed agent (docs/architecture/45 §6): picks queued contacts with no drafts, writes an intro email and LinkedIn
+ * message for each with the model, and PROPOSES saving them as drafts. It does not enrich the shared directory, classify replies, move stages or send. Off by default
+ * (it needs the workspace's AI write-up switch) and untrusted by design: the research brief it reads came from the open web.
+ */
+export const outreachDrafter: AgentDefinition = {
+  id: "outreach_drafter", version: 1, title: "Outreach drafter", usesModel: true, readsUntrusted: true,
+  summary: "Writes intro emails and LinkedIn messages for contacts you have queued, and proposes saving them as drafts for you to review.",
+  personas: ["founder", "vc"], riskCeiling: "R1", maxSpendUsd: 0.25, schedule: "daily@08",
+  defaults: { useModel: false, perRun: 3 },
+  guarantees: ["Only proposes saving drafts, which you approve in Actions; never sends anything", "Needs a default sender profile, and you switch it on separately because it uses AI", "Its proposals always need your approval, because it reads research from the open web", "At most 3 contacts and $0.25 per run", "Skips a contact that already has drafts or a draft waiting for approval"],
+  steps: [
+    {
+      id: "select", label: "Pick queued contacts with no drafts, and your default sender profile",
+      async run(ctx) {
+        if (ctx.config.useModel !== true) return { skip: "AI drafting is switched off for this workspace" }
+        const [sender] = await ctx.rows(`SELECT $1::text AS org, id, built_profile, profile_set FROM sender_profiles WHERE user_id = $2 AND is_default = true ORDER BY updated_at DESC LIMIT 1`, [ctx.userId])
+        if (!sender) return { skip: "no default sender profile: build one in Outreach first" }
+        const per = Math.max(1, Math.min(5, Number(ctx.config.perRun) || 3))
+        const entries = await ctx.rows(`SELECT e.id, e.display_name, e.display_title, e.display_type, e.display_location, e.why_match, e.research_summary
+          FROM crm_entries e
+          WHERE e.org_id = $1 AND e.stage = 'queued' AND (e.display_email LIKE '%@%' OR e.display_linkedin IS NOT NULL)
+            AND NOT EXISTS (SELECT 1 FROM outreach_messages m WHERE m.user_id = $2 AND m.crm_entry_id = e.id AND m.kind IN ('email_intro','dm_intro'))
+            AND NOT EXISTS (SELECT 1 FROM action_proposals p WHERE p.org_id = e.org_id AND p.capability = 'outreach_save_drafts' AND p.status = 'pending' AND p.input->>'entryId' = e.id)
+          ORDER BY e.display_score DESC NULLS LAST, e.added_at ASC LIMIT ${per}`, [ctx.userId])
+        return { sender: { id: String(sender.id), built: sender.built_profile ?? null, founder: sender.profile_set ?? {} }, entries }
+      },
+    },
+    {
+      id: "draft", label: "Write an email and a LinkedIn message for each (model, capped at $0.25)",
+      async run(ctx) {
+        const sel = ctx.prev.select
+        if (sel.skip || !sel.entries?.length) return { drafts: [], skipped: [] }
+        const founder = sel.sender.founder ?? {}
+        const sender = senderBlock(sel.sender.built, founder)
+        if (!sender.trim()) return { drafts: [], skipped: [{ name: "all", reason: "the sender profile is empty" }] }
+        const drafts: any[] = [], skipped: Array<{ name: string; reason: string }> = []
+        let budgetStopped = false
+        for (const e of sel.entries) {
+          try {
+            const text = await ctx.generate(buildPrompt(e, sender, founder), { maxTokens: 700, temperature: 0.6, task: "dm_personalize" })
+            const d = parseDraft(text, e, founder)
+            // The plain-template fallback is generic; this agent proposes only what the model actually wrote.
+            if (!d.usedModel) { skipped.push({ name: e.display_name, reason: "the model's answer could not be used" }); continue }
+            const bad = draftProblem(d)
+            if (bad) { skipped.push({ name: e.display_name, reason: bad }); continue }
+            drafts.push({ entryId: String(e.id), name: e.display_name, subject: d.subject, email: d.email, dm: d.dm })
+          } catch (err: any) {
+            // The spending limit ends the writing, but the drafts already written are kept and proposed.
+            if (err?.status === "budget_stopped") { budgetStopped = true; skipped.push({ name: e.display_name, reason: "stopped at the spending limit" }); break }
+            skipped.push({ name: e.display_name, reason: `no draft: ${String(err?.message ?? err).slice(0, 80)}` })
+          }
+        }
+        return { drafts, skipped, budgetStopped }
+      },
+    },
+    {
+      id: "propose", label: "Propose saving each as a draft",
+      async run(ctx) {
+        const out: string[] = []
+        for (const d of ctx.prev.draft.drafts as any[]) out.push((await ctx.propose("outreach_save_drafts", { entryId: d.entryId, subject: d.subject, email: d.email, dm: d.dm, senderProfileId: ctx.prev.select.sender.id })).summary)
+        return { proposals: out }
+      },
+    },
+  ],
+  finish: (s) => ({
+    summary: s.select.skip ? `Nothing to do: ${s.select.skip}.` : s.draft.budgetStopped ? `Stopped at its spending limit: ${s.propose.proposals.length} draft set${s.propose.proposals.length === 1 ? "" : "s"} proposed, the rest left for the next run.` : s.propose.proposals.length ? `${s.propose.proposals.length} draft set${s.propose.proposals.length === 1 ? "" : "s"} proposed for your review.` : s.select.entries?.length ? "Drafts were not usable this time; nothing proposed." : "Nothing to do: no queued contacts without drafts.",
+    proposals: s.propose.proposals, skipped: s.draft.skipped ?? [],
+  }),
+}
+
+export const DEFINITIONS: Record<string, AgentDefinition> = { pipeline_keeper: pipelineKeeper, weekly_brief: weeklyBrief, reply_keeper: replyKeeper, outreach_drafter: outreachDrafter }
 export const definitionsFor = (persona: string) => Object.values(DEFINITIONS).filter((d) => d.personas.includes(persona as any))

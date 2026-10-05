@@ -24,7 +24,7 @@ describe("static evals", () => {
 
 describe("live evals", () => {
   const byName = (n: string) => liveCases.find((c) => c.name.startsWith(n))!
-  it("all pass on clean data", async () => { for (const o of await runCases("live", liveCases)) expect(o.ok, `${o.name}: ${o.detail}`).toBe(true) })
+  it("all pass on clean data", async () => { for (const o of await runCases("live", liveCases.filter((c) => !c.name.startsWith("every column")))) expect(o.ok, `${o.name}: ${o.detail}`).toBe(true) })
   it("catch a planted violation each", async () => {
     await db.exec("INSERT INTO agent_settings (org_id, agent_id, enabled, enabled_by) VALUES ('o1','ghost_agent',true,'u1'), ('o2','pipeline_keeper',true,'gone')")
     await db.exec("INSERT INTO memberships VALUES ('o2','other','member')")
@@ -34,6 +34,10 @@ describe("live evals", () => {
     for (const name of ["every enabled agent setting names", "every enabled agent was enabled", "no run has sat running", "every applied proposal", "agents with no model budget", "no agent run failed"]) {
       const r = await byName(name).run(); expect(r.ok, name).toBe(false)
     }
+  })
+  it("the schema check names every missing table and column", async () => {
+    const r = await byName("every column").run()
+    expect(r.ok).toBe(false); expect(r.detail).toMatch(/crm_entries \(table\)/) // the test database has no CRM tables: the check reports it rather than passing
   })
   it("catches a duplicated period (the unique index is dropped to plant one)", async () => {
     await db.exec("DROP INDEX agent_executions_period_idx")
@@ -48,6 +52,7 @@ describe("runner", () => {
     const out = await runCases("t", [{ name: "boom", run: () => { throw new Error("x") } }, { name: "fine", run: () => ({ ok: true, detail: "ok" }) }])
     expect(out.map((o) => o.ok)).toEqual([false, true]); expect(out[0].detail).toMatch(/threw: x/)
     await store(out); expect(((await db.query("SELECT count(*)::int n FROM eval_runs")).rows[0] as any).n).toBe(2)
-    expect((await runAll()).every((o) => o.ok)).toBe(true)
+    // On the test database only the live-schema check fails (it has no CRM tables); everything else passes.
+    expect((await runAll()).filter((o) => !o.ok).map((o) => o.name)).toEqual([expect.stringMatching(/^every column/)])
   })
 })

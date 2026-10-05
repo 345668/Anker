@@ -20,7 +20,7 @@ export interface Deps {
   /** Run `fn` inside the workspace's AI context (plan, pause, monthly allowance) with a hard per-run spend ceiling. */
   ai: <T>(who: AgentPrincipal, maxSpendUsd: number, fn: () => Promise<T>) => Promise<T>
   /** One model call, inside `ai`. Throws on failure or an empty answer. */
-  generate: (prompt: string, opts?: { maxTokens?: number }) => Promise<string>
+  generate: (prompt: string, opts?: { maxTokens?: number; temperature?: number; task?: "agent_brief" | "dm_personalize" }) => Promise<string>
   /** Spend so far in the current `ai` context, in USD. */
   spent: () => number
 }
@@ -40,7 +40,7 @@ export const defaultDeps: Deps = {
   },
   async generate(prompt, opts) {
     const { generateDetailed } = await import("@/lib/ai/provider")
-    const r = await generateDetailed(prompt, { task: "agent_brief", maxTokens: opts?.maxTokens ?? 400, temperature: 0.2 })
+    const r = await generateDetailed(prompt, { task: opts?.task ?? "agent_brief", maxTokens: opts?.maxTokens ?? 400, temperature: opts?.temperature ?? 0.2 })
     if (r.error || !r.text) throw new Error(r.error || "The model returned nothing.")
     return r.text
   },
@@ -129,7 +129,7 @@ export async function runExecution(id: string, deps: Deps = defaultDeps, opts: {
         if (!withinCeiling(cap.risk, def.riskCeiling)) throw new Stop("killed", `${def.title} may not propose ${capability} (${cap.risk} is above its ${def.riskCeiling} ceiling).`)
         const scope = { orgId: who.orgId, userId: who.userId, persona: who.persona }
         if (dry) { const plan = await cap.plan(scope, cap.check(input)); return { summary: plan.summary, created: false } }
-        const r = await proposeAction(scope, capability, input, { runId: id, trust: "trusted", agentId: def.id, executionId: id }, { userId: who.userId })
+        const r = await proposeAction(scope, capability, input, { runId: id, trust: def.readsUntrusted ? "untrusted" : "trusted", agentId: def.id, executionId: id }, { userId: who.userId })
         return { summary: r.proposal.summary, created: !r.existing }
       },
     }
