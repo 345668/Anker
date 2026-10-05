@@ -12,6 +12,17 @@ export async function PUT(req: NextRequest) {
   const b = await req.json().catch(() => ({}))
   if (typeof b?.enabled !== "boolean" || typeof b?.agentId !== "string") return NextResponse.json({ error: "agentId and enabled are required." }, { status: 400 })
   if (!definitionsFor(who.persona).some((d) => d.id === b.agentId)) return NextResponse.json({ error: "That agent is not available for this workspace." }, { status: 404 })
-  await setEnabled(who.orgId, b.agentId, b.enabled, { userId: who.userId, email: who.email })
+  const def = definitionsFor(who.persona).find((d) => d.id === b.agentId)!
+  // Only the options a definition declares can be set, and only with the type its default has.
+  let config: Record<string, unknown> | undefined
+  if (b.config && typeof b.config === "object") {
+    config = {}
+    for (const [k, v] of Object.entries(b.config as Record<string, unknown>)) {
+      if (!Object.hasOwn(def.defaults, k) || typeof v !== typeof def.defaults[k]) return NextResponse.json({ error: `Unknown option ${k}.` }, { status: 400 })
+      config[k] = v
+    }
+  }
+  if (config?.useModel === true && !def.usesModel) return NextResponse.json({ error: "This agent does not use a model." }, { status: 400 })
+  await setEnabled(who.orgId, b.agentId, b.enabled, { userId: who.userId, email: who.email }, config)
   return NextResponse.json({ ok: true })
 }

@@ -72,7 +72,7 @@ export async function decide(orgId: string, id: string, decision: "approve" | "r
       WHERE id = ${id} AND org_id = ${orgId} AND status = 'pending' RETURNING *`) as any[]
     if (!claimed) throw new ActionError(`This proposal is ${cur.status} and cannot be approved.`)
     try {
-      const out = await cap.apply(scope, cur.input)
+      const out = await cap.apply(scope, cur.input, { agentId: cur.agent_id })
       const [done] = (await sql`UPDATE action_proposals SET applied_at = now(), undo = ${JSON.stringify(out.undo)}::jsonb WHERE id = ${id} RETURNING *`) as any[]
       await audit(orgId, by, opts.auto ? "auto_committed" : "applied", done, { capability: cur.capability, proposal_id: id })
       return { proposal: done, message: out.message }

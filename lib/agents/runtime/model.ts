@@ -12,6 +12,12 @@ export const MAX_ATTEMPTS = 3
 export interface StepCtx {
   orgId: string; userId: string; persona: Exclude<Persona, null>; executionId: string; mode: ExecMode
   config: Record<string, any>
+  /** The event that started this run (event-triggered agents), else null. */
+  event: { id: string; kind: string; subjectId: string | null; payload: Record<string, any> } | null
+  /** The run's clock (the dispatcher's, so tests and replays are deterministic). */
+  now: () => Date
+  /** Model text for a step that is allowed one. Bounded by the definition's maxSpendUsd; throws StepBudget when over. Never available in dry-run beyond the same call (nothing it returns is written). */
+  generate: (prompt: string, opts?: { maxTokens?: number }) => Promise<string>
   /** Outputs of steps finished earlier in this run (reloaded after a crash). */
   prev: Record<string, any>
   /** Read the workspace's own data. Always scoped by $1 = org id; the definition writes the SQL, never the caller. */
@@ -25,8 +31,12 @@ export interface AgentDefinition {
   personas: Array<Exclude<Persona, null>>
   riskCeiling: RiskClass
   maxSpendUsd: number
-  /** "daily@07" or "weekly:mon@07" (UTC). */
-  schedule: string
+  /** "daily@07" or "weekly:mon@07" (UTC), or null for an agent that runs only on events and by hand. */
+  schedule: string | null
+  /** Events this agent listens for. Each event starts at most one run. */
+  triggers?: Array<{ event: string }>
+  /** True if any step calls ctx.generate. The workspace must opt in per agent (config.useModel). */
+  usesModel?: boolean
   defaults: Record<string, number | string | boolean>
   /** What this agent will never do, shown to the person who turns it on. */
   guarantees: string[]

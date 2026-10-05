@@ -1,3 +1,4 @@
+import { emit } from "@/lib/agents/runtime/events"
 import { requireCrmWorkspace as requireWorkspace, requireCrmEntry, requireCrmBoard } from "@/lib/crm/workspace"
 /**
  * PATCH  /api/crm/entries/[id]   — partial update. Accepts stage, notes,
@@ -115,6 +116,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       metadata: { crmSource: row.source ?? null, sourceSessionId: row.source_session_id ?? null },
     })
 
+    if (stage !== undefined && prevStage !== (row.stage ?? null)) await emit(scope.orgId, "crm.stage_changed", id, { from: prevStage, to: row.stage ?? null })
     return NextResponse.json({ entry: updated[0] })
   } catch (e: any) {
     if (e instanceof WorkspaceError) return workspaceError(e)

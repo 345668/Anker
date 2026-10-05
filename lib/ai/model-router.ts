@@ -76,6 +76,8 @@ export const TASKS = [
   "campaign_draft",     // Per-investor outreach email {subject, body}, bulk
   // ─── Fund inbound deal intake (docs/architecture/39) ──────────────────
   "intake_assessment",  // Scores one inbound submission against the fund's own rubric
+  // ─── Agent runtime (docs/architecture/45 §4) ─────────────────────────
+  "agent_brief",        // Plain-words write-up of numbers an agent already computed; validated by code
   // ─── Agentic tasks (DeepSeek practices; skills/models/*.md) ───────────
   "investor_score",     // SPCT thesis-fit scorer (principles → critique → score)
   "agent_plan",         // Subgoal-decomposition planner (reasoning tier)
@@ -111,6 +113,7 @@ export const TASK_TIER: Record<TaskTag, ModelTier> = {
 
   campaign_readiness: "reason",   // SPCT gate — reasoning tier (falls back to deep model)
   campaign_draft:     "balanced", // structured email JSON, run in bulk
+  agent_brief:        "balanced", // short paragraph from computed facts; the numbers are checked by code
   intake_assessment:  "balanced", // rubric scoring against the fund thesis; the reasoning tier took about a minute per submission
 
   investor_score: "deep",   // SPCT scorer — long-form principled critique

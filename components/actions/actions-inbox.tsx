@@ -6,7 +6,7 @@ interface P { id: string; summary: string; diff: Array<{ label: string; before: 
   status: string; created_at: string; decided_at: string | null; auto_committed: boolean; failure: string | null }
 interface Data { proposals: P[]; autonomy: Record<string, boolean>; canDecide: boolean; canSetAutonomy: boolean }
 
-const AGENT_NAMES: Record<string, string> = { pipeline_keeper: "Pipeline keeper", weekly_brief: "Weekly brief" }
+const AGENT_NAMES: Record<string, string> = { pipeline_keeper: "Pipeline keeper", weekly_brief: "Weekly brief", reply_keeper: "Reply keeper" }
 const STATUS: Record<string, string> = { applied: "Applied", rejected: "Rejected", undone: "Undone", expired: "Expired", failed: "Failed", pending: "Waiting" }
 
 export function ActionsInbox() {

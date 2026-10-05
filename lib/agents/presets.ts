@@ -43,7 +43,7 @@ export const PRESETS: Record<Exclude<Persona, null>, AgentPreset> = {
       ...SHARED,
       "match_investors", "score_investors", "network_intro_paths", "planning_snapshot", "call_intelligence",
       "draft_outreach_batch", "outreach_sequence", "send_outreach", "followup_sweep", "outreach_inbox",
-      "crm_overview", "crm_search", "crm_update_stage", "crm_add_task",
+      "crm_overview", "crm_search", "crm_update_stage", "crm_add_task", "memory_recall", "memory_remember",
       "create_pitch_deck", "improve_pitch_deck", "generate_image",
       // Cap-table / equity modeling (deterministic engines)
       "model_vesting", "model_409a", "model_waterfall",
@@ -60,7 +60,7 @@ export const PRESETS: Record<Exclude<Persona, null>, AgentPreset> = {
       "build_investor_profile", "score_investors", "enrich_firms", "matchmake_lps",
       "deal_pipeline", "fund_performance", "network_intro_paths", "call_intelligence",
       "draft_outreach_batch", "outreach_sequence", "send_outreach", "followup_sweep", "outreach_inbox",
-      "crm_overview", "crm_search", "crm_update_stage", "crm_add_task",
+      "crm_overview", "crm_search", "crm_update_stage", "crm_add_task", "memory_recall", "memory_remember",
       "create_pitch_deck", "generate_image",
       // Fund modeling + IC + portfolio/LP ops (deterministic engines; drafts human-approved)
       "model_waterfall", "model_409a", "draft_capital_call", "ic_memo",

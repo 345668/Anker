@@ -32,7 +32,8 @@ export async function executeTool(p:AiPrincipal,name:string,input:unknown,refs:A
       // Not a write: a proposal, applied only by a person (or by an owner-enabled policy for trusted R0 work). doc 43.
       const {propose}=await import("@/lib/actions/store")
       if(!p.orgId)throw new Error("Select a workspace to propose changes.")
-      const r=await propose({orgId:p.orgId,userId:p.userId,persona:p.persona},name,input,{runId,trust:runIsUntrusted()?"untrusted":"trusted"})
+      const capInput=name==="memory_remember"?{...(input as any),entityId:(input as any)?.entryId}:input
+      const r=await propose({orgId:p.orgId,userId:p.userId,persona:p.persona},name,capInput,{runId,trust:runIsUntrusted()?"untrusted":"trusted"})
       const note=r.applied?`Done (applied by your workspace's auto-apply setting): ${r.message??r.proposal.summary}`
         :`Proposed, not applied: ${r.proposal.summary}. It is waiting in the Actions inbox (/dashboard/actions) for a person to approve${r.proposal.source_trust==="untrusted"?" (this run read outside content, so it always needs a person)":""}. Tell the user it is awaiting approval; do not say it was done.`
       logEvent("tool.end",{tool:name,ok:true,proposal:r.proposal.id,status:r.proposal.status,ms:Date.now()-startedAt,obs_chars:note.length},runId)

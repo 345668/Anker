@@ -5,6 +5,7 @@
     "action_proposals",
     "activities",
     "activity_logs",
+    "agent_events",
     "agent_executions",
     "agent_runs",
     "agent_settings",
@@ -88,7 +89,9 @@
     "email_templates",
     "email_verifications",
     "enrichment_jobs",
+    "entity_memory",
     "equity_filings",
+    "eval_runs",
     "extension_tokens",
     "fee_accruals",
     "fee_schedules",
@@ -291,6 +294,9 @@
     "action_proposals": [
       "org_id"
     ],
+    "agent_events": [
+      "org_id"
+    ],
     "agent_executions": [
       "org_id"
     ],
@@ -379,6 +385,9 @@
       "fund_id"
     ],
     "document_extractions": [
+      "org_id"
+    ],
+    "entity_memory": [
       "org_id"
     ],
     "fee_accruals": [

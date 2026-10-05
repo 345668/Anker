@@ -121,6 +121,27 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     run: async () => { throw new Error("crm_add_task is a governed action: it must go through the proposal path (lib/actions)."); },
   },
 
+  memory_recall: {
+    name: "memory_recall",
+    description: "What this workspace has asked the system to remember about one CRM contact (for example follow_up_paused). Expired entries are not returned.",
+    params: '{ "entryId": string }',
+    run: async (inp, ctx) => {
+      const scope = await needWorkspace(ctx);
+      await requireCrmEntry(scope.orgId, String(inp?.entryId ?? ""));
+      const { recall } = await import("@/lib/memory/store");
+      const rows = await recall(scope.orgId, "crm_entry", String(inp.entryId));
+      return { observation: rows.length ? rows.map((r) => `${r.key} = ${r.value}${r.valid_until ? ` (until ${String(r.valid_until).slice(0, 10)})` : ""}${r.pinned ? " [set by a person]" : ""}`).join("\n") : "Nothing is remembered about this contact." };
+    },
+  },
+
+  // Governed write (doc 43, 45 §5): becomes a proposal a person approves; never writes from here.
+  memory_remember: {
+    name: "memory_remember",
+    description: "Propose that the workspace remember a short fact about a CRM contact (key, value, optional validUntil). It waits in the Actions inbox for a person to approve; it is not saved by this call.",
+    params: '{ "entryId": string, "key": string, "value": string, "validUntil"?: "YYYY-MM-DD" }',
+    run: async () => { throw new Error("memory_remember is a governed action: it must go through the proposal path (lib/actions)."); },
+  },
+
   deal_pipeline: {
     name: "deal_pipeline",
     description: "The fund's deal-flow board: counts per stage, proposed-check total, and the active deals (company, stage, round, check).",

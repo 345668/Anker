@@ -15,7 +15,10 @@ let db: PGlite
 let allowed = async (_o: string) => {}
 let principalFor = async (userId: string, orgId: string) => ({ userId, orgId, persona: "founder" as const, canWrite: true })
 let clock = new Date("2026-10-05T08:00:00Z") // a Monday
-const deps: Deps = { principal: (u, o) => principalFor(u, o), allowed: (o) => allowed(o), now: () => clock }
+let spent = 0
+let generated: (prompt: string) => Promise<string> = async () => "A quiet week."
+const deps: Deps = { principal: (u, o) => principalFor(u, o), allowed: (o) => allowed(o), now: () => clock,
+  ai: async (_w, _max, fn) => fn(), generate: (p) => { spent += 0.01; return generated(p) }, spent: () => spent }
 const who = { userId: "u1", email: "u1@x.test" }
 const one = async (q: string, p: unknown[] = []) => (await db.query(q, p)).rows[0] as any
 const all = async (q: string, p: unknown[] = []) => (await db.query(q, p)).rows as any[]
@@ -29,12 +32,13 @@ beforeAll(async () => {
     CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100);`)
   await db.exec(readFileSync("scripts/migrations/2026-10-05-action-proposals.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-05b-agent-runtime.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-05c-agents-complete.sql", "utf8"))
   const run = async (strings: TemplateStringsArray, ...values: unknown[]) => (await db.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values)).rows
   h.sql.mockImplementation(run); h.sql.unsafe = async (q: string, p: unknown[]) => (await db.query(q, p)).rows
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => {
-  await db.exec("DELETE FROM agent_executions; DELETE FROM agent_settings; DELETE FROM action_proposals; DELETE FROM workspace_autonomy; DELETE FROM crm_tasks; DELETE FROM crm_entries; DELETE FROM platform_flags")
+  await db.exec("DELETE FROM agent_executions; DELETE FROM agent_settings; DELETE FROM action_proposals; DELETE FROM workspace_autonomy; DELETE FROM crm_tasks; DELETE FROM crm_entries; DELETE FROM platform_flags; DELETE FROM agent_events; DELETE FROM entity_memory")
   allowed = async () => {}; principalFor = async (userId, orgId) => ({ userId, orgId, persona: "founder", canWrite: true })
   clock = new Date("2026-10-05T08:00:00Z"); h.audit.mockReset(); h.audit.mockResolvedValue(undefined)
 })
@@ -151,12 +155,12 @@ describe("kill switches and authority", () => {
   })
   it("the platform flag stops a scheduled run before it starts and a run in flight between steps", async () => {
     await setEnabled("org-a", "weekly_brief", true, who)
-    await db.query("INSERT INTO platform_flags (key, enabled) VALUES ('agents.disabled.weekly_brief', true)")
+    await db.query("INSERT INTO platform_flags (key, enabled) VALUES ('agents_disabled_weekly_brief', true)")
     await dispatch(deps)
     expect((await one("SELECT count(*)::int n FROM agent_executions")).n).toBe(0)
     await db.query("DELETE FROM platform_flags")
     const def = DEFINITIONS.weekly_brief, orig = def.steps[0].run
-    def.steps[0] = { ...def.steps[0], run: async (c) => { const r = await orig(c); await db.query("INSERT INTO platform_flags (key, enabled) VALUES ('agents.disabled', true)"); return r } }
+    def.steps[0] = { ...def.steps[0], run: async (c) => { const r = await orig(c); await db.query("INSERT INTO platform_flags (key, enabled) VALUES ('agents_disabled', true)"); return r } }
     try {
       const done = await runExecution((await startManual("org-a", "weekly_brief"))!, deps)
       expect(done.status).toBe("killed"); expect(done.error).toMatch(/platform-wide/); expect(Object.keys(done.state)).toEqual(["pipeline"])

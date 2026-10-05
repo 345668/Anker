@@ -128,6 +128,8 @@ export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
   }),
   crm_update_stage: obj({ entryId: str(), stage: str() }, ["entryId", "stage"]),
   crm_add_task: obj({ title: str(), entryId: str(), dueAt: str({ description: "YYYY-MM-DD" }) }, ["title"]),
+  memory_recall: obj({ entryId: str() }, ["entryId"]),
+  memory_remember: obj({ entryId: str(), key: str({ description: "lowercase_with_underscores, e.g. follow_up_paused" }), value: str(), validUntil: str({ description: "YYYY-MM-DD, optional" }) }, ["entryId", "key", "value"]),
   deal_pipeline: NO_INPUT,
   network_intro_paths: obj({ person: str({ description: "name or linkedin.com/in/… URL" }) }, ["person"]),
   outreach_inbox: NO_INPUT,
