@@ -5,7 +5,7 @@ const h = vi.hoisted(() => ({ propose: vi.fn(), web: vi.fn() }))
 vi.mock("@/lib/db", () => ({ sql: vi.fn() }))
 vi.mock("@/lib/actions/store", () => ({ propose: h.propose }))
 vi.mock("@/lib/observability/log", () => ({ logEvent: vi.fn() }))
-vi.mock("@/lib/assistant/tools", () => ({ TOOLS: { web_search: { name: "web_search", description: "", params: "", run: h.web } } }))
+vi.mock("@/lib/assistant/tools", () => ({ TOOLS: { web_search: { name: "web_search", description: "", params: "", run: h.web }, build_investor_profile: { name: "build_investor_profile", description: "", params: "", run: h.web }, enrich_firms: { name: "enrich_firms", description: "", params: "", run: h.web } } }))
 vi.mock("@/lib/assistant/tools-fo", () => ({ FO_TOOLS: {} }))
 vi.mock("@/lib/assistant/tools-modeling", () => ({ MODELING_TOOLS: {} }))
 vi.mock("@/lib/assistant/tools-context", () => ({ CONTEXT_TOOLS: {} }))
@@ -24,6 +24,20 @@ describe("assistant path", () => {
     expect(canUseTool(principal({ readonly: true }), "crm_update_stage")).toBe(false)
     expect(canUseTool(principal({ canWrite: false }), "crm_add_task")).toBe(false)
     expect(canUseTool(principal(), "enrich_firms")).toBe(false)
+  })
+  it("directory writes stay blocked for tenants; the profile builder is a read tool for writers", () => {
+    for (const name of ["enrich_firms", "enrich_db_from_xlsx"]) expect(canUseTool(principal(), name)).toBe(false)
+    const vc = { persona: "vc" as const, membership: { orgRole: "member", kind: "fund" } as any }
+    expect(canUseTool(principal(vc), "build_investor_profile")).toBe(true)
+    expect(canUseTool(principal({ ...vc, readonly: true }), "build_investor_profile")).toBe(false)
+  })
+  it("a profile build reads the web, so a proposal made after it is untrusted", async () => {
+    const p = principal({ persona: "vc", membership: { orgRole: "member", kind: "fund" } as any })
+    await withAiContext(p, async () => {
+      await executeTool(p, "build_investor_profile", { firmId: "f1" })
+      await executeTool(p, "crm_add_task", { title: "Follow up" })
+    })
+    expect(h.propose.mock.calls[0][3].trust).toBe("untrusted")
   })
   it("a governed tool call proposes, tells the model it is waiting, and writes nothing itself", async () => {
     const p = principal()

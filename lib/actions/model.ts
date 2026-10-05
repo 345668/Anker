@@ -14,7 +14,7 @@ export const RISK_LABELS: Record<RiskClass, string> = {
 }
 
 /** Tools that read the outside world: after any of them runs, the rest of the run may have been steered by text a stranger wrote. */
-export const UNTRUSTED_SOURCES = new Set(["web_search", "web_crawl", "outreach_inbox", "analyze_image", "ocr_image", "translate_text", "call_intelligence", "dataroom_ingest", "dataroom_reconcile", "dataroom_normalize", "dataroom_statements", "dataroom_questions"])
+export const UNTRUSTED_SOURCES = new Set(["web_search", "web_crawl", "outreach_inbox", "build_investor_profile", "analyze_image", "ocr_image", "translate_text", "call_intelligence", "dataroom_ingest", "dataroom_reconcile", "dataroom_normalize", "dataroom_statements", "dataroom_questions"])
 
 /**
  * May this proposal be applied without a person? Only R0, only when the workspace turned it on for that class, and never when the run touched untrusted content.

@@ -83,3 +83,15 @@ Tests: 14 against PGlite with the real migration (apply once, double approval, f
 
 Verified against production with a throwaway workspace (removed afterwards): proposals changed nothing until approved; approval applied once and a repeat said "already applied"; undo restored the stage; the audit trail held created, applied and undone; with the switch on a trusted stage move applied by itself while an untrusted one stayed pending.
 Not verified: the inbox page and the assistant's live tool call (they need a signed-in session), and the "approve" route's refusal of a non-session caller beyond its unit-level guard.
+
+## 12. The other three blocked tools, decided 2026-10-05
+
+Reading what each does changed the plan in §2 ("one entry each"): they are three different cases, and only one is a tenant capability.
+
+| Tool | What it does | Decision |
+| --- | --- | --- |
+| `build_investor_profile` | Reads a firm's site and public LinkedIn, synthesizes a profile; **writes nothing** | Unblocked as an ordinary read tool (VC preset, writers only, not for read-only tokens). It reads outside content, so it joins the untrusted sources: any proposal made after it in the same run needs a person. |
+| `enrich_firms` | Fills missing description and sectors on rows in `investment_firms`, the **shared directory** | Stays blocked for tenants. A workspace member approving it would be editing every other workspace's records, and the proposal layer is per-workspace. Its path is the owner console (`/api/admin/enrich` already exists, owner-gated). |
+| `enrich_db_from_xlsx` | Inserts firms and investors from an uploaded sheet into the shared directory | Stays blocked for tenants, for the same reason plus provenance and licence: spec 37 §8.2 requires both on every directory import, and the S-6 import console is where that lives. A tenant's own contacts belong in their CRM, not the directory. |
+
+Consequence for the model: a capability is a `propose` capability only if its write is confined to the workspace. A write to shared data is an owner-console feature with its own provenance, not an approval a tenant can give. The BLOCKED comment in `lib/assistant/policy.ts` now says so, and tests pin all three outcomes.

@@ -2,8 +2,10 @@ import { toolAllowlistFor } from "@/lib/agents/presets"
 import { TOOL_SCHEMAS } from "./tool-schemas"
 import type { AiPrincipal } from "./context"
 
-// These mutations require a separate human-reviewed administrative/action workflow.
-const BLOCKED = new Set(["enrich_db_from_xlsx","enrich_firms","build_investor_profile"])
+// These write to the SHARED investor directory (investment_firms, investors), which is not a tenant's data: a workspace member approving a change there would be editing every
+// other workspace's records, and imports need provenance and a licence (docs 37 §8.2, 43 §2). They stay blocked for tenants; the owner console is their path.
+// build_investor_profile is not here: it writes nothing (it reads a firm's site and public LinkedIn and synthesizes a profile), so it is an ordinary read tool whose run is marked untrusted.
+const BLOCKED = new Set(["enrich_db_from_xlsx","enrich_firms"])
 // Governed writes: these do not run, they become proposals a person decides (lib/actions, doc 43). Only a member who can write may propose.
 const PROPOSE = new Set(["crm_update_stage","crm_add_task"])
 const READ_ONLY = new Set(["web_search","web_crawl","query_investors","crm_overview","crm_search","deal_pipeline","network_intro_paths","outreach_inbox","fund_performance","planning_snapshot","call_intelligence","lp_overview","analyze_image","ocr_image","translate_text"])
