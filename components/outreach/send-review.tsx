@@ -58,9 +58,10 @@ export function SendReview({ messageIds, provider, initialSequence, onClose, onD
         {err && <p role="alert" className="mt-3 rounded-md border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950/30 dark:text-rose-300">{err}</p>}
         {result ? (
           <div className="mt-4 space-y-2 text-sm" role="status">
-            <p className="font-medium">Approved. {result.authorized} message{result.authorized === 1 ? "" : "s"}{result.sendNow ? `: ${result.sendNow.sent} sent now` : ""}.</p>
-            {result.sendNow?.paused && <p className="text-amber-700 dark:text-amber-300">Sending is paused for the whole platform right now, so nothing has gone. Your approval stands for 7 days and the messages will go out when sending resumes, or you can stop them below.</p>}
-            {result.sendNow && !result.sendNow.paused && result.sendNow.sent < result.authorized && <p className="text-muted-foreground">The rest will go out as your daily cap allows{result.days > 1 ? ` (about ${result.days} days in all)` : ""}. You can stop what has not gone from Sending, below.</p>}
+            <p className="font-medium">Approved{seq ? " as a dated sequence" : ""}. {result.authorized} message{result.authorized === 1 ? "" : "s"}{result.sendNow ? `: ${result.sendNow.sent} sent now` : ""}.</p>
+            {result.sendNow?.paused && <p className="text-amber-700 dark:text-amber-300">Sending is paused for the whole platform right now, so nothing has gone. Your approval stands for {seq ? "the whole sequence" : "7 days"} and the messages will go out when sending resumes, or you can stop them below.</p>}
+            {seq && !result.sendNow?.paused && <p className="text-muted-foreground">Each step goes on its own day, after the one before it. You can stop what has not gone from Sending, below.</p>}
+            {!seq && result.sendNow && !result.sendNow.paused && result.sendNow.sent < result.authorized && <p className="text-muted-foreground">The rest will go out as your daily cap allows{result.days > 1 ? ` (about ${result.days} days in all)` : ""}. You can stop what has not gone from Sending, below.</p>}
             {result.blocked > 0 && <p className="text-muted-foreground">{result.blocked} {result.blocked === 1 ? "was" : "were"} left out; the reasons are on the authorization.</p>}
             <button onClick={onClose} className="mt-2 rounded-md bg-foreground px-3 py-1.5 text-background">Done</button>
           </div>
@@ -102,7 +103,7 @@ export function SendReview({ messageIds, provider, initialSequence, onClose, onD
             <p className="text-xs text-muted-foreground">Sent email cannot be recalled. You can stop anything that has not gone yet. {seq ? "The approval lasts until the last step." : "The approval lasts 7 days."}</p>
             {note && <p role="status" className="text-xs">{note}</p>}
             <div className="flex flex-wrap gap-2">
-              <button disabled={busy || p.count === 0 || (p.requiresTypedCount && Number(typed) !== p.count)} onClick={approve} className="rounded-md bg-foreground px-4 py-2 font-medium text-background disabled:opacity-50">{busy ? "Working…" : after ? `Approve ${p.count} for later` : `Approve and send ${p.count}`}</button>
+              <button disabled={busy || p.count === 0 || (p.requiresTypedCount && Number(typed) !== p.count)} onClick={approve} className="rounded-md bg-foreground px-4 py-2 font-medium text-background disabled:opacity-50">{busy ? "Working…" : after ? `Approve ${p.count} for later` : seq ? `Approve ${p.count}-step sequence` : `Approve and send ${p.count}`}</button>
               <button disabled={busy} onClick={test} className="rounded-md border border-foreground/15 px-3 py-2 disabled:opacity-50">Send me a test copy</button>
             </div>
           </div>
