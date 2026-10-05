@@ -48,7 +48,7 @@ export function SendReview({ messageIds, provider, onClose, onDone }: { messageI
   const blocked = p?.items.filter((i) => i.verdict.code !== "ok") ?? []
   const dropped = p?.items.flatMap((i) => i.droppedSecondary.map((d) => ({ ...d, member: i.name }))) ?? []
   return (
-    <div role="dialog" aria-modal="true" aria-label="Review and send" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+    <div role="dialog" aria-modal="true" aria-label="Review and send" className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/40 p-4 pb-24 sm:pb-4">
       <div className="mt-8 w-full max-w-2xl rounded-xl border border-foreground/10 bg-background p-5 shadow-xl">
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-lg font-semibold">Review and send</h2>

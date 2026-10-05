@@ -230,7 +230,8 @@ export function EmailOutboxPanel() {
 
       {/* Rows */}
       <div className="space-y-3">
-        {(data?.rows ?? []).length === 0 && !loading && (
+        {!data && <p role="status" className="py-12 text-center text-sm text-muted-foreground">Loading the outbox…</p>}
+        {data && (data.rows ?? []).length === 0 && !loading && (
           <div className="text-center text-sm text-muted-foreground py-12 border border-dashed border-foreground/15 rounded-md">
             No emails in this bucket.
           </div>
