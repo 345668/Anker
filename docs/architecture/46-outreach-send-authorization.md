@@ -1,6 +1,6 @@
 # 46. The R2 sending approval layer: send authorizations
 
-Status: design 2026-10-05; **P0 (§13), P1 (§15) and P2 (§16) built**; P3 and P4 not built. Completes [43](43-action-layer-and-approval-inbox.md) (risk class R2: "external to a third party") and answers the open item in [45](45-agent-runtime-completion.md) §9. Written from a read of every code path that can email a third party (§1); where the code surprised me it says so.
+Status: design 2026-10-05; **P0 (§13), P1 (§15), P2 (§16) and P3 (§17) built**; enforcement is off until the log is quiet for two weeks; P4 not built. Completes [43](43-action-layer-and-approval-inbox.md) (risk class R2: "external to a third party") and answers the open item in [45](45-agent-runtime-completion.md) §9. Written from a read of every code path that can email a third party (§1); where the code surprised me it says so.
 
 ## 0. The goal, stated so it can be tested
 
@@ -239,4 +239,25 @@ Found, not fixed: **228 of the owner's drafts belong to a legacy account id (`us
 **Not verified:** the Actions inbox card and the SAIL `/sending` page in a browser, the assistant raising the proposal in a live conversation (a real model call), and a real send through a proposal.
 
 **Still open:** P3 (move `send-one`, the dashboard send action, investor updates, replies and the platform wave onto authorizations, then enforce once the shadow log has been quiet two weeks) and P4 (dated sequences, LinkedIn).
+
+## 17. P3 built, 2026-10-06: every outreach path runs under an authorization
+
+**The idea.** The paths that send at once from a click have no stored draft for a person to approve, so for them the click (or, for the platform wave, the owner's standing setting) is the approval. What P3 adds is the record and the proof: the approval is written first (who, the exact recipients and copies, a hash of the text, the mailbox, when), the sending code then runs under it (`withSendAuthorization`), and the provider functions can tell an authorized send from a path nobody moved. If the record cannot be written, nothing is sent.
+
+**Built** (`lib/outreach/send-auth/inline.ts`, `enforce.ts`; migration `2026-10-06b-send-auth-sources.sql` applied to production, which adds the sources `direct` and `investor_update` and the flag `outreach_require_authorization`, off):
+- **Single send (`lp-campaign/send-one`) and the dashboard send action**: source `direct`, approver the signed-in sender.
+- **Replies (`deliverApprovedReply`)**: source `reply`; the item's reference is the real reply message, so it is one record per reply.
+- **Investor updates**: source `investor_update`, one authorization per update kept across retries (`update:<id>`), one item per recipient still owed, items move approved, sending, then sent, skipped or failed; a retry opens a fresh authorization only for the recipients not yet settled. The route's lease and snapshot logic are unchanged.
+- **Platform campaign wave**: source `platform_wave` under the workspace id `platform:pitch-us`, approved by `platform:setting:autoSend` or `platform:owner-release` (whichever released the wave), one authorization per submission per wave, six-hour life.
+- **The executor now sends only message-backed sources** (`manual_single`, `manual_batch`, `proposal`); an inline authorization's items are never picked up by the cron, and an inline send interrupted mid-way becomes `unknown` for a person to check, never a retry.
+- **Enforcement**: with `outreach_require_authorization` on, `sendEmail` and `sendGmail` refuse an outreach send that is not under an authorization (`UnauthorizedSendError`, code `send_unauthorized`); a percentage rolls it out per sender by a stable hash; a failed flag read never blocks sending. SAIL `/sending` has the control: superadmin only, with a reason, **refused while any send skipped an authorization in the last 14 days** (it names the paths), off at any time.
+- **Evals:** live: every outreach message sent since the first inline authorization has a sent item; if enforcement is on, no unauthorized send is logged after it was switched on; the earlier shadow-log report remains. Static: no code outside the two provider modules posts mail to a provider (the public contact form, which mails the company's own inbox, and the Resend event reader are the only named exceptions), and every file that sends outreach labels its path.
+
+**A hole found and closed.** The dashboard send action had a SendGrid fallback that posted straight to SendGrid with a key and sender address the caller could supply, so it skipped the opt-out, the country rule, the footer and any authorization. It could only run when Resend was not configured (production has Resend), and it is removed: with no Resend the action now says nothing was sent.
+
+**Tests:** 17 new on inline authorizations, enforcement (off, on, rollout, a failed read, `sendEmail` refusing before the provider and sending under one, the gates still applying) and the send-one route; the investor-update tests now also check the one-authorization-across-retries behaviour; the SAIL rule is tested (a quiet fortnight, superadmin only, off any time). Anker 1,424 tests, SAIL 83.
+**Verified on production** with the provider stubbed (nothing was sent; everything removed): a `direct` authorization was recorded before the send and settled sent with a content hash and completed; a `platform_wave` authorization under `platform:pitch-us` accepted its approver and completed; an investor-update authorization was reused on a retry; the enforcement flag is off in production; the live evals pass.
+**Not verified:** the real cron wave and a real reply under authorization (they need live campaign data and a reply), the SAIL enforcement control in a browser, and enforcement switched on for real (deliberately not done).
+
+**The clock.** Enforcement can be switched on after 14 days with no `send.unauthorized_path` event. The log had no events when P3 shipped, so the earliest date is two weeks after the last event, which is today if nothing unmoved sends. The SAIL control computes this itself and refuses early. **Still open: P4** (dated sequences, LinkedIn).
 
