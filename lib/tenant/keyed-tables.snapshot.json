@@ -244,6 +244,8 @@
     "roles",
     "saved_templates",
     "schema_migrations",
+    "send_authorizations",
+    "send_items",
     "sender_profiles",
     "sessions",
     "spv_portal_tokens",
@@ -537,6 +539,12 @@
       "fund_id"
     ],
     "private_artifacts": [
+      "org_id"
+    ],
+    "send_authorizations": [
+      "org_id"
+    ],
+    "send_items": [
       "org_id"
     ],
     "startup_profiles": [

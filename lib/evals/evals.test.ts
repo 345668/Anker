@@ -11,12 +11,12 @@ import { runCases, store, runAll } from "./runner"
 let db: PGlite
 beforeAll(async () => {
   db = new PGlite()
-  await db.exec("CREATE TABLE memberships (org_id text, user_id text, org_role text);")
-  for (const f of ["2026-10-05-action-proposals", "2026-10-05b-agent-runtime", "2026-10-05c-agents-complete"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
+  await db.exec("CREATE TABLE memberships (org_id text, user_id text, org_role text); CREATE TABLE audit_events (action text, target_label text, created_at timestamptz DEFAULT now()); CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text);")
+  for (const f of ["2026-10-05-action-proposals", "2026-10-05b-agent-runtime", "2026-10-05c-agents-complete", "2026-10-06-send-authorizations"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
   h.sql.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => (await db.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values.map((v) => (Array.isArray(v) ? v : v)))).rows)
 }, 30000)
 afterAll(async () => db.close())
-beforeEach(async () => { await db.exec("DELETE FROM agent_settings; DELETE FROM agent_executions; DELETE FROM action_proposals; DELETE FROM memberships; DELETE FROM eval_runs") })
+beforeEach(async () => { await db.exec("DELETE FROM agent_settings; DELETE FROM agent_executions; DELETE FROM action_proposals; DELETE FROM memberships; DELETE FROM eval_runs; DELETE FROM send_items; DELETE FROM send_authorizations; DELETE FROM audit_events") })
 
 describe("static evals", () => {
   for (const c of staticCases) it(c.name, async () => { const r = await c.run(); expect(r.detail).toBeTruthy(); expect(r.ok, r.detail).toBe(true) })
@@ -34,6 +34,20 @@ describe("live evals", () => {
     for (const name of ["every enabled agent setting names", "every enabled agent was enabled", "no run has sat running", "every applied proposal", "agents with no model budget", "no agent run failed"]) {
       const r = await byName(name).run(); expect(r.ok, name).toBe(false)
     }
+  })
+  it("catches sends under the wrong approver, after a revoke, over the cap, stuck, and reports the shadow log", async () => {
+    await db.exec(`INSERT INTO send_authorizations (id, org_id, sender_user_id, provider, source, approved_by, digest, expires_at, status, revoked_at) VALUES
+      ('a1','o','sender','resend','manual_batch','someone-else','d', now() + interval '1 day','active', NULL), ('a2','o','sender','resend','manual_batch','sender','d', now() + interval '1 day','revoked', now() - interval '1 hour')`)
+    await db.exec(`INSERT INTO send_items (authorization_id, org_id, message_id, recipients, content_hash, idempotency_key, status, sent_at) VALUES ('a1','o','m1','{}','h','k1','sent', now()), ('a2','o','m2','{}','h','k2','sent', now())`)
+    expect((await byName("every message sent through an authorization").run()).ok).toBe(false)
+    await db.exec("DELETE FROM send_items; DELETE FROM send_authorizations")
+    await db.exec("INSERT INTO send_authorizations (id, org_id, sender_user_id, provider, source, approved_by, digest, expires_at) VALUES ('a3','o','s','resend','manual_batch','s','d', now() + interval '1 day')")
+    for (let i = 0; i < 51; i++) await db.query("INSERT INTO send_items (authorization_id, org_id, message_id, recipients, content_hash, idempotency_key, status, sent_at) VALUES ('a3','o',$1,'{}','h',$2,'sent', now())", [`m${i}`, `k${i}`])
+    expect((await byName("no sender went over the daily cap").run()).ok).toBe(false)
+    await db.exec("DELETE FROM send_items"); await db.exec("INSERT INTO send_items (authorization_id, org_id, message_id, recipients, content_hash, idempotency_key, status, claimed_at) VALUES ('a3','o','m','{}','h','k','sending', now() - interval '2 hours')")
+    expect((await byName("no sender went over the daily cap").run()).ok).toBe(false)
+    await db.exec("INSERT INTO audit_events (action, target_label) VALUES ('send.unauthorized_path','investor-update'), ('send.unauthorized_path','investor-update')")
+    const shadow = await byName("sends that skipped authorization").run(); expect(shadow.ok).toBe(true); expect(shadow.detail).toMatch(/investor-update 2/)
   })
   it("the schema check names every missing table and column", async () => {
     const r = await byName("every column").run()

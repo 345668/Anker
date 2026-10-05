@@ -102,6 +102,7 @@ export async function sendOutreachEmailAction(data: {
     try {
       const res = await sendEmail({
         purpose: "outreach",
+        via: "dashboard-action",
         senderUserId: user.id,
         to: data.to,
         subject,

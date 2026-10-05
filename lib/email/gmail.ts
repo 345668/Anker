@@ -64,6 +64,8 @@ export interface SendGmailInput {
   messageId?: string
   /** Internal tracking id surfaced as X-Anker-Tracking-Id. */
   trackingId?: string
+  /** Which code path is sending, for the log of sends that did not go through a send authorization. */
+  via?: string
 }
 
 export interface SendGmailResult {
@@ -263,6 +265,7 @@ export async function sendGmail(input: SendGmailInput): Promise<{ ok: true; resu
     if (e?.code === "recipient_suppressed" || e?.code === "country_gated") return { ok: false, error: e.message }
     throw e
   }
+  await (await import("@/lib/outreach/send-auth/context")).shadowLogUnauthorized(input.via)
   // cc and bcc are recipients too (docs/architecture/46 §1.3): the opt-out and the country rule apply to them.
   let droppedRecipients: import("@/lib/email/send-gate").DroppedRecipient[] = []
   if ((input.cc?.length ?? 0) || (input.bcc?.length ?? 0)) {

@@ -77,6 +77,12 @@ export const RELIED_ON_COLUMNS: Record<string, string[]> = {
   agent_settings: ["org_id", "agent_id", "enabled", "config", "enabled_by"],
   agent_events: ["org_id", "kind", "subject_id", "payload", "processed_at", "created_at"],
   entity_memory: ["org_id", "entity_type", "entity_id", "key", "value", "valid_until", "pinned", "source"],
+  send_authorizations: ["id", "org_id", "sender_user_id", "provider", "account_id", "source", "approved_by", "approved_at", "expires_at", "status", "revoked_at"],
+  send_items: ["authorization_id", "org_id", "message_id", "recipients", "content_hash", "send_after", "status", "idempotency_key", "attempts", "claimed_at", "sent_at"],
+  outreach_replies: ["crm_entry_id"],
+  outreach_campaign_members: ["campaign_id", "user_id", "crm_entry_id", "status", "sent_at", "updated_at"],
+  outreach_campaigns: ["id", "cc_emails", "bcc_emails", "default_send_provider", "default_send_account_id"],
+  email_oauth_accounts: ["id", "user_id", "email", "status", "is_default"],
 }
 export const liveCases: EvalCase[] = [
   { name: "every column the agents and capabilities rely on exists in the live schema", run: async () => {
@@ -107,6 +113,19 @@ export const liveCases: EvalCase[] = [
     const free = Object.values(DEFINITIONS).filter((d) => d.maxSpendUsd === 0).map((d) => d.id)
     const n = free.length ? await count(sql`SELECT count(*)::int AS n FROM agent_executions WHERE agent_id = ANY(${free}) AND spend_usd > 0`) : 0
     return n ? fail(`${n} run(s) of a zero-budget agent recorded spend`) : pass() } },
+  { name: "every message sent through an authorization was approved by its own sender, and nothing went after a revoke or expiry", run: async () => {
+    const notSender = await count(sql`SELECT count(*)::int AS n FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id WHERE i.status = 'sent' AND a.source <> 'platform_wave' AND a.approved_by <> a.sender_user_id`)
+    const afterRevoke = await count(sql`SELECT count(*)::int AS n FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id WHERE i.status = 'sent' AND ((a.revoked_at IS NOT NULL AND i.sent_at > a.revoked_at) OR i.sent_at > a.expires_at)`)
+    return notSender || afterRevoke ? fail(`${notSender} sent for another approver, ${afterRevoke} sent after revoke or expiry`) : pass() } },
+  { name: "no sender went over the daily cap through the executor, and no send is stuck", run: async () => {
+    const cap = Math.max(1, Number(process.env.OUTREACH_DAILY_CAP) || 50)
+    const over = await count(sql`SELECT count(*)::int AS n FROM (SELECT a.sender_user_id FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id WHERE i.status = 'sent' AND i.sent_at > now() - interval '7 days' GROUP BY a.sender_user_id, date_trunc('day', i.sent_at) HAVING count(*) > ${cap}) d`)
+    const stuck = await count(sql`SELECT count(*)::int AS n FROM send_items WHERE (status = 'sending' AND claimed_at < now() - interval '1 hour') OR (status = 'unknown' AND claimed_at < now() - interval '2 days')`)
+    return over || stuck ? fail(`${over} sender-day(s) over ${cap}, ${stuck} stuck or unresolved item(s)`) : pass() } },
+  { name: "sends that skipped authorization are known (shadow log for the enforcement date)", run: async () => {
+    const rows = (await sql`SELECT target_label, count(*)::int AS n FROM audit_events WHERE action = 'send.unauthorized_path' AND created_at > now() - interval '14 days' GROUP BY 1 ORDER BY 2 DESC`) as any[]
+    // Informational: this passes whatever it finds, and the detail is what the enforcement decision reads (docs/architecture/46 section 7, P3).
+    return pass(rows.length ? `in the last 14 days: ${rows.map((r) => `${r.target_label} ${r.n}`).join(", ")}` : "no unauthorized-path sends in the last 14 days") } },
   { name: "no agent run failed in the last 7 days without someone looking", run: async () => {
     const n = await count(sql`SELECT count(*)::int AS n FROM agent_executions WHERE status = 'failed' AND created_at > now() - interval '7 days'`)
     return n ? fail(`${n} failed run(s) in the last 7 days`) : pass() } },

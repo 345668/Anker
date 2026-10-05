@@ -1,42 +1,36 @@
 import { crmWorkspaceResponse } from "@/lib/crm/workspace"
-import { isAdminUser } from "@/lib/auth/require-admin"
 /**
  * POST /api/outreach/send-email
  *
- * Send one outreach_messages row as an email via Resend.
+ * Send one outreach_messages row as an email (Resend, or Gmail with provider: "gmail").
  *
- * Body: { messageId: string }
- *   - The outreach_messages.id to send.  The row's body becomes the
- *     email body.  Subject must be set (use the email-personalizer to
- *     populate before calling).
- *   - For threaded follow-ups (kind != 'connection_request'), we look
- *     up the prior connection_request email_message_id on the same
- *     crm_entry and use it as In-Reply-To.
+ * Body: { messageId: string, provider?: "resend" | "gmail", accountId?: string }
  *
- * Side effects:
- *   - Calls Resend
- *   - Updates outreach_messages: tracking_id, resend_id, email_message_id,
- *     email_from, email_to, status='sent', sent_at, body=rewritten HTML/text
- *   - Triggers syncCrmStageFromOutreach so the CRM stage flips forward
+ * Since docs/architecture/46 this goes through the send authorization path: the click is the approval of exactly this message to exactly this recipient from this
+ * mailbox, it is recorded, bound to the text, and sent by the same executor as every other send, so the same checks apply at the moment of sending
+ * (opt-out, consent, the contact replying, the daily allowance). The response keeps its old shape.
+ *
+ * Side effects (done by the executor): the message becomes sent with its provider ids, the CRM stage syncs forward, last_contacted_at is stamped.
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { resolveActingUser } from "@/lib/auth/acting-user"
-import { sendEmail, isResendConfigured } from "@/lib/email/resend"
-import { sendGmail, loadGmailAccount, isGmailOAuthConfigured } from "@/lib/email/gmail"
-import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
-import { isEmailSuppressed } from "@/lib/outreach/deliverability"
-import { randomUUID } from "node:crypto"
+import { isResendConfigured } from "@/lib/email/resend"
+import { isGmailOAuthConfigured } from "@/lib/email/gmail"
 import { describeDropped } from "@/lib/email/send-errors"
+import { buildPreview } from "@/lib/outreach/send-auth/preview"
+import { confirmAuthorization, AuthorizationError } from "@/lib/outreach/send-auth/store"
+import { runExecutor } from "@/lib/outreach/send-auth/executor"
+import { VERDICT_TEXT, type VerdictCode } from "@/lib/outreach/send-auth/model"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
 
+const STATUS: Partial<Record<VerdictCode, number>> = { not_found: 404, wrong_sender: 403, not_email: 400, no_recipient: 400, no_subject: 400, no_body: 400, suppressed: 409, country_gated: 409, bad_address: 400 }
+
 export async function POST(req: NextRequest) {
   try {
-    // Signed-in user, or the tenant user the staff portal is acting as.
-    // See lib/auth/acting-user.ts — portal impersonation is explicit, audited,
-    // and grants only that user's privileges (no admin role).
+    // Signed-in user, or the tenant user the staff portal is acting as (lib/auth/acting-user.ts: explicit, audited, that user's privileges only).
     const user = await resolveActingUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
     const crmScope = await crmWorkspaceResponse(true, true)
@@ -46,170 +40,36 @@ export async function POST(req: NextRequest) {
     const messageId = String(body?.messageId ?? "")
     if (!messageId) return NextResponse.json({ error: "messageId required" }, { status: 400 })
     const sendVia: "resend" | "gmail" = body?.provider === "gmail" ? "gmail" : "resend"
-    const gmailAccountId = body?.accountId ? String(body.accountId) : undefined
+    if (sendVia === "gmail" && !isGmailOAuthConfigured()) return NextResponse.json({ error: "Gmail OAuth not configured on this server" }, { status: 503 })
 
-    const [row] = await sql`
-      SELECT m.*, e.user_id AS entry_user_id, e.display_email, e.display_name
-      FROM outreach_messages m
-      JOIN crm_entries e ON e.id = m.crm_entry_id
-      WHERE e.org_id = ${crmScope.orgId} AND m.id = ${messageId}
-      LIMIT 1
-    `
-    if (!row) return NextResponse.json({ error: "Message not found" }, { status: 404 })
-
-    // Drafts and mailbox credentials remain sender-private.
-    if (row.user_id !== user.id) return NextResponse.json({error:"This draft belongs to another sender."},{status:403})
-
-    if ((row as any).channel !== "email") {
-      return NextResponse.json({ error: `Message is channel=${(row as any).channel}, expected email` }, { status: 400 })
-    }
-    const toEmail = String((row as any).email_to ?? (row as any).display_email ?? "").trim()
-    if (!toEmail) return NextResponse.json({ error: "No recipient email on message or CRM entry" }, { status: 400 })
-    // Never send to a bounced/complained/unsubscribed address.
-    if (await isEmailSuppressed((row as any).entry_user_id ?? user.id, toEmail)) {
-      return NextResponse.json({ error: "Recipient is on the suppression list (bounced/complained/unsubscribed)" }, { status: 409 })
-    }
-    const subject = String((row as any).subject ?? "").trim()
-    if (!subject) return NextResponse.json({ error: "Message has no subject — run the email personalizer first" }, { status: 400 })
-    if (!(row as any).body) return NextResponse.json({ error: "Message has no body" }, { status: 400 })
-
-    // Threading: if this is a follow-up, find the connection_request on
-    // the same entry and reuse its message-id for In-Reply-To.
-    let inReplyTo: string | undefined = undefined
-    if ((row as any).kind !== "connection_request") {
-      const [parent] = await sql`
-        SELECT email_message_id FROM outreach_messages
-        WHERE user_id = ${user.id} AND crm_entry_id = ${(row as any).crm_entry_id}
-          AND kind = 'connection_request'
-          AND email_message_id IS NOT NULL
-        LIMIT 1
-      `
-      if (parent) inReplyTo = (parent as any).email_message_id || undefined
+    const preview = await buildPreview({ orgId: crmScope.orgId, userId: user.id, messageIds: [messageId], provider: sendVia, accountId: body?.accountId ? String(body.accountId) : null })
+    if (preview.error) return NextResponse.json({ error: preview.error }, { status: /another user/.test(preview.error) ? 403 : 400 })
+    const item = preview.items[0]
+    if (!item || item.verdict.code !== "ok") {
+      const code = (item?.verdict.code ?? "not_found") as VerdictCode
+      return NextResponse.json({ error: `${VERDICT_TEXT[code]}${item?.verdict.detail ? ` (${item.verdict.detail})` : ""}` }, { status: STATUS[code] ?? 409 })
     }
 
-    // Pull cc/bcc from any campaign(s) this CRM entry is enrolled in (typically one).
-    // Union the lists so a CRM entry that's in multiple campaigns honours all configured CCs.
-    const ccRows = await sql`
-      SELECT DISTINCT jsonb_array_elements_text(c.cc_emails)  AS email
-      FROM outreach_campaign_members m
-      JOIN outreach_campaigns c ON c.id = m.campaign_id
-      WHERE m.crm_entry_id = ${(row as any).crm_entry_id}
-        AND m.user_id      = ${user.id}
-    ` as any[]
-    const bccRows = await sql`
-      SELECT DISTINCT jsonb_array_elements_text(c.bcc_emails) AS email
-      FROM outreach_campaign_members m
-      JOIN outreach_campaigns c ON c.id = m.campaign_id
-      WHERE m.crm_entry_id = ${(row as any).crm_entry_id}
-        AND m.user_id      = ${user.id}
-    ` as any[]
-    const cc  = ccRows.map((r: any) => r.email).filter(Boolean)
-    const bcc = bccRows.map((r: any) => r.email).filter(Boolean)
+    const conf = await confirmAuthorization({ orgId: crmScope.orgId, userId: user.id, messageIds: [messageId], provider: sendVia, accountId: body?.accountId ? String(body.accountId) : null, digest: preview.digest, source: "manual_single" }, { userId: user.id, email: (user as any).email ?? null })
+    await runExecutor(undefined, { authorizationId: conf.authorizationId, max: 1 })
 
-    const trackingId = (row as any).tracking_id ?? randomUUID()
-    let result: {
-      resendId: string; messageId: string; trackingId: string;
-      finalFrom: string; finalReplyTo: string; finalSubject: string;
-      finalHtml: string; finalText: string; finalCc: string[]; finalBcc: string[];
-      droppedRecipients?: Array<{ email: string; field: "cc" | "bcc"; reason: "suppressed" | "country_gated" }>;
+    const [res] = (await sql`SELECT i.status, i.reason, i.provider_id, i.provider_message_id, m.tracking_id, m.email_from FROM send_items i JOIN outreach_messages m ON m.id = i.message_id WHERE i.authorization_id = ${conf.authorizationId} AND i.message_id = ${messageId}`) as any[]
+    if (res?.status !== "sent") {
+      // Not sent: say why, and leave nothing waiting that the person did not expect.
+      if (res?.status === "approved") await sql`UPDATE send_items SET status = 'revoked', reason = 'Not sent now; cancelled so nothing sends later unexpectedly.' WHERE authorization_id = ${conf.authorizationId} AND status = 'approved'`
+      if (res?.status === "approved") await sql`UPDATE outreach_messages SET status = 'draft', scheduled_for = NULL WHERE id = ${messageId} AND status = 'queued'`
+      return NextResponse.json({ error: res?.reason || "The message was not sent." }, { status: res?.status === "blocked" || res?.status === "skipped" ? 409 : 502 })
     }
-
-    if (sendVia === "gmail") {
-      if (!isGmailOAuthConfigured()) return NextResponse.json({ error: "Gmail OAuth not configured on this server" }, { status: 503 })
-      // Resolve the account: explicit accountId > campaign default > user default
-      let acct = gmailAccountId ? await loadGmailAccount({ accountId: gmailAccountId }) : null
-      if (!acct) {
-        // Try the campaign's default account
-        const [camp] = await sql`
-          SELECT c.default_send_account_id FROM outreach_campaign_members m
-          JOIN outreach_campaigns c ON c.id = m.campaign_id
-          WHERE m.crm_entry_id = ${(row as any).crm_entry_id}
-            AND m.user_id = ${user.id}
-            AND c.default_send_provider = 'gmail'
-            AND c.default_send_account_id IS NOT NULL
-          LIMIT 1
-        ` as any[]
-        if (camp?.default_send_account_id) acct = await loadGmailAccount({ accountId: camp.default_send_account_id })
-      }
-      if (!acct) acct = await loadGmailAccount({ userId: user.id })
-      if (!acct) return NextResponse.json({ error: "No Gmail account connected. Connect one via Settings → Email." }, { status: 400 })
-      if (acct.user_id !== user.id) return NextResponse.json({ error: "Forbidden — account belongs to another user" }, { status: 403 })
-
-      const gmail = await sendGmail({
-        account: acct,
-        to: toEmail,
-        subject,
-        text: (row as any).body,
-        cc,
-        bcc,
-        inReplyTo,
-        trackingId,
-      })
-      if (!gmail.ok) return NextResponse.json({ error: `Gmail send failed: ${gmail.error}` }, { status: 502 })
-      result = {
-        resendId: `gmail:${gmail.result.gmailId}`,
-        messageId: gmail.result.messageId,
-        trackingId: gmail.result.trackingId,
-        finalFrom: gmail.result.finalFrom,
-        finalReplyTo: gmail.result.finalFrom,
-        finalSubject: gmail.result.finalSubject,
-        finalHtml: gmail.result.finalHtml,
-        finalText: gmail.result.finalText,
-        finalCc: gmail.result.finalCc,
-        finalBcc: gmail.result.finalBcc,
-        droppedRecipients: gmail.result.droppedRecipients,
-      }
-    } else {
-      result = await sendEmail({
-        purpose: "outreach",
-        senderUserId: user.id,
-        to: toEmail,
-        subject,
-        text: (row as any).body,
-        trackingId,
-        inReplyTo,
-        cc,
-        bcc,
-      })
-    }
-
-    await sql`
-      UPDATE outreach_messages SET
-        tracking_id      = ${result.trackingId},
-        resend_id        = ${result.resendId},
-        email_message_id = ${result.messageId},
-        email_from       = ${result.finalFrom},
-        email_to         = ${toEmail},
-        subject          = ${result.finalSubject},
-        status           = 'sent',
-        sent_at          = NOW(),
-        generated_by     = COALESCE(generated_by, 'manual'),
-        updated_at       = NOW()
-      WHERE id = ${messageId}
-    `
-
-    // Sync CRM stage forward — the connection_request 'sent' transition
-    // takes 'queued' → 'contacted'. Also stamp last_contacted_at: the CRM's
-    // stale detection and "last contact" column read it.
-    try { await syncCrmStageFromOutreach((row as any).crm_entry_id) } catch {}
-    try {
-      await sql`UPDATE crm_entries SET last_contacted_at = NOW(), updated_at = NOW()
-                WHERE org_id = ${crmScope.orgId} AND id = ${(row as any).crm_entry_id}`
-    } catch {}
-
     return NextResponse.json({
-      ok: true,
-      provider: sendVia,
-      resendId: result.resendId,
-      messageId: result.messageId,
-      trackingId: result.trackingId,
-      from: result.finalFrom,
+      ok: true, provider: sendVia, resendId: res.provider_id, messageId: res.provider_message_id, trackingId: res.tracking_id, from: res.email_from,
       providerConfigured: sendVia === "gmail" ? isGmailOAuthConfigured() : isResendConfigured(),
-      // cc and bcc addresses left out (opted out, or needing consent), so the sender is told rather than left to assume the copy went.
-      dropped: result.droppedRecipients ?? [],
-      note: describeDropped(result.droppedRecipients),
+      authorizationId: conf.authorizationId,
+      // The executor records any left-out cc/bcc on the item; the sender is told rather than left to assume the copy went.
+      note: res.reason && /not copied/i.test(res.reason) ? res.reason : describeDropped(item.droppedSecondary),
+      dropped: item.droppedSecondary,
     })
   } catch (e: any) {
+    if (e instanceof AuthorizationError) return NextResponse.json({ error: e.message }, { status: e.status })
     console.error("[outreach/send-email] error:", e)
     return NextResponse.json({ error: e?.message ?? "Send failed" }, { status: 500 })
   }

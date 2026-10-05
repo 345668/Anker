@@ -1,5 +1,6 @@
 "use client"
 
+import { SendReview, SendAuthorizations } from "@/components/outreach/send-review"
 import { useEffect, useState, useTransition } from "react"
 import {
   Loader2, RefreshCw, AlertTriangle, Send, Eye, MousePointerClick, Clock,
@@ -68,6 +69,8 @@ export function EmailOutboxPanel() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [reviewIds, setReviewIds] = useState<string[] | null>(null)
+  const [authKey, setAuthKey] = useState(0)
   const [syncState, setSyncState] = useState<SyncState | null>(null)
   const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -98,23 +101,8 @@ export function EmailOutboxPanel() {
       setError("Row missing subject, body, or recipient email.")
       return
     }
-    const ok = confirm(`Send to ${row.partnerEmail}?\n\nSubject: ${row.subject}\n\n${row.body.slice(0, 200)}${row.body.length > 200 ? "…" : ""}`)
-    if (!ok) return
-    setBusy(`send:${row.id}`); setError(null); setNotice(null)
-    try {
-      const res = await fetch("/api/outreach/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageId: row.id }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json?.error ?? `Failed (${res.status})`)
-      // A cc or bcc left out (opted out, or needs consent) is said plainly, not hidden.
-      if (json?.note) setNotice(json.note)
-      // refresh
-      load(bucket)
-    } catch (e: any) { setError(e?.message ?? "Send failed") }
-    finally { setBusy(null) }
+    // Sending is approved in the review dialog (docs/architecture/46): the person sees the recipient, the gates' verdict and the text first.
+    setError(null); setNotice(null); setReviewIds([row.id])
   }
 
   async function triggerSync(opts: { force?: boolean } = {}) {
@@ -228,6 +216,9 @@ export function EmailOutboxPanel() {
           <span className="text-rose-700 dark:text-rose-400">{error}</span>
         </div>
       )}
+
+      <SendAuthorizations refreshKey={authKey} />
+      {reviewIds && <SendReview messageIds={reviewIds} onClose={() => setReviewIds(null)} onDone={() => { setAuthKey((k) => k + 1); load(bucket) }} />}
 
       {notice && (
         <div role="status" className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md text-xs">

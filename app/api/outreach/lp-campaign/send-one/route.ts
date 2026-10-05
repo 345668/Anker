@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     const trackingId = randomUUID()
     const result = await sendEmail({
       purpose: "outreach",
+      via: "lp-send-one",
       senderUserId: user.id,
       to: to.trim(),
       subject: subject.trim(),

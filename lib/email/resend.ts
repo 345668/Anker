@@ -41,6 +41,8 @@ export interface SendEmailInput {
   replyTo?: string
   /** Skip tracking injection (use for transactional / system mail). */
   noTracking?: boolean
+  /** Which code path is sending (e.g. "investor-update"), for the log of sends that did not go through a send authorization. */
+  via?: string
   /** CC recipients — every send for the campaign goes to these as well.  Useful
    *  for keeping a colleague in the loop without giving them CRM access. */
   cc?: string[]
@@ -170,6 +172,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   // The opt-out is checked here, in the one function every send passes through, so a path that forgot to check
   // (four of eight did) cannot email someone who unsubscribed.
   if (isOutreach) await assertOutreachAllowed({ to: input.to, senderUserId: input.senderUserId, recipientCountry: input.recipientCountry })
+  // Until sending requires an authorization (docs/architecture/46 P3), a send without one is recorded so the remaining paths are known, not guessed.
+  if (isOutreach) await (await import("@/lib/outreach/send-auth/context")).shadowLogUnauthorized(input.via)
   let html = input.html ?? (input.text ? textToHtml(input.text) : "")
   if (!input.noTracking && trackViaApp && html) {
     html = rewriteLinks(html, trackingId)

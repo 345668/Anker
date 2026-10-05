@@ -85,6 +85,7 @@ async function handle(req: NextRequest) {
       try {
         const res = await sendEmail({
           purpose: "outreach",
+          via: "platform-wave",
           senderUserId: PLATFORM_SENDER_ID,
           to: e.investor_email,
           subject: e.draft_subject || `Intro: ${sub.startup_name}`,

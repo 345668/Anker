@@ -80,6 +80,8 @@ export const RULES: Rule[] = [
   { scope: F, table: "deal_opportunities", where: "fund_id::text = $2" },
   { scope: F, table: "fund_lps", where: "fund_id::text = $2" },
   // ── workspace (company or fund workspace) ──
+  { scope: O, table: "send_items", where: "org_id::text = $1" },
+  { scope: O, table: "send_authorizations", where: "org_id::text = $1" },
   { scope: O, table: "agent_events", where: "org_id::text = $1" },
   { scope: O, table: "entity_memory", where: "org_id::text = $1" },
   { scope: O, table: "agent_executions", where: "org_id::text = $1" },

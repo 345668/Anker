@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         continue
       }
       try {
-        const result = await sendEmail({ purpose: "outreach", senderUserId: user.id, to: r.email, subject: snapshot.title,
+        const result = await sendEmail({ purpose: "outreach", via: "investor-update", senderUserId: user.id, to: r.email, subject: snapshot.title,
           text: [snapshot.body, snapshot.asks ? `Asks:\n${snapshot.asks}` : ""].filter(Boolean).join("\n\n"),
           trackingId: r.trackingId, messageId: `<${r.trackingId}@an-ker.de>`, idempotencyKey: `investor-update:${id}:${r.trackingId}`,
           signal: AbortSignal.timeout(25000),

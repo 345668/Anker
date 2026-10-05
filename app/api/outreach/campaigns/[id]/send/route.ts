@@ -26,7 +26,10 @@ import { sendGmail, loadGmailAccount, isGmailOAuthConfigured } from "@/lib/email
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
 import { randomUUID } from "node:crypto"
 import { parseBulkSelection, checkCount } from "@/lib/outreach/bulk-selection"
-import { describeDropped } from "@/lib/email/send-errors"
+import { buildPreview } from "@/lib/outreach/send-auth/preview"
+import { confirmAuthorization, authorizationItems, AuthorizationError } from "@/lib/outreach/send-auth/store"
+import { runExecutor } from "@/lib/outreach/send-auth/executor"
+import { VERDICT_TEXT } from "@/lib/outreach/send-auth/model"
 import { recordChange } from "@/lib/audit/record-change"
 
 export const runtime = "nodejs"
@@ -37,7 +40,7 @@ interface SendResult {
   messageId: string
   name: string
   email: string
-  status: "sent" | "failed" | "skipped"
+  status: "sent" | "failed" | "skipped" | "queued"
   error?: string
   dryRun?: boolean
   resendId?: string
@@ -153,136 +156,46 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       return NextResponse.json({ ok: true, preview: true, count: memberRows.length, sendable, skipped: memberRows.length - sendable })
     }
 
+    // Since docs/architecture/46 the send is approved as one batch, previewed, bound to the text, and carried out by the send executor.
     const results: SendResult[] = []
     let sent = 0, failed = 0, skipped = 0
-
+    const candidates: any[] = []
     for (const row of memberRows) {
-      const name = String(row.display_name ?? "Investor")
-      const email = String(row.display_email ?? "").trim()
-      const msgId = row.msg_id as string | null
-
-      // Skip if no email address
-      if (!email) {
-        results.push({ memberId: row.member_id, messageId: msgId ?? "", name, email: "", status: "skipped", error: "No email address" })
-        skipped++
-        continue
-      }
-
-      // Skip if no message drafted
-      if (!msgId || !row.body) {
-        results.push({ memberId: row.member_id, messageId: msgId ?? "", name, email, status: "skipped", error: "No drafted message — run Draft first" })
-        skipped++
-        continue
-      }
-
-      const subject = String(row.subject ?? "Introduction").trim()
-
-      try {
-        // Threading: look up prior connection_request message-id for In-Reply-To
-        let inReplyTo: string | undefined
-        if (row.kind !== "connection_request" && row.crm_entry_id) {
-          const [parent] = await sql`
-            SELECT email_message_id FROM outreach_messages
-            WHERE crm_entry_id = ${row.crm_entry_id}
-              AND kind = 'connection_request'
-              AND email_message_id IS NOT NULL
-            LIMIT 1
-          ` as any[]
-          if (parent) inReplyTo = (parent as any).email_message_id || undefined
-        }
-
-        const trackingId = (row.tracking_id as string) ?? randomUUID()
-        let result: any
-        if (bulkProvider === "gmail") {
-          const g = await sendGmail({
-            account: gmailAcct,
-            to: email,
-            subject,
-            text: row.body,
-            inReplyTo,
-            cc: campaignCc,
-            bcc: campaignBcc,
-            trackingId,
-          })
-          if (!g.ok) throw new Error(`gmail send failed: ${g.error}`)
-          result = {
-            resendId: `gmail:${g.result.gmailId}`,
-            messageId: g.result.messageId,
-            trackingId: g.result.trackingId,
-            finalFrom: g.result.finalFrom,
-            finalSubject: g.result.finalSubject,
-            dryRun: false,
-            droppedRecipients: g.result.droppedRecipients,
-          }
-        } else {
-          result = await sendEmail({
-            purpose: "outreach",
-            senderUserId: user.id,
-            to: email,
-            subject,
-            text: row.body,
-            trackingId,
-            inReplyTo,
-            cc:  campaignCc,
-            bcc: campaignBcc,
-          })
-        }
-
-        // Update outreach_message row
-        await sql`
-          UPDATE outreach_messages SET
-            tracking_id      = ${result.trackingId},
-            resend_id        = ${result.resendId},
-            email_message_id = ${result.messageId},
-            email_from       = ${result.finalFrom},
-            email_to         = ${email},
-            subject          = ${result.finalSubject},
-            status           = 'sent',
-            sent_at          = NOW(),
-            updated_at       = NOW()
-          WHERE id = ${msgId}
-        `
-
-        // Update campaign member status
-        await sql`
-          UPDATE outreach_campaign_members SET
-            status   = 'sent',
-            sent_at  = NOW(),
-            updated_at = NOW()
-          WHERE id = ${row.member_id}
-        `
-
-        // Sync CRM stage + stamp last_contacted_at (stale detection reads it)
-        try { await syncCrmStageFromOutreach(row.crm_entry_id) } catch {}
-        try {
-          await sql`UPDATE crm_entries SET last_contacted_at = NOW(), updated_at = NOW()
-                    WHERE org_id = ${crmScope.orgId} AND id = ${row.crm_entry_id}`
-        } catch {}
-
-        results.push({
-          memberId: row.member_id, messageId: msgId, name, email,
-          status: "sent", dryRun: result.dryRun, resendId: result.resendId, dropped: result.droppedRecipients ?? [],
-        })
-        sent++
-      } catch (e: any) {
-        results.push({ memberId: row.member_id, messageId: msgId, name, email, status: "failed", error: e?.message ?? "Send failed" })
-        failed++
-      }
-
-      // Rate-limit gap between sends
-      await new Promise((r) => setTimeout(r, 150))
+      const name = String(row.display_name ?? "Investor"), email = String(row.display_email ?? "").trim(), msgId = row.msg_id as string | null
+      if (!email) { results.push({ memberId: row.member_id, messageId: msgId ?? "", name, email: "", status: "skipped", error: "No email address" }); skipped++; continue }
+      if (!msgId || !row.body) { results.push({ memberId: row.member_id, messageId: msgId ?? "", name, email, status: "skipped", error: "No drafted message — run Draft first" }); skipped++; continue }
+      candidates.push(row)
     }
-
-    // The send is on record: who sent how many, from which campaign (the per-message rows hold the rest).
+    let authorizationId: string | null = null, waiting = 0
+    if (candidates.length) {
+      const messageIds = candidates.map((r) => r.msg_id as string)
+      const preview = await buildPreview({ orgId: crmScope.orgId, userId: user.id, messageIds, provider: bulkProvider, accountId: bulkAccountId })
+      if (preview.error) return NextResponse.json({ error: preview.error }, { status: 409 })
+      if (!preview.sendable.length) {
+        for (const r of candidates) { const i = preview.items.find((x) => x.messageId === r.msg_id); results.push({ memberId: r.member_id, messageId: r.msg_id, name: String(r.display_name ?? "Investor"), email: String(r.display_email ?? ""), status: "skipped", error: i ? VERDICT_TEXT[i.verdict.code] : "Not sendable" }); skipped++ }
+      } else {
+        let conf
+        try { conf = await confirmAuthorization({ orgId: crmScope.orgId, userId: user.id, messageIds, provider: bulkProvider, accountId: bulkAccountId, digest: preview.digest, typedCount: Number.isInteger(body?.typedCount) ? body.typedCount : undefined, source: "manual_batch" }, { userId: user.id, email: user.email ?? null }) }
+        catch (e) { if (e instanceof AuthorizationError) return NextResponse.json({ error: e.message, count: preview.count, needsTypedCount: preview.requiresTypedCount }, { status: e.status }); throw e }
+        authorizationId = conf.authorizationId
+        await runExecutor(undefined, { authorizationId, max: 100 })
+        const items = await authorizationItems(crmScope.orgId, authorizationId)
+        for (const r of candidates) {
+          const it = items.find((x: any) => x.message_id === r.msg_id)
+          const base = { memberId: r.member_id, messageId: r.msg_id as string, name: String(r.display_name ?? "Investor"), email: String(r.display_email ?? "") }
+          if (it?.status === "sent") { results.push({ ...base, status: "sent" }); sent++ }
+          else if (it?.status === "approved") { results.push({ ...base, status: "queued", error: it.reason ?? "Waiting: it will send within your daily cap." }); waiting++ }
+          else if (it?.status === "failed" || it?.status === "unknown") { results.push({ ...base, status: "failed", error: it.reason ?? "Send failed" }); failed++ }
+          else { results.push({ ...base, status: "skipped", error: it?.reason ?? "Not sendable" }); skipped++ }
+        }
+      }
+    }
     await recordChange({ actor: { userId: user.id, email: user.email ?? null }, scope: { type: "org", id: crmScope.orgId }, action: "outreach.bulk_send", target: { type: "outreach_campaign", id: campaignId },
-      before: null, after: { sent, failed, skipped, requested: memberRows.length, provider: bulkProvider }, context: { selection: selection.kind } })
-    // Which cc and bcc addresses were left out of which sends (opted out, or needing consent): the sender sees it instead of assuming the copies went.
-    const droppedAll = results.flatMap((r) => (r.dropped ?? []).map((d) => ({ ...d, member: r.name })))
+      before: null, after: { sent, failed, skipped, waiting, requested: memberRows.length, provider: bulkProvider, authorizationId }, context: { selection: selection.kind } })
     return NextResponse.json({
       ok: failed === 0,
-      sent, failed, skipped,
-      dropped: droppedAll,
-      note: droppedAll.length ? `${describeDropped(droppedAll.slice(0, 5))}${droppedAll.length > 5 ? ` and ${droppedAll.length - 5} more.` : ""}` : null,
+      sent, failed, skipped, waiting, authorizationId,
+      note: waiting ? `${waiting} will send as your daily cap allows. You can stop them any time from the authorization.` : null,
       providerConfigured: isResendConfigured(),
       results,
     })

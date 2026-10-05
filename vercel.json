@@ -38,6 +38,10 @@
       "schedule": "*/30 * * * *"
     },
     {
+      "path": "/api/cron/outreach-send",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/agents",
       "schedule": "*/15 * * * *"
     },
