@@ -11,6 +11,6 @@ export const VERDICT_TEXT: Record<VerdictCode, string> = {
   no_recipient: "No email address", no_subject: "No subject", no_body: "No body", not_email: "Not an email message", cancelled: "Cancelled",
   already_sent: "Already sent", already_replied: "They have already replied", bounced: "Bounced or complained earlier", follow_ups_paused: "Follow-ups are paused for this contact",
   stage_passed: "The contact is marked passed", in_other_authorization: "Already approved in another batch", wrong_sender: "This draft belongs to another sender",
-  duplicate_recent: "A message to this address went out in the last 24 hours", duplicate_in_batch: "Another message to this address is in this batch; only the first step goes now", not_found: "Message not found in this workspace",
+  duplicate_recent: "A message to this address went out in the last 24 hours", duplicate_in_batch: "Another message to this address is in this batch; only the first step goes now", not_found: "Not in this workspace. Switch to the workspace this message belongs to",
 }
 

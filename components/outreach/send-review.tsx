@@ -58,7 +58,8 @@ export function SendReview({ messageIds, provider, onClose, onDone }: { messageI
         {result ? (
           <div className="mt-4 space-y-2 text-sm" role="status">
             <p className="font-medium">Approved. {result.authorized} message{result.authorized === 1 ? "" : "s"}{result.sendNow ? `: ${result.sendNow.sent} sent now` : ""}.</p>
-            {result.sendNow && result.sendNow.sent < result.authorized && <p className="text-muted-foreground">The rest will go out as your daily cap allows{result.days > 1 ? ` (about ${result.days} days in all)` : ""}. You can stop what has not gone from Sending, below.</p>}
+            {result.sendNow?.paused && <p className="text-amber-700 dark:text-amber-300">Sending is paused for the whole platform right now, so nothing has gone. Your approval stands for 7 days and the messages will go out when sending resumes, or you can stop them below.</p>}
+            {result.sendNow && !result.sendNow.paused && result.sendNow.sent < result.authorized && <p className="text-muted-foreground">The rest will go out as your daily cap allows{result.days > 1 ? ` (about ${result.days} days in all)` : ""}. You can stop what has not gone from Sending, below.</p>}
             {result.blocked > 0 && <p className="text-muted-foreground">{result.blocked} {result.blocked === 1 ? "was" : "were"} left out; the reasons are on the authorization.</p>}
             <button onClick={onClose} className="mt-2 rounded-md bg-foreground px-3 py-1.5 text-background">Done</button>
           </div>
