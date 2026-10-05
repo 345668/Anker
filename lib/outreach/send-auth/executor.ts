@@ -37,17 +37,18 @@ export interface ExecStats { paused: boolean; sent: number; blocked: number; ski
 const newStats = (): ExecStats => ({ paused: false, sent: 0, blocked: 0, skipped: 0, failed: 0, deferred: 0, expired: 0, recovered: 0, unknown: 0, held: [] })
 
 async function expireOld(stats: ExecStats) {
-  const old = (await sql`UPDATE send_authorizations SET status = 'expired' WHERE status = 'active' AND expires_at < now() RETURNING id`) as any[]
+  const old = (await sql`UPDATE send_authorizations SET status = 'expired' WHERE status = 'active' AND expires_at < now() RETURNING id, source`) as any[]
   for (const a of old) {
     const items = (await sql`UPDATE send_items SET status = 'expired', reason = 'The approval expired before this was sent. Approve it again to send.' WHERE authorization_id = ${a.id} AND status = 'approved' RETURNING message_id`) as any[]
-    if (items.length) await sql`UPDATE outreach_messages SET status = 'draft', scheduled_for = NULL, updated_at = now() WHERE id = ANY(${items.map((i) => i.message_id)}) AND status = 'queued'`
+    if (items.length && a.source === "linkedin") await (await import("@/lib/linkedin/authorization")).returnToApproval(items.map((i) => i.message_id))
+    else if (items.length) await sql`UPDATE outreach_messages SET status = 'draft', scheduled_for = NULL, updated_at = now() WHERE id = ANY(${items.map((i) => i.message_id)}) AND status = 'queued'`
     stats.expired += items.length
   }
 }
 
 /** An item still `sending` after ten minutes was claimed by a run that died. Resend's idempotency key makes a retry safe for 23 hours; anything else is `unknown`, never guessed. */
 async function recoverStale(now: Date, stats: ExecStats) {
-  const stale = (await sql`SELECT i.id, i.claimed_at, a.provider, a.source FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id WHERE i.status = 'sending' AND i.claimed_at < ${new Date(now.getTime() - STALE_SENDING_MS).toISOString()}::timestamptz`) as any[]
+  const stale = (await sql`SELECT i.id, i.claimed_at, a.provider, a.source FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id WHERE i.status = 'sending' AND a.source <> 'linkedin' AND i.claimed_at < ${new Date(now.getTime() - STALE_SENDING_MS).toISOString()}::timestamptz`) as any[]
   for (const s of stale) {
     const safe = EXECUTOR_SOURCES.includes(s.source) && s.provider === "resend" && now.getTime() - new Date(s.claimed_at).getTime() < IDEMPOTENCY_SAFE_MS
     if (safe) { await sql`UPDATE send_items SET status = 'approved', reason = 'Retrying after an interrupted attempt (the provider will not send it twice).' WHERE id = ${s.id} AND status = 'sending'`; stats.recovered++ }
@@ -62,6 +63,22 @@ async function revokeSiblings(authorizationId: string, entryId: string | null, e
   if (!entryId) return
   const sib = (await sql`UPDATE send_items SET status = 'revoked', reason = ${why} WHERE authorization_id = ${authorizationId} AND crm_entry_id = ${entryId} AND status = 'approved' AND id <> ${exceptItem} RETURNING message_id`) as any[]
   if (sib.length) await sql`UPDATE outreach_messages SET status = 'draft', scheduled_for = NULL, updated_at = now() WHERE id = ANY(${sib.map((s) => s.message_id)}) AND status = 'queued'`
+}
+
+/**
+ * Dated sequences (doc 46 §18): a step goes only after the earlier steps of the same contact in the same authorization have gone. While one is still waiting or being
+ * sent the step waits (no attempt spent); if one ended without being sent, the rest of the sequence stops with that reason.
+ */
+async function sequenceGate(it: any): Promise<{ wait: true } | { stop: string } | null> {
+  if (!it.crm_entry_id) return null
+  const prev = (await sql`SELECT i.status, i.reason, (i.sent_at > now() - interval '24 hours') AS recent FROM send_items i JOIN outreach_messages pm ON pm.id = i.message_id JOIN outreach_messages cm ON cm.id = ${it.message_id}
+    WHERE i.authorization_id = ${it.authorization_id} AND i.crm_entry_id = ${it.crm_entry_id} AND i.id <> ${it.id} AND pm.step_number < cm.step_number`) as any[]
+  if (!prev.length) return null
+  const bad = prev.find((p) => ["blocked", "skipped", "failed", "unknown", "revoked", "expired"].includes(p.status))
+  if (bad) return { stop: `An earlier step was not sent${bad.reason ? ` (${String(bad.reason).slice(0, 120)})` : ""}, so the rest of this sequence stops.` }
+  // Steps are at least a day apart even after an outage, so a catch-up never sends a contact two steps at once (and the 24-hour duplicate rule never skips one).
+  if (prev.some((p) => p.status === "approved" || p.status === "sending" || p.recent)) return { wait: true }
+  return null
 }
 
 type Outcome = "sent" | "blocked" | "skipped" | "failed" | "deferred" | "held" | "gone"
@@ -170,10 +187,18 @@ export async function runExecutor(deps: ExecDeps = defaultExecDeps, opts: { auth
   for (const d of due) bySender.set(d.sender_user_id, [...(bySender.get(d.sender_user_id) ?? []), d])
   for (const [sender, list] of bySender) {
     const room = Math.min(await deps.waveRemaining(sender), opts.max ?? PER_TICK)
-    stats.deferred += Math.max(0, list.length - room) // beyond today's cap or this tick's pace: they wait, approved
     let held = false
-    for (const it of list.slice(0, room)) {
+    let used = 0
+    for (const it of list) {
+      if (used >= room) { stats.deferred++; continue }
       if (held) { stats.deferred++; continue }
+      const gate = await sequenceGate(it)
+      if (gate && "wait" in gate) continue // an earlier step has not gone: this one waits its turn and costs nothing
+      if (gate && "stop" in gate) {
+        await sql`UPDATE send_items SET status = 'revoked', reason = ${gate.stop} WHERE id = ${it.id} AND status = 'approved'`
+        await backToDraft(it.message_id); stats.skipped++; continue
+      }
+      used++
       const r = await processItem(it, deps)
       if (r.outcome === "held") { held = true; stats.held.push(r.held ?? "held"); continue }
       if (r.outcome === "sent") stats.sent++; else if (r.outcome === "blocked") stats.blocked++; else if (r.outcome === "skipped") stats.skipped++; else if (r.outcome === "failed") stats.failed++; else if (r.outcome === "deferred") stats.deferred++

@@ -11,8 +11,12 @@ export const MAX_ATTEMPTS = 3
 /** Resend honours an idempotency key for 24 hours; past this a stale send is reconciled by a person, not retried. */
 export const IDEMPOTENCY_SAFE_MS = 23 * 3_600_000
 export const MAX_AUTHORIZED_PER_BATCH = 500
+/** A dated sequence spans at most this many days, and its approval lasts until its last step plus a short grace (doc 46 §18). */
+export const MAX_SEQUENCE_DAYS = 30
+export const SEQUENCE_GRACE_DAYS = 2
+export const sequenceOffsetDays = (step: number) => Math.max(0, Math.min(MAX_SEQUENCE_DAYS, Math.floor(Number(step) || 0)))
 
-export type Provider = "resend" | "gmail"
+export type Provider = "resend" | "gmail" | "linkedin"
 export * from "./verdicts"
 import { VERDICT_TEXT, type VerdictCode } from "./verdicts"
 
@@ -24,11 +28,11 @@ export function contentHash(p: HashParts): string {
   return createHash("sha256").update(JSON.stringify([p.to.trim().toLowerCase(), norm(p.cc), norm(p.bcc), p.subject.trim(), p.body, p.provider, p.accountId ?? "", p.senderUserId])).digest("hex").slice(0, 40)
 }
 
-export interface DigestItem { messageId: string; contentHash: string }
+export interface DigestItem { messageId: string; contentHash: string; /** Sequences only: days after the start this step goes. */ offsetDays?: number }
 /** One value for the previewed set, so a confirm can prove it is for exactly what was shown. */
-export function digestOf(items: DigestItem[], opts: { provider: Provider; accountId: string | null; mode: "send" | "test"; sendAfter: string | null }): string {
+export function digestOf(items: DigestItem[], opts: { provider: Provider; accountId: string | null; mode: "send" | "test"; sendAfter: string | null; sequence?: boolean }): string {
   const sorted = [...items].sort((a, b) => a.messageId.localeCompare(b.messageId))
-  return createHash("sha256").update(JSON.stringify([opts.provider, opts.accountId ?? "", opts.mode, opts.sendAfter ?? "", sorted.map((i) => [i.messageId, i.contentHash])])).digest("hex").slice(0, 40)
+  return createHash("sha256").update(JSON.stringify([opts.provider, opts.accountId ?? "", opts.mode, opts.sendAfter ?? "", sorted.map((i) => (opts.sequence ? [i.messageId, i.contentHash, i.offsetDays ?? 0] : [i.messageId, i.contentHash])), ...(opts.sequence ? ["sequence"] : [])])).digest("hex").slice(0, 40)
 }
 
 export const needsTypedCount = (n: number) => n > TYPED_COUNT_ABOVE

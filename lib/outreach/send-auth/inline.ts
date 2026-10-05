@@ -11,7 +11,7 @@ import { classifySendError } from "@/lib/email/send-errors"
 import { withSendAuthorization } from "./context"
 import { contentHash, digestOf, type Provider } from "./model"
 
-export type InlineSource = "direct" | "reply" | "platform_wave" | "investor_update" | "manual_single"
+export type InlineSource = "direct" | "reply" | "platform_wave" | "investor_update" | "manual_single" | "linkedin"
 export interface InlineItem { ref: string; to: string; cc?: string[]; bcc?: string[]; subject: string; body: string; entryId?: string | null }
 export interface Opened { id: string; reused: boolean }
 export interface Settle { status: "sent" | "blocked" | "skipped" | "failed"; reason?: string | null; providerId?: string | null; providerMessageId?: string | null }

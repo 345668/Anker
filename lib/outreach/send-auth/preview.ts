@@ -8,17 +8,19 @@ import { checkDeliverability, waveCapRemaining, DAILY_CAP } from "@/lib/outreach
 import { isGloballySuppressed } from "@/lib/email/unsubscribe"
 import { GATED_COUNTRIES, hasConsent, resolveRecipientCountry } from "@/lib/email/send-gate"
 import { isEmailSuppressed } from "@/lib/outreach/deliverability"
-import { contentHash, daysNeeded, digestOf, needsTypedCount, MAX_AUTHORIZED_PER_BATCH, type Provider, type Verdict, type VerdictCode } from "./model"
+import { contentHash, daysNeeded, digestOf, needsTypedCount, sequenceOffsetDays, MAX_AUTHORIZED_PER_BATCH, type Provider, type Verdict, type VerdictCode } from "./model"
 
-export interface PreviewInput { orgId: string; userId: string; messageIds: string[]; provider?: Provider; accountId?: string | null; sendAfter?: string | null; mode?: "send" | "test" }
+export interface PreviewInput { orgId: string; userId: string; messageIds: string[]; provider?: Provider; accountId?: string | null; sendAfter?: string | null; mode?: "send" | "test"
+  /** Approve a contact's steps as one dated sequence: each goes `step_number` days after the start (doc 46 §18). */
+  sequence?: boolean }
 export interface PreviewItem {
   messageId: string; entryId: string | null; name: string; to: string; cc: string[]; bcc: string[]; subject: string; kind: string
-  body: string; step: number; country: string | null; verdict: Verdict; contentHash: string
+  body: string; step: number; offsetDays: number; sendAt: string; country: string | null; verdict: Verdict; contentHash: string
   /** cc and bcc addresses the providers will leave out when sending (opted out, or needing consent). */
   droppedSecondary: Array<{ email: string; field: "cc" | "bcc"; reason: "suppressed" | "country_gated" }>
 }
 export interface Preview {
-  provider: Provider; accountId: string | null; accountEmail: string | null; mode: "send" | "test"; sendAfter: string | null
+  provider: Provider; accountId: string | null; accountEmail: string | null; mode: "send" | "test"; sendAfter: string | null; sequence: boolean
   items: PreviewItem[]; sendable: PreviewItem[]; blocked: PreviewItem[]
   countries: Record<string, number>
   cap: { daily: number; sentToday: number; remaining: number; days: number }
@@ -64,7 +66,7 @@ export async function recipientVerdict(to: string, senderUserId: string): Promis
 
 export async function buildPreview(input: PreviewInput): Promise<Preview> {
   const mode = input.mode ?? "send", ids = [...new Set(input.messageIds)]
-  const empty = (error: string, mb?: Awaited<ReturnType<typeof resolveMailbox>>): Preview => ({ provider: mb?.provider ?? input.provider ?? "resend", accountId: mb?.accountId ?? null, accountEmail: mb?.accountEmail ?? null, mode, sendAfter: input.sendAfter ?? null,
+  const empty = (error: string, mb?: Awaited<ReturnType<typeof resolveMailbox>>): Preview => ({ provider: mb?.provider ?? input.provider ?? "resend", accountId: mb?.accountId ?? null, accountEmail: mb?.accountEmail ?? null, mode, sendAfter: input.sendAfter ?? null, sequence: !!input.sequence,
     items: [], sendable: [], blocked: [], countries: {}, cap: { daily: DAILY_CAP, sentToday: 0, remaining: DAILY_CAP, days: 0 }, digest: "", requiresTypedCount: false, count: 0, error })
   if (!ids.length) return empty("Choose at least one message.")
   if (ids.length > MAX_AUTHORIZED_PER_BATCH) return empty(`At most ${MAX_AUTHORIZED_PER_BATCH} messages per approval. Approve in batches.`)
@@ -95,9 +97,10 @@ export async function buildPreview(input: PreviewInput): Promise<Preview> {
   }
   const byId = new Map(rows.map((r) => [r.id, r]))
   const items: PreviewItem[] = []
+  const startMs = input.sendAfter ? new Date(input.sendAfter).getTime() : Date.now()
   for (const id of ids) {
     const r = byId.get(id)
-    if (!r) { const ws = elsewhere.get(id); items.push({ messageId: id, entryId: null, name: ws ? `A draft in "${ws}"` : "Unknown", to: "", cc: [], bcc: [], subject: "", kind: "", body: "", step: 0, country: null, verdict: ws ? { code: "other_workspace", detail: ws } : { code: "not_found" }, contentHash: "", droppedSecondary: [] }); continue }
+    if (!r) { const ws = elsewhere.get(id); items.push({ messageId: id, entryId: null, name: ws ? `A draft in "${ws}"` : "Unknown", to: "", cc: [], bcc: [], subject: "", kind: "", body: "", step: 0, offsetDays: 0, sendAt: "", country: null, verdict: ws ? { code: "other_workspace", detail: ws } : { code: "not_found" }, contentHash: "", droppedSecondary: [] }); continue }
     const to = String(r.email_to ?? r.display_email ?? "").trim(), subject = String(r.subject ?? "").trim(), body = String(r.body ?? "")
     const cc = copies(r.crm_entry_id, "cc_emails"), bcc = copies(r.crm_entry_id, "bcc_emails")
     let verdict: Verdict = { code: "ok" }, country: string | null = null
@@ -118,19 +121,22 @@ export async function buildPreview(input: PreviewInput): Promise<Preview> {
     // What the providers will leave out of cc and bcc, so the person knows before it happens.
     let dropped: PreviewItem["droppedSecondary"] = []
     if (verdict.code === "ok" && (cc.length || bcc.length)) dropped = (await (await import("@/lib/email/send-gate")).filterSecondaryRecipients({ cc, bcc, senderUserId: input.userId })).dropped
-    items.push({ messageId: id, entryId: r.crm_entry_id, name: r.display_name ?? to, to, cc, bcc, subject, kind: r.kind, body, step: Number(r.step_number ?? 0), country, verdict, droppedSecondary: dropped,
+    const step = Number(r.step_number ?? 0), offsetDays = input.sequence ? sequenceOffsetDays(step) : 0
+    items.push({ messageId: id, entryId: r.crm_entry_id, name: r.display_name ?? to, to, cc, bcc, subject, kind: r.kind, body, step, offsetDays, sendAt: new Date(startMs + offsetDays * 86_400_000).toISOString(), country, verdict, droppedSecondary: dropped,
       contentHash: contentHash({ to, cc, bcc, subject, body, provider: mb.provider, accountId: mb.accountId, senderUserId: input.userId }) })
   }
   // One message per address per batch: the old bulk send blasted a contact's whole four-step sequence at once. The first step goes now; the rest wait for their own approval.
+  // In a dated sequence every step of a contact is wanted, each on its own day; only two messages for the same step are a duplicate.
   const firstFor = new Map<string, PreviewItem>()
-  for (const i of items.filter((x) => x.verdict.code === "ok")) { const k = i.to.toLowerCase(), cur = firstFor.get(k); if (!cur || i.step < cur.step) firstFor.set(k, i) }
-  for (const i of items) if (i.verdict.code === "ok" && firstFor.get(i.to.toLowerCase()) !== i) i.verdict = { code: "duplicate_in_batch" }
+  const dupKey = (i: PreviewItem) => (input.sequence ? `${i.to.toLowerCase()}#${i.step}` : i.to.toLowerCase())
+  for (const i of items.filter((x) => x.verdict.code === "ok")) { const k = dupKey(i), cur = firstFor.get(k); if (!cur || i.step < cur.step) firstFor.set(k, i) }
+  for (const i of items) if (i.verdict.code === "ok" && firstFor.get(dupKey(i)) !== i) i.verdict = { code: "duplicate_in_batch" }
   const sendable = items.filter((i) => i.verdict.code === "ok"), blocked = items.filter((i) => i.verdict.code !== "ok")
   const countries: Record<string, number> = {}
   for (const i of sendable) countries[i.country ?? "unknown"] = (countries[i.country ?? "unknown"] ?? 0) + 1
   const wave = await waveCapRemaining(input.userId)
-  return { provider: mb.provider, accountId: mb.accountId, accountEmail: mb.accountEmail, mode, sendAfter: input.sendAfter ?? null, items, sendable, blocked, countries,
+  return { provider: mb.provider, accountId: mb.accountId, accountEmail: mb.accountEmail, mode, sendAfter: input.sendAfter ?? null, sequence: !!input.sequence, items, sendable, blocked, countries,
     cap: { daily: wave.cap, sentToday: wave.sentToday, remaining: wave.remaining, days: daysNeeded(sendable.length, wave.remaining, wave.cap) },
-    digest: digestOf(sendable.map((i) => ({ messageId: i.messageId, contentHash: i.contentHash })), { provider: mb.provider, accountId: mb.accountId, mode, sendAfter: input.sendAfter ?? null }),
+    digest: digestOf(sendable.map((i) => ({ messageId: i.messageId, contentHash: i.contentHash, offsetDays: i.offsetDays })), { provider: mb.provider, accountId: mb.accountId, mode, sendAfter: input.sendAfter ?? null, sequence: !!input.sequence }),
     requiresTypedCount: needsTypedCount(sendable.length), count: sendable.length, error: null }
 }

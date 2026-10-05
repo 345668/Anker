@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { VERDICT_TEXT, type VerdictCode } from "@/lib/outreach/send-auth/verdicts"
 
-interface PItem { messageId: string; name: string; to: string; cc: string[]; bcc: string[]; subject: string; body: string; country: string | null; verdict: { code: VerdictCode; detail?: string }; droppedSecondary: Array<{ email: string; field: string; reason: string }> }
-interface Preview { error: string | null; provider: string; accountEmail: string | null; items: PItem[]; sendableCount: number; blockedCount: number; countries: Record<string, number>; cap: { daily: number; sentToday: number; remaining: number; days: number }; digest: string; requiresTypedCount: boolean; count: number }
+interface PItem { messageId: string; name: string; to: string; cc: string[]; bcc: string[]; subject: string; body: string; step: number; offsetDays: number; sendAt: string; country: string | null; verdict: { code: VerdictCode; detail?: string }; droppedSecondary: Array<{ email: string; field: string; reason: string }> }
+interface Preview { error: string | null; provider: string; accountEmail: string | null; items: PItem[]; sendableCount: number; blockedCount: number; countries: Record<string, number>; cap: { daily: number; sentToday: number; remaining: number; days: number }; digest: string; requiresTypedCount: boolean; count: number; sequence: boolean }
 
 /**
  * Review and send (docs/architecture/46 §4): what will be sent, to whom, from which mailbox, what is refused and why, how long a big batch takes. Approving is the
@@ -16,22 +16,23 @@ export function SendReview({ messageIds, provider, onClose, onDone }: { messageI
   const [busy, setBusy] = useState(false)
   const [typed, setTyped] = useState("")
   const [after, setAfter] = useState("")
+  const [seq, setSeq] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [result, setResult] = useState<any>(null)
   const load = useCallback(async () => {
     setErr(null)
-    const r = await fetch("/api/outreach/send-authorizations/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messageIds, provider, sendAfter: after ? new Date(after).toISOString() : undefined }) })
+    const r = await fetch("/api/outreach/send-authorizations/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messageIds, provider, sendAfter: after ? new Date(after).toISOString() : undefined, sequence: seq }) })
     const j = await r.json().catch(() => ({}))
     if (!r.ok) { setErr(j.error ?? "Could not load the preview."); return }
     setP(j)
-  }, [messageIds, provider, after])
+  }, [messageIds, provider, after, seq])
   useEffect(() => { void load() }, [load])
 
   async function approve() {
     if (!p) return
     setBusy(true); setErr(null)
     const r = await fetch("/api/outreach/send-authorizations", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messageIds, provider, digest: p.digest, typedCount: p.requiresTypedCount ? Number(typed) : undefined, sendAfter: after ? new Date(after).toISOString() : undefined }) })
+      body: JSON.stringify({ messageIds, provider, digest: p.digest, typedCount: p.requiresTypedCount ? Number(typed) : undefined, sendAfter: after ? new Date(after).toISOString() : undefined, sequence: seq }) })
     const j = await r.json().catch(() => ({}))
     setBusy(false)
     if (!r.ok) { setErr(j.error ?? "Could not approve."); if (/changed since/.test(j.error ?? "")) void load(); return }
@@ -85,13 +86,20 @@ export function SendReview({ messageIds, provider, onClose, onDone }: { messageI
                 <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap font-sans text-sm">{first.body}</pre>
               </div>
             )}
+            {(seq || p.items.some((i) => i.verdict.code === "duplicate_in_batch")) && (
+              <div className="rounded-lg border border-foreground/10 p-3">
+                <label className="flex items-start gap-2"><input type="checkbox" checked={seq} onChange={(e) => setSeq(e.target.checked)} className="mt-1" />
+                  <span>Send each contact&apos;s steps as one dated sequence. <span className="text-muted-foreground">Approve once; every step goes on its own day, only after the one before it has gone, and stops if they reply, bounce or opt out.</span></span></label>
+                {seq && <p className="mt-2 text-xs text-muted-foreground">Steps go on day {[...new Set(p.items.filter((i) => i.verdict.code === "ok").map((i) => i.offsetDays))].sort((a, b) => a - b).join(", ")} after the start. The approval lasts until the last step plus two days.</p>}
+              </div>
+            )}
             <label className="block text-xs text-muted-foreground">Send after (optional)
               <input type="datetime-local" value={after} onChange={(e) => setAfter(e.target.value)} className="ml-2 rounded-md border border-foreground/15 bg-background px-2 py-1 text-sm text-foreground" /></label>
             {p.requiresTypedCount && (
               <label className="block">To approve {p.count} messages, type {p.count}:
                 <input inputMode="numeric" value={typed} onChange={(e) => setTyped(e.target.value)} className="ml-2 w-24 rounded-md border border-foreground/15 bg-background px-2 py-1" aria-label="Type the number of messages to confirm" /></label>
             )}
-            <p className="text-xs text-muted-foreground">Sent email cannot be recalled. You can stop anything that has not gone yet. The approval lasts 7 days.</p>
+            <p className="text-xs text-muted-foreground">Sent email cannot be recalled. You can stop anything that has not gone yet. {seq ? "The approval lasts until the last step." : "The approval lasts 7 days."}</p>
             {note && <p role="status" className="text-xs">{note}</p>}
             <div className="flex flex-wrap gap-2">
               <button disabled={busy || p.count === 0 || (p.requiresTypedCount && Number(typed) !== p.count)} onClick={approve} className="rounded-md bg-foreground px-4 py-2 font-medium text-background disabled:opacity-50">{busy ? "Working…" : after ? `Approve ${p.count} for later` : `Approve and send ${p.count}`}</button>

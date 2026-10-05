@@ -13,6 +13,7 @@
  */
 import "server-only"
 import { sql } from "@/lib/db"
+import { actionHash, backfillQueued, markClaimed, recordLinkedInApprovals, sendingPaused, settleActions } from "./authorization"
 import {
   rowToAction,
   type LiAction,
@@ -58,6 +59,11 @@ export async function enqueueAction(userId: string, input: EnqueueActionInput): 
        ${approvedBy}, ${approvedAt}, ${input.scheduledFor ?? null})
     RETURNING *
   `) as any[]
+  // The approval is recorded before the action can be claimed; if it cannot be, the action is not created at all.
+  if (input.autoApprove) {
+    try { await recordLinkedInApprovals(userId, [rows[0]], approvedBy ?? userId) }
+    catch (e) { await sql`DELETE FROM li_action_queue WHERE id = ${rows[0].id}`; throw e }
+  }
   return rowToAction(rows[0])
 }
 
@@ -122,8 +128,14 @@ export async function approveActions(
     WHERE user_id = ${userId}
       AND id = ANY(${ids}::text[])
       AND status = 'pending_approval'
-    RETURNING id
+    RETURNING id, crm_entry_id, sender_id, target_url, action_type, payload
   `) as any[]
+  // Record who approved exactly what before it can be claimed; if the record cannot be written, the approval is undone.
+  try { await recordLinkedInApprovals(userId, rows, approverId) }
+  catch (e) {
+    await sql`UPDATE li_action_queue SET status = 'pending_approval', approved_by = NULL, approved_at = NULL, updated_at = now() WHERE id = ANY(${rows.map((r) => r.id)}::text[]) AND status = 'queued'`
+    throw e
+  }
   return rows.length
 }
 
@@ -175,6 +187,7 @@ export async function reclaimStaleActions(userId: string): Promise<{ requeued: n
       AND attempts >= ${MAX_ATTEMPTS}
     RETURNING id
   `) as any[]
+  await settleActions(failed.map((r) => r.id), { status: "failed", reason: "The extension did not report back after 3 attempts." }).catch(() => {})
 
   const requeued = (await sql`
     UPDATE li_action_queue
@@ -186,6 +199,7 @@ export async function reclaimStaleActions(userId: string): Promise<{ requeued: n
     RETURNING id
   `) as any[]
 
+  await settleActions(requeued.map((r) => r.id), { status: "approved", reason: "Recovered after the extension did not report back." }).catch(() => {})
   return { requeued: requeued.length, failed: failed.length }
 }
 
@@ -203,6 +217,9 @@ export async function claimActions(
   orgId?: string,
 ): Promise<ClaimedAction[]> {
   await reclaimStaleActions(userId).catch(() => {})
+  // The platform pause stops claims, and every queued action must have a live record (older ones get theirs from their own approval columns).
+  if (await sendingPaused()) return []
+  await backfillQueued(userId)
   const n = Math.max(1, Math.min(25, limit))
   const rows = (await sql`
     WITH pick AS (
@@ -212,6 +229,8 @@ export async function claimActions(
         AND (crm_entry_id IS NULL OR EXISTS(SELECT 1 FROM crm_entries e WHERE e.id=li_action_queue.crm_entry_id
           AND (${orgId ?? null}::text IS NULL OR e.org_id=${orgId ?? null}) AND workspace_record_access(${userId},e.org_id,true,true)))
         AND (scheduled_for IS NULL OR scheduled_for <= now())
+        AND EXISTS (SELECT 1 FROM send_items i JOIN send_authorizations a ON a.id = i.authorization_id
+          WHERE i.message_id = li_action_queue.id AND i.status = 'approved' AND a.source = 'linkedin' AND a.status = 'active' AND a.expires_at > now())
       ORDER BY scheduled_for NULLS FIRST, created_at
       LIMIT ${n}
       FOR UPDATE SKIP LOCKED
@@ -223,7 +242,15 @@ export async function claimActions(
     WHERE q.id = pick.id
     RETURNING q.id, q.action_type, q.target_url, q.target_name, q.sender_id, q.payload
   `) as any[]
-  return rows.map((r) => ({
+  await markClaimed(rows.map((r) => r.id))
+  // What was approved is what goes: an action whose target, kind, text or account changed since the approval is failed, not handed to the extension.
+  const hashes = new Map(((await sql`SELECT message_id, content_hash FROM send_items WHERE message_id = ANY(${rows.map((r) => r.id)}::text[]) AND status = 'sending'`) as any[]).map((r) => [r.message_id, r.content_hash]))
+  const changed = rows.filter((r) => hashes.has(r.id) && hashes.get(r.id) !== actionHash(r, userId)).map((r) => r.id)
+  if (changed.length) {
+    await sql`UPDATE li_action_queue SET status = 'failed', failed_reason = 'edited after it was approved', completed_at = now(), updated_at = now() WHERE id = ANY(${changed}::text[])`
+    await settleActions(changed, { status: "failed", reason: "Edited after it was approved, so it was not sent." })
+  }
+  return rows.filter((r) => !changed.includes(r.id)).map((r) => ({
     id: r.id,
     actionType: r.action_type,
     targetUrl: r.target_url,
@@ -255,6 +282,7 @@ export async function reportActionResult(
     RETURNING sender_id, status
   `) as any[]
   if (!rows.length) return null
+  await settleActions([id], outcome.ok ? { status: "sent" } : { status: "failed", reason: outcome.error || "unknown" }).catch(() => {})
 
   if (outcome.ok && rows[0].sender_id) {
     await sql`

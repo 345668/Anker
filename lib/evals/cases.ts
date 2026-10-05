@@ -140,6 +140,13 @@ export const liveCases: EvalCase[] = [
     const n = await count(sql`SELECT count(*)::int AS n FROM outreach_messages m WHERE m.status IN ('sent','delivered','replied','accepted') AND m.sent_at > ${c.since}
       AND NOT EXISTS (SELECT 1 FROM send_items i WHERE i.message_id = m.id AND i.status = 'sent')`)
     return n ? fail(`${n} message(s) sent without a send authorization`) : pass() } },
+  { name: "every LinkedIn action handed to the extension since P4 has a send authorization", run: async () => {
+    // From the first linkedin authorization on, an action that was claimed or finished must have an item that is sending or settled; one done without a record would mean the claim rule was bypassed.
+    const [c] = (await sql`SELECT min(approved_at) AS since FROM send_authorizations WHERE source = 'linkedin'`) as any[]
+    if (!c?.since) return pass("no LinkedIn authorization yet")
+    const n = await count(sql`SELECT count(*)::int AS n FROM li_action_queue q WHERE q.status IN ('claimed','done') AND q.claimed_at > ${c.since}
+      AND NOT EXISTS (SELECT 1 FROM send_items i WHERE i.message_id = q.id AND i.status IN ('sending','sent','failed'))`)
+    return n ? fail(`${n} LinkedIn action(s) claimed without a send authorization`) : pass() } },
   { name: "if enforcement is on, no send has skipped authorization since", run: async () => {
     const [f] = (await sql`SELECT enabled, updated_at FROM platform_flags WHERE key = 'outreach_require_authorization'`) as any[]
     if (!f?.enabled) return pass("enforcement is off")

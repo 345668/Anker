@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (sendAfter && Number.isNaN(sendAfter.getTime())) return NextResponse.json({ error: "sendAfter is not a valid date." }, { status: 400 })
   try {
     const r = await confirmAuthorization({ orgId: who.orgId, userId: who.userId, messageIds: b.messageIds, digest: b.digest, typedCount: Number.isInteger(b.typedCount) ? b.typedCount : undefined,
-      provider: b.provider === "gmail" ? "gmail" : b.provider === "resend" ? "resend" : undefined, accountId: typeof b.accountId === "string" ? b.accountId : null, sendAfter: sendAfter?.toISOString() ?? null }, { userId: who.userId, email: who.email })
+      provider: b.provider === "gmail" ? "gmail" : b.provider === "resend" ? "resend" : undefined, accountId: typeof b.accountId === "string" ? b.accountId : null, sendAfter: sendAfter?.toISOString() ?? null, sequence: b.sequence === true }, { userId: who.userId, email: who.email })
     const sendNow = !sendAfter || sendAfter.getTime() <= Date.now()
     const stats = sendNow && b.now !== false ? await runExecutor(undefined, { authorizationId: r.authorizationId, max: 25 }) : null
     return NextResponse.json({ ok: true, authorizationId: r.authorizationId, authorized: r.authorized, blocked: r.blocked, sendNow: stats, days: r.preview.cap.days })

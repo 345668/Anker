@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { sql } from "@/lib/db"
 import { recordChange } from "@/lib/audit/record-change"
 import { buildPreview, type Preview, type PreviewInput } from "./preview"
-import { AUTH_EXPIRY_DAYS, TYPED_COUNT_ABOVE, VERDICT_TEXT } from "./model"
+import { AUTH_EXPIRY_DAYS, SEQUENCE_GRACE_DAYS, TYPED_COUNT_ABOVE, VERDICT_TEXT } from "./model"
 
 export class AuthorizationError extends Error { constructor(message: string, readonly status = 409) { super(message) } }
 export interface Approver { userId: string; email?: string | null }
@@ -30,15 +30,18 @@ export async function confirmAuthorization(input: ConfirmInput, by: Approver): P
   if (preview.requiresTypedCount && input.typedCount !== preview.count) throw new AuthorizationError(`To approve more than ${TYPED_COUNT_ABOVE} messages, type the number (${preview.count}) to confirm.`)
 
   const id = randomUUID()
-  const expires = new Date(Date.now() + AUTH_EXPIRY_DAYS * 86_400_000).toISOString()
   const sendAfter = input.sendAfter ? new Date(input.sendAfter).toISOString() : new Date().toISOString()
-  const summary = { count: preview.count, blocked: preview.blocked.length, countries: preview.countries, provider: preview.provider, accountEmail: preview.accountEmail, days: preview.cap.days }
+  // Each step's own date: the start plus its offset (a plain batch has offset 0). A sequence is approved until its last step plus a short grace.
+  const at = (i: { offsetDays: number }) => new Date(new Date(sendAfter).getTime() + i.offsetDays * 86_400_000).toISOString()
+  const lastMs = Math.max(...preview.sendable.map((i) => new Date(at(i)).getTime()))
+  const expires = new Date(preview.sequence ? lastMs + SEQUENCE_GRACE_DAYS * 86_400_000 : Date.now() + AUTH_EXPIRY_DAYS * 86_400_000).toISOString()
+  const summary = { ...(preview.sequence ? { sequence: true, lastStepAt: new Date(lastMs).toISOString() } : {}), count: preview.count, blocked: preview.blocked.length, countries: preview.countries, provider: preview.provider, accountEmail: preview.accountEmail, days: preview.cap.days }
   await sql`INSERT INTO send_authorizations (id, org_id, sender_user_id, provider, account_id, source, proposal_id, approved_by, expires_at, digest, summary)
     VALUES (${id}, ${input.orgId}, ${input.userId}, ${preview.provider}, ${preview.accountId}, ${input.source ?? (preview.count === 1 ? "manual_single" : "manual_batch")}, ${input.proposalId ?? null}, ${by.userId}, ${expires}, ${preview.digest}, ${JSON.stringify(summary)}::jsonb)`
   try {
     for (const i of preview.sendable) {
       await sql`INSERT INTO send_items (authorization_id, org_id, message_id, crm_entry_id, recipients, recipient_country, content_hash, send_after, idempotency_key)
-        VALUES (${id}, ${input.orgId}, ${i.messageId}, ${i.entryId}, ${JSON.stringify({ to: i.to, cc: i.cc, bcc: i.bcc })}::jsonb, ${i.country}, ${i.contentHash}, ${sendAfter}, ${`anker-send/${id}/${i.messageId}`})`
+        VALUES (${id}, ${input.orgId}, ${i.messageId}, ${i.entryId}, ${JSON.stringify({ to: i.to, cc: i.cc, bcc: i.bcc })}::jsonb, ${i.country}, ${i.contentHash}, ${at(i)}, ${`anker-send/${id}/${i.messageId}`})`
     }
   } catch (e) {
     // A message got into another live authorization between the preview and now (the unique live index): nothing of this one stands.
@@ -52,8 +55,7 @@ export async function confirmAuthorization(input: ConfirmInput, by: Approver): P
       VALUES (${id}, ${input.orgId}, ${i.messageId}, ${i.entryId}, ${JSON.stringify({ to: i.to, cc: i.cc, bcc: i.bcc })}::jsonb, ${i.contentHash || "none"}, ${sendAfter}, 'blocked', ${VERDICT_TEXT[i.verdict.code] + (i.verdict.detail ? ` (${i.verdict.detail})` : "")}, ${`anker-send/${id}/${i.messageId}`})
       ON CONFLICT (authorization_id, message_id) DO NOTHING`
   }
-  const ids = preview.sendable.map((i) => i.messageId)
-  await sql`UPDATE outreach_messages SET status = 'queued', scheduled_for = ${sendAfter}, updated_at = now() WHERE id = ANY(${ids}) AND user_id = ${input.userId} AND status IN ('draft','approved','failed','queued')`
+  for (const i of preview.sendable) await sql`UPDATE outreach_messages SET status = 'queued', scheduled_for = ${at(i)}, updated_at = now() WHERE id = ${i.messageId} AND user_id = ${input.userId} AND status IN ('draft','approved','failed','queued')`
   await recordChange({ actor: by, scope: { type: "org", id: input.orgId }, action: "send_authorization.approved", target: { type: "send_authorization", id, label: `${preview.count} message${preview.count === 1 ? "" : "s"}` },
     before: null, after: { ...summary, expiresAt: expires, sendAfter }, context: { digest: preview.digest, typedCount: input.typedCount ?? null } })
   return { authorizationId: id, preview, authorized: preview.sendable.length, blocked: preview.blocked.length }
@@ -61,10 +63,11 @@ export async function confirmAuthorization(input: ConfirmInput, by: Approver): P
 
 /** Stop what has not gone. The approver, a workspace owner or admin, or staff in an incident may revoke. Sent mail is never touched or claimed undone. */
 export async function revokeAuthorization(orgId: string, id: string, by: Approver, reason: string): Promise<{ revoked: number; alreadySent: number; inFlight: number }> {
-  const [a] = (await sql`SELECT id, status FROM send_authorizations WHERE id = ${id} AND org_id = ${orgId}`) as any[]
+  const [a] = (await sql`SELECT id, status, source FROM send_authorizations WHERE id = ${id} AND org_id = ${orgId}`) as any[]
   if (!a) throw new AuthorizationError("Authorization not found.", 404)
   const items = (await sql`UPDATE send_items SET status = 'revoked', reason = ${reason.slice(0, 200) || "revoked"} WHERE authorization_id = ${id} AND status = 'approved' RETURNING message_id`) as any[]
-  if (items.length) await sql`UPDATE outreach_messages SET status = 'draft', scheduled_for = NULL, updated_at = now() WHERE id = ANY(${items.map((i) => i.message_id)}) AND status = 'queued'`
+  if (items.length && a.source === "linkedin") await (await import("@/lib/linkedin/authorization")).returnToApproval(items.map((i) => i.message_id))
+  else if (items.length) await sql`UPDATE outreach_messages SET status = 'draft', scheduled_for = NULL, updated_at = now() WHERE id = ANY(${items.map((i) => i.message_id)}) AND status = 'queued'`
   const [c] = (await sql`SELECT count(*) FILTER (WHERE status = 'sent')::int AS sent, count(*) FILTER (WHERE status IN ('sending','unknown'))::int AS flight FROM send_items WHERE authorization_id = ${id}`) as any[]
   if (a.status === "active") await sql`UPDATE send_authorizations SET status = 'revoked', revoked_by = ${by.userId}, revoked_at = now(), revoke_reason = ${reason.slice(0, 200) || null} WHERE id = ${id}`
   await recordChange({ actor: by, scope: { type: "org", id: orgId }, action: "send_authorization.revoked", target: { type: "send_authorization", id }, before: { status: a.status }, after: { status: "revoked", revokedUnsent: items.length, alreadySent: Number(c.sent) }, context: { reason } })

@@ -39,7 +39,7 @@ beforeAll(async () => {
     INSERT INTO investment_firms VALUES ('firm-one','Firm One'); INSERT INTO investors VALUES ('person-one','One','Investor','firm-one');`)
   for (const file of ['2026-05-04-crm-entries.sql','2026-05-25-crm-boards.sql','2026-07-10-crm-powerhouse.sql','2026-08-14-crm-check-size.sql','2026-09-09-fundraising-rounds.sql','2026-09-06-investor-updates.sql','2026-09-11-investor-update-delivery-state.sql','2026-09-12-founder-workflow-integrity.sql']) await db.exec(migration(file))
   await db.exec("CREATE TABLE IF NOT EXISTS platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text)")
-  for (const f of ["2026-10-06-send-authorizations.sql", "2026-10-06b-send-auth-sources.sql"]) await db.exec(migration(f)) // investor updates now send under a send authorization
+  for (const f of ["2026-10-06-send-authorizations.sql", "2026-10-06b-send-auth-sources.sql", "2026-10-07-send-auth-linkedin.sql"]) await db.exec(migration(f)) // investor updates now send under a send authorization
   await db.exec(migration("2026-09-20-ai-persona-access.sql"))
   await db.exec(migration("2026-09-13-workspace-team-lifecycle.sql"))
   await db.exec(migration("2026-08-24-linkedin-outreach.sql"))
