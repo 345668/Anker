@@ -1,3 +1,5 @@
+import Link from "next/link"
+import { MediaStudio } from "./media-studio"
 import { redirect } from "next/navigation"
 import { requireAiPrincipal } from "@/lib/assistant/principal"
 import { WorkspaceError } from "@/lib/auth/workspace-context"
@@ -25,7 +27,7 @@ import { AnkerAiChat } from "./anker-ai-chat"
  * session, so it has to be resolved here and passed down. Mirrors
  * components/assistant/persona-assistant-page.tsx.
  */
-export async function AnkerAiPage() {
+export async function AnkerAiPage({ studio = false }: { studio?: boolean } = {}) {
   let p
   try {
     p = await requireAiPrincipal()
@@ -46,11 +48,17 @@ export async function AnkerAiPage() {
   // Keyed on the scope so switching workspace remounts with a clean history
   // rather than showing the previous workspace's conversation.
   return (
-    <AnkerAiChat
+    <>
+    <nav aria-label="Anker AI modes" className="flex gap-5 border-b border-border px-6 py-3 text-sm">
+      <Link href="/dashboard/anker-ai" aria-current={!studio ? "page" : undefined} className={!studio ? "font-semibold underline underline-offset-8" : "text-muted-foreground hover:text-foreground"}>Conversation</Link>
+      <Link href="/dashboard/anker-ai/studio" aria-current={studio ? "page" : undefined} className={studio ? "font-semibold underline underline-offset-8" : "text-muted-foreground hover:text-foreground"}>Image &amp; Video</Link>
+    </nav>
+    {studio ? <MediaStudio key={`${p.userId}:${p.scopeKey}`} scopeKey={p.scopeKey} persona={p.persona} /> : <AnkerAiChat
       key={`${p.userId}:${p.scopeKey}`}
       scopeKey={p.scopeKey}
       agentLabel={agent.label}
       suggestions={agent.suggestions}
-    />
+    />}
+    </>
   )
 }

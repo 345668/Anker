@@ -84,6 +84,10 @@
     {
       "path": "/api/cron/dependency-check",
       "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/cron/ai-media",
+      "schedule": "* * * * *"
     }
   ]
 }
