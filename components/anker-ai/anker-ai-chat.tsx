@@ -30,7 +30,7 @@ interface Artifact { name: string; url: string; kind?: string }
 interface Msg { role: "user" | "assistant"; content: string; images?: string[]; video?: string; artifacts?: Artifact[]; tools?: string[]; notice?: string }
 
 /** Categories the composer can drive directly. */
-const SELECTABLE = ["chat", "vision", "omni", "image", "video"];
+const SELECTABLE = ["chat", "vision", "omni"]; // Media lives in the durable Image & Video studio.
 
 const CATEGORY_LABEL: Record<string, string> = {
   chat: "Chat", vision: "Vision + chat", omni: "Omni (multimodal)",
@@ -301,7 +301,7 @@ export function AnkerAiChat({ suggestions, agentLabel, scopeKey }: { suggestions
                   return (
                     <div key={cat} className="mb-1">
                       <div className="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {CATEGORY_LABEL[cat] ?? cat}{!isSel && <span className="ml-1 opacity-60">· tool</span>}
+                        {CATEGORY_LABEL[cat] ?? cat}{!isSel && <span className="ml-1 opacity-60">· {cat === "image" || cat === "video" ? "Image & Video studio" : "tool"}</span>}
                       </div>
                       {list.map((m) => (
                         <button

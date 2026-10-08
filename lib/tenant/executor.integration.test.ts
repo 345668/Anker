@@ -1,8 +1,10 @@
 /** Export and erasure against a real Postgres (PGlite): scoped to one workspace, children before parents, shared data untouched. */
 import { PGlite } from "@electric-sql/pglite"
 import { readFileSync } from "node:fs"
-import { beforeAll, afterAll, beforeEach, describe, it, expect, vi } from "vitest"
+import { beforeAll, afterAll, beforeEach, afterEach, describe, it, expect, vi } from "vitest"
 vi.mock("server-only", () => ({}))
+vi.mock("@vercel/blob", () => ({ del: vi.fn(async () => {}) }))
+import { del } from "@vercel/blob"
 const h = vi.hoisted(() => ({ db: null as any }))
 vi.mock("@/lib/db", () => ({ sql: { unsafe: async (text: string, params: unknown[] = []) => (await h.db.query(text, params)).rows } }))
 import { resolveScope, erasureBlockers, dryRun, driftOk, eraseWorkspace, buildExport, countRows, totalRows, bind } from "./executor"
@@ -13,7 +15,7 @@ const count = async (t: string, where = "true") => Number((await rowsOf(`SELECT 
 
 async function seed() {
   await db.exec(`
-    TRUNCATE organizations, memberships, profiles, funds, journal_entries, deal_opportunities, deal_rooms, crm_entries, ai_calls, billing_subscriptions, billing_customers, outreach_messages, investors, email_suppressions, user_settings, tenant_lifecycle, tenant_entitlements, tenant_tombstones CASCADE;
+    TRUNCATE ai_studio_jobs, ai_studio_assets, ai_studio_scope_locks, organizations, memberships, profiles, funds, journal_entries, deal_opportunities, deal_rooms, crm_entries, ai_calls, billing_subscriptions, billing_customers, outreach_messages, investors, email_suppressions, user_settings, tenant_lifecycle, tenant_entitlements, tenant_tombstones CASCADE;
     INSERT INTO funds VALUES ('fA'), ('fB');
     INSERT INTO organizations VALUES ('A', 'Acme Fund', 'fA', '{}'), ('B', 'Beta Fund', 'fB', '{}');
     INSERT INTO profiles VALUES ('uA', 'owner@acme.test'), ('uA2', 'analyst@acme.test'), ('uS', 'shared@both.test'), ('uB', 'owner@beta.test'), ('uAdmin', 'founder@an-ker.test');
@@ -53,6 +55,7 @@ beforeAll(async () => {
     CREATE TABLE investors (user_id text, name text);
     CREATE TABLE email_suppressions (user_id text, email text);
     CREATE TABLE user_settings (user_id text, openai_api_key text);`)
+  await db.exec(readFileSync("scripts/migrations/2026-10-07b-ai-media-studio.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-04c-tenant-control.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-04e-tenant-tombstones.sql", "utf8"))
 }, 30000)
@@ -173,5 +176,53 @@ describe("the registry against the real counts", () => {
   it("totalRows adds up what a dry run reports", async () => {
     const c = await countRows((await resolveScope("A"))!)
     expect(totalRows(c)).toBe(totalRows(c, "delete") + totalRows(c, "anonymize") + totalRows(c, "retain"))
+  })
+})
+
+
+describe("AI Studio workspace lifecycle", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.mocked(del).mockReset(); vi.mocked(del).mockResolvedValue(undefined) })
+  async function media() {
+    for (const [id, scope, org] of [["A", "org:A", "A"], ["B", "org:B", "B"], ["LP", "lp:uA", null]]) {
+      await db.query("INSERT INTO ai_studio_assets(id,user_id,scope_key,kind,pathname,filename,content_type,bytes) VALUES($1,'uA',$2,'image',$3,'frame.png','image/png',12)", [id, scope, `ai-studio/${id}/frame.png`])
+      await db.query("INSERT INTO ai_studio_jobs(id,user_id,scope_key,org_id,request_key,request_hash,model,kind,prompt,settings,status,source_asset_id,source_token_hash) VALUES($1,'uA',$2,$3,$1,'hash','soul-2','image','private prompt','{}','completed',$1,'private-token')", [id, scope, org])
+      await db.query("INSERT INTO ai_studio_scope_locks VALUES($1)", [scope])
+    }
+  }
+  it("exports only this workspace's media metadata without capabilities or storage paths", async () => {
+    await media()
+    const { unzipSync, strFromU8 } = await import("fflate")
+    const out = await buildExport((await resolveScope("A"))!)
+    const files = unzipSync(out.zip)
+    const jobs = JSON.parse(strFromU8(files["data/ai_studio_jobs.json"]))
+    const assets = JSON.parse(strFromU8(files["data/ai_studio_assets.json"]))
+    expect(jobs.map((j: any) => j.id)).toEqual(["A"])
+    expect(jobs[0]).not.toHaveProperty("source_token_hash")
+    expect(assets.map((a: any) => a.id)).toEqual(["A"])
+    expect(assets[0]).not.toHaveProperty("pathname")
+  })
+  it("deletes this workspace's private files before rows, preserving other workspaces and personal LP media", async () => {
+    await media(); vi.stubEnv("MEDIA_BLOB_READ_WRITE_TOKEN", "private-test-token")
+    vi.mocked(del).mockImplementation(async () => { expect(await count("ai_studio_assets")).toBe(3) })
+    const result = await eraseWorkspace((await resolveScope("A"))!, "media-erase", null)
+    expect(del).toHaveBeenCalledWith(["ai-studio/A/frame.png"], { token: "private-test-token" })
+    expect(result.blobsDeleted).toBe(1)
+    expect((await rowsOf("SELECT id FROM ai_studio_jobs ORDER BY id")).map((r) => r.id)).toEqual(["B", "LP"])
+    expect((await rowsOf("SELECT id FROM ai_studio_assets ORDER BY id")).map((r) => r.id)).toEqual(["B", "LP"])
+    expect(await count("ai_studio_scope_locks")).toBe(2)
+  })
+  it("keeps ownership metadata for retry if private storage is unavailable", async () => {
+    await media(); vi.stubEnv("MEDIA_BLOB_READ_WRITE_TOKEN", "private-test-token")
+    vi.mocked(del).mockRejectedValueOnce(new Error("store unavailable"))
+    await expect(eraseWorkspace((await resolveScope("A"))!, "media-retry", null)).rejects.toThrow("store unavailable")
+    expect(await count("ai_studio_assets")).toBe(3)
+    expect(await count("ai_studio_jobs")).toBe(3)
+    expect(await count("organizations")).toBe(2)
+  })
+  it("refuses to report erasure complete without the dedicated media token", async () => {
+    await media(); vi.stubEnv("MEDIA_BLOB_READ_WRITE_TOKEN", "")
+    await expect(eraseWorkspace((await resolveScope("A"))!, "media-no-token", null)).rejects.toThrow("private media store token")
+    expect(await count("ai_studio_assets")).toBe(3)
+    expect(del).not.toHaveBeenCalled()
   })
 })

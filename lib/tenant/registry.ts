@@ -23,7 +23,14 @@ export interface Rule {
 
 const O = "workspace" as const, F = "fund" as const, M = "member" as const
 
+// Only the selected workspace; an LP's personal scope is not owned by a fund.
+export const MEDIA_WORKSPACE_WHERE = "scope_key = concat('org:', $1::text)"
+
 export const RULES: Rule[] = [
+  // Jobs reference uploaded start frames, so remove them before assets.
+  { scope: O, table: "ai_studio_jobs", where: MEDIA_WORKSPACE_WHERE, secret: ["source_token_hash", "lease_token", "provider_id"] },
+  { scope: O, table: "ai_studio_assets", where: MEDIA_WORKSPACE_WHERE, secret: ["pathname"] },
+  { scope: O, table: "ai_studio_scope_locks", where: MEDIA_WORKSPACE_WHERE },
   // ── fund: children whose parent would otherwise refuse the delete ──
   { scope: F, table: "deal_room_documents", where: "room_id::text IN (SELECT id::text FROM deal_rooms WHERE deal_id::text IN (SELECT id::text FROM deal_opportunities WHERE fund_id::text = $2))" },
   { scope: F, table: "deal_room_access_grants", where: "room_id::text IN (SELECT id::text FROM deal_rooms WHERE deal_id::text IN (SELECT id::text FROM deal_opportunities WHERE fund_id::text = $2))" },

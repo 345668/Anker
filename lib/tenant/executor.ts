@@ -7,7 +7,7 @@
 import "server-only"
 import { createHash } from "node:crypto"
 import { sql } from "@/lib/db"
-import { RULES, BLOB_QUERIES, blobPrefixes, type Rule } from "./registry"
+import { RULES, BLOB_QUERIES, blobPrefixes, MEDIA_WORKSPACE_WHERE, type Rule } from "./registry"
 
 export interface Scope { orgId: string; orgName: string; fundId: string | null; soleMembers: string[]; ownerEmails: string[]; memberEmails: string[] }
 
@@ -74,6 +74,12 @@ export async function countRows(s: Scope): Promise<TableCount[]> {
 
 export const totalRows = (c: TableCount[], action?: TableCount["action"]) => c.filter((x) => !action || x.action === action).reduce((n, x) => n + x.count, 0)
 
+async function mediaRefs(s: Scope): Promise<string[]> {
+  const b = bind(MEDIA_WORKSPACE_WHERE, s)
+  try { return (await q(`SELECT pathname FROM ai_studio_assets WHERE ${b.where}`, b.values)).map((r) => String(r.pathname)) }
+  catch (e) { if (missingTable(e)) return []; throw e }
+}
+
 /** Blob references this workspace owns, found through its own rows, plus its named prefixes. Counts only, for the dry run. */
 export async function blobRefs(s: Scope): Promise<{ label: string; refs: string[] }[]> {
   const out: { label: string; refs: string[] }[] = []
@@ -94,7 +100,7 @@ export interface DryRun { takenAt: string; counts: TableCount[]; blobs: { label:
 
 export async function dryRun(s: Scope): Promise<DryRun> {
   const counts = await countRows(s)
-  const blobs = (await blobRefs(s)).map((b) => ({ label: b.label, count: b.refs.length }))
+  const blobs = [...(await blobRefs(s)).map((b) => ({ label: b.label, count: b.refs.length })), { label: "AI Studio private media", count: (await mediaRefs(s)).length }]
   const toDelete = totalRows(counts, "delete"), toAnonymize = totalRows(counts, "anonymize"), retained = totalRows(counts, "retain")
   const digest = createHash("sha256").update(JSON.stringify(counts.map((c) => [c.table, c.count]))).digest("hex").slice(0, 16)
   return { takenAt: new Date().toISOString(), counts, blobs, toDelete, toAnonymize, retained, digest }
@@ -146,6 +152,21 @@ export async function eraseWorkspace(s: Scope, requestId: string, requestedBy: s
   // The tombstone is written first: the fact of the erasure must exist even if the run is interrupted. It holds no customer content.
   await q(`INSERT INTO tenant_tombstones (org_id, org_name_hash, request_id, requested_by, status) VALUES ($1, $2, $3, $4, 'started')
     ON CONFLICT (request_id) DO UPDATE SET status = 'started'`, [s.orgId, createHash("sha256").update(s.orgName).digest("hex"), requestId, requestedBy])
+  // Delete from the dedicated private store before removing ownership metadata.
+  // Fail closed: a missing token or failed delete must keep rows for a retry.
+  const media = await mediaRefs(s)
+  let mediaDeleted = 0
+  if (media.length) {
+    const token = process.env.MEDIA_BLOB_READ_WRITE_TOKEN
+    if (!token) throw new Error("AI Studio erasure requires the private media store token.")
+    if (media.some((ref) => !ref.startsWith("ai-studio/") || ref.includes(".."))) throw new Error("Invalid AI Studio storage reference.")
+    const blob = await import("@vercel/blob")
+    for (let i = 0; i < media.length; i += 100) {
+      const batch = media.slice(i, i + 100)
+      await blob.del(batch, { token })
+      mediaDeleted += batch.length
+    }
+  }
   for (const r of RULES) {
     if (r.retain) continue
     if (r.scope === "fund" && !s.fundId) continue
@@ -158,7 +179,7 @@ export async function eraseWorkspace(s: Scope, requestId: string, requestedBy: s
       counts.push({ table: r.table, deleted: n, action: r.anonymize ? "anonymized" : "deleted" })
     } catch (e) { if (missingTable(e)) skipped.push(r.table); else throw new Error(`${r.table}: ${(e as Error).message}`) }
   }
-  const blobsDeleted = await deleteBlobs(refs, prefixes)
+  const blobsDeleted = mediaDeleted + await deleteBlobs(refs, prefixes)
   // The control-plane rows for a workspace that no longer exists. The lifecycle events stay as the audit trail.
   await q("DELETE FROM tenant_entitlements WHERE org_id = $1", [s.orgId])
   await q("DELETE FROM tenant_lifecycle WHERE org_id = $1", [s.orgId])
@@ -196,7 +217,7 @@ export async function buildExport(s: Scope): Promise<ExportResult> {
       tables.push({ table: r.table, rows: clean.length, truncated, scope: r.scope, ...(r.retain ? { note: "Also kept by Anker for the statutory retention period." } : {}) })
     } catch (e) { if (!missingTable(e)) throw e }
   }
-  const blobs = (await blobRefs(s)).map((b) => ({ label: b.label, files: b.refs.length }))
+  const blobs = [...(await blobRefs(s)).map((b) => ({ label: b.label, files: b.refs.length })), { label: "AI Studio private media", files: (await mediaRefs(s)).length }]
   const manifest = {
     workspace: { id: s.orgId, name: s.orgName }, generatedAt: new Date().toISOString(),
     contents: "One JSON file per table, secrets (tokens, API keys, password material) removed. Dates are UTC.",
