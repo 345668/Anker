@@ -12,16 +12,28 @@ async function endpoint(): Promise<{ key: string; base: string } | null> {
   const lane = qwenLanes(cfg).find((l) => l.id !== "plan")
   if (!lane) return null
   // The text lanes use the OpenAI-compatible path; media uses the native API on the same host (or workspace host).
-  return { key: lane.apiKey.trim(), base: (process.env.DASHSCOPE_BASE_API || lane.baseUrl.replace(/\/compatible-mode\/v1$/, "/api/v1")).replace(/\/+$/, "") }
+  return {
+    key: lane.apiKey.trim(),
+    base: (
+      process.env.DASHSCOPE_BASE_API || lane.baseUrl.replace(/\/compatible-mode\/v1$/, "/api/v1")
+    ).replace(/\/+$/, ""),
+  }
 }
 export async function configuration() {
   const e = await endpoint()
-  return { ready: !!(e?.key && process.env.MEDIA_BLOB_READ_WRITE_TOKEN), key: e?.key ?? "", base: e?.base ?? "" }
+  return {
+    ready: !!(e?.key && process.env.MEDIA_BLOB_READ_WRITE_TOKEN),
+    key: e?.key ?? "",
+    base: e?.base ?? "",
+  }
 }
 export async function requireConfiguration() {
   const c = await configuration()
   if (!c.ready)
-    throw new WorkspaceError("Media Studio needs administrator setup. Chat and saved media remain available.", 503)
+    throw new WorkspaceError(
+      "Media Studio needs administrator setup. Chat and saved media remain available.",
+      503,
+    )
   return c
 }
 export class ProviderError extends Error {
@@ -32,8 +44,13 @@ export class ProviderError extends Error {
     super(message)
   }
 }
+export const providerCall = (path: string, init: { body?: object; async?: boolean; timeout: number }) =>
+  call(path, init)
 const BLOCKED = /DataInspectionFailed|IPInfringementSuspect|inappropriate|sensitive/i
-async function call(path: string, init: { body?: object; async?: boolean; timeout: number }): Promise<Record<string, any>> {
+async function call(
+  path: string,
+  init: { body?: object; async?: boolean; timeout: number },
+): Promise<Record<string, any>> {
   const c = await requireConfiguration()
   const r = await fetch(`${c.base}/${path}`, {
     method: init.body ? "POST" : "GET",
@@ -67,48 +84,97 @@ async function call(path: string, init: { body?: object; async?: boolean; timeou
               : "The provider rejected these settings. Review the prompt and model.",
     )
   }
-  if (!data || typeof data !== "object" || Array.isArray(data)) throw new ProviderError(502, "Invalid provider response.")
+  if (!data || typeof data !== "object" || Array.isArray(data))
+    throw new ProviderError(502, "Invalid provider response.")
   return data
 }
 /** Returns the job's provider reference: `task:<id>` for video, `img:<url>` for an image the synchronous call already produced. */
-export async function submitGeneration(v: GenerationInput, sourceUrl?: string) {
-  const m = mapInput(v, sourceUrl)
+export async function submitGeneration(v: GenerationInput, sourceUrl?: string, audioUrl?: string) {
+  const m = mapInput(v, sourceUrl, audioUrl)
   if (m.kind === "image") {
+    const content: Array<{ image: string } | { text: string }> = [
+      ...(m.sourceImage ? [{ image: m.sourceImage }] : []),
+      { text: m.prompt },
+    ]
     const j = await call("services/aigc/multimodal-generation/generation", {
       timeout: 55000,
       body: {
         model: m.model,
-        input: { messages: [{ role: "user", content: [{ text: m.prompt }] }] },
-        parameters: { n: 1, watermark: false, size: m.size, prompt_extend: m.promptExtend },
+        input: { messages: [{ role: "user", content }] },
+        parameters: {
+          n: 1,
+          watermark: false,
+          ...(m.size ? { size: m.size } : {}),
+          prompt_extend: m.promptExtend,
+          ...(m.negativePrompt ? { negative_prompt: m.negativePrompt } : {}),
+        },
       },
     })
     const parts = j?.output?.choices?.[0]?.message?.content
-    const url = Array.isArray(parts) ? parts.map((p: any) => p?.image).find((u: unknown) => typeof u === "string") : null
+    const url = Array.isArray(parts)
+      ? parts.map((p: any) => p?.image).find((u: unknown) => typeof u === "string")
+      : null
     if (!url) throw new ProviderError(502, "Submission returned no image and may have been charged.")
     return `img:${url}`
   }
+  // Wan 2.7 text-to-video takes the voice track as input.audio_url; image-to-video takes it as a driving_audio media item.
+  const media = [
+    ...(m.firstFrame ? [{ type: "first_frame", url: m.firstFrame }] : []),
+    ...(m.audioUrl && m.firstFrame ? [{ type: "driving_audio", url: m.audioUrl }] : []),
+  ]
   const j = await call("services/aigc/video-generation/video-synthesis", {
     async: true,
     timeout: 25000,
     body: {
       model: m.model,
-      input: { prompt: m.prompt, ...(m.firstFrame ? { media: [{ type: "first_frame", url: m.firstFrame }] } : {}) },
-      parameters: { resolution: m.resolution, ratio: m.ratio, duration: m.duration, prompt_extend: m.promptExtend, watermark: false },
+      input: {
+        prompt: m.prompt,
+        ...(m.negativePrompt ? { negative_prompt: m.negativePrompt } : {}),
+        ...(m.audioUrl && !m.firstFrame ? { audio_url: m.audioUrl } : {}),
+        ...(media.length ? { media } : {}),
+      },
+      parameters: {
+        resolution: m.resolution,
+        ...(m.ratio ? { ratio: m.ratio } : {}),
+        duration: m.duration,
+        prompt_extend: m.promptExtend,
+        watermark: false,
+        ...(m.seed !== undefined ? { seed: m.seed } : {}),
+      },
     },
   })
   const id = j?.output?.task_id
-  if (typeof id !== "string" || !id || id.length > 200) throw new ProviderError(502, "Submission returned no task ID and may have succeeded.")
+  if (typeof id !== "string" || !id || id.length > 200)
+    throw new ProviderError(502, "Submission returned no task ID and may have succeeded.")
   return `task:${id}`
 }
 export async function generationStatus(ref: string) {
-  if (ref.startsWith("img:")) return { status: "completed", image: ref.slice(4), video: null as string | null }
+  if (ref.startsWith("img:"))
+    return {
+      status: "completed",
+      image: ref.slice(4),
+      video: null as string | null,
+    }
   const id = ref.replace(/^task:/, "")
   const j = await call(`tasks/${encodeURIComponent(id)}`, { timeout: 25000 })
   const out = j.output ?? {}
   const s = String(out.task_status || "unknown").toUpperCase()
   const blocked = BLOCKED.test(`${out.code ?? ""} ${out.message ?? ""}`)
   return {
-    status: s === "SUCCEEDED" ? "completed" : s === "PENDING" ? "queued" : s === "RUNNING" ? "running" : s === "FAILED" ? (blocked ? "nsfw" : "failed") : s === "CANCELED" ? "canceled" : "unknown",
+    status:
+      s === "SUCCEEDED"
+        ? "completed"
+        : s === "PENDING"
+          ? "queued"
+          : s === "RUNNING"
+            ? "running"
+            : s === "FAILED"
+              ? blocked
+                ? "nsfw"
+                : "failed"
+              : s === "CANCELED"
+                ? "canceled"
+                : "unknown",
     image: null as string | null,
     video: typeof out.video_url === "string" ? (out.video_url as string) : null,
   }

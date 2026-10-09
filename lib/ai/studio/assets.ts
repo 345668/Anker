@@ -3,7 +3,7 @@ import { get, put } from "@vercel/blob"
 import { sql } from "@/lib/db"
 import { WorkspaceError } from "@/lib/auth/workspace-context"
 import type { AiPrincipal } from "@/lib/assistant/context"
-import type { MediaKind, Asset } from "./catalog"
+import type { AssetKind, Asset } from "./catalog"
 export const MAX_BYTES = 64 * 1024 * 1024
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex")
 export interface AssetRow {
@@ -11,19 +11,21 @@ export interface AssetRow {
   user_id: string
   scope_key: string
   job_id: string | null
-  kind: MediaKind
+  kind: AssetKind
   pathname: string
   filename: string
   content_type: string
   bytes: number
+  duration_ms?: number | null
 }
 export const publicAsset = (a: AssetRow): Asset => ({
   id: a.id,
   kind: a.kind,
   name: a.filename,
   url: `/api/anker/studio/assets/${a.id}`,
+  durationMs: a.duration_ms ?? null,
 })
-export function mediaFormat(b: Buffer): { kind: MediaKind; type: string; ext: string } | null {
+export function mediaFormat(b: Buffer): { kind: AssetKind; type: string; ext: string } | null {
   if (b.length < 12) return null
   if (b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
     return { kind: "image", type: "image/png", ext: "png" }
@@ -35,6 +37,10 @@ export function mediaFormat(b: Buffer): { kind: MediaKind; type: string; ext: st
     ["isom", "iso2", "mp41", "mp42", "avc1", "M4V ", "dash"].includes(b.toString("ascii", 8, 12))
   )
     return { kind: "video", type: "video/mp4", ext: "mp4" }
+  if (b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WAVE")
+    return { kind: "audio", type: "audio/wav", ext: "wav" }
+  if (b.toString("ascii", 0, 3) === "ID3" || (b[0] === 255 && (b[1] & 0xe0) === 0xe0 && (b[1] & 0x06) !== 0))
+    return { kind: "audio", type: "audio/mpeg", ext: "mp3" }
   return null
 }
 export async function ownedAsset(p: Pick<AiPrincipal, "userId" | "scopeKey">, id: string): Promise<AssetRow> {
@@ -47,8 +53,9 @@ export async function storeAsset(
   p: Pick<AiPrincipal, "userId" | "scopeKey">,
   id: string,
   bytes: Buffer,
-  kind: MediaKind,
+  kind: AssetKind,
   jobId: string | null,
+  durationMs: number | null = null,
 ): Promise<AssetRow> {
   const f = mediaFormat(bytes)
   if (!f || f.kind !== kind || bytes.length > MAX_BYTES)
@@ -64,7 +71,7 @@ export async function storeAsset(
     abortSignal: AbortSignal.timeout(45000),
   })
   const [a] =
-    await sql`INSERT INTO ai_studio_assets(id,user_id,scope_key,job_id,kind,pathname,filename,content_type,bytes) VALUES(${id},${p.userId},${p.scopeKey},${jobId},${kind},${pathname},${filename},${f.type},${bytes.length}) ON CONFLICT(id) DO UPDATE SET bytes=EXCLUDED.bytes RETURNING *`
+    await sql`INSERT INTO ai_studio_assets(id,user_id,scope_key,job_id,kind,pathname,filename,content_type,bytes,duration_ms) VALUES(${id},${p.userId},${p.scopeKey},${jobId},${kind},${pathname},${filename},${f.type},${bytes.length},${durationMs}) ON CONFLICT(id) DO UPDATE SET bytes=EXCLUDED.bytes RETURNING *`
   return a as AssetRow
 }
 export async function assetResponse(a: AssetRow, download = false) {

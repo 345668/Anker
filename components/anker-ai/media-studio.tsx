@@ -87,7 +87,16 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
   const [duration, setDuration] = useState(5),
     [audio, setAudio] = useState(false),
     [enhance, setEnhance] = useState(false),
-    [source, setSource] = useState<Asset | null>(null)
+    [source, setSource] = useState<Asset | null>(null),
+    [negative, setNegative] = useState(""),
+    [seed, setSeed] = useState(""),
+    [voiceMode, setVoiceMode] = useState<"none" | "upload" | "dialogue">("none"),
+    [voiceAsset, setVoiceAsset] = useState<Asset | null>(null),
+    [speaking, setSpeaking] = useState(false),
+    [lines, setLines] = useState<Array<{ voice: string; text: string }>>([
+      { voice: "Cherry", text: "" },
+      { voice: "Ethan", text: "" },
+    ])
   const [busy, setBusy] = useState(false),
     [uploading, setUploading] = useState(false),
     [filter, setFilter] = useState("all"),
@@ -97,7 +106,8 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
   const lock = useRef(false),
     pending = useRef<{ value: string; key: string } | null>(null),
     promptRef = useRef<HTMLTextAreaElement>(null),
-    uploadRef = useRef<HTMLInputElement>(null)
+    uploadRef = useRef<HTMLInputElement>(null),
+    audioUploadRef = useRef<HTMLInputElement>(null)
   const m = modelFor(modelId)!,
     query = `scopeKey=${encodeURIComponent(scopeKey)}`
   const load = useCallback(
@@ -187,7 +197,71 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
     setDuration(5)
     setAudio(false)
     setEnhance(false)
-    if (next.kind === "image") setSource(null)
+    if (!next.canSource) setSource(null)
+    if (!next.voice) {
+      setVoiceMode("none")
+      setVoiceAsset(null)
+    }
+    if (!next.negative) setNegative("")
+    if (!next.seed) setSeed("")
+    setDuration((d) => (next.kind === "video" ? Math.min(Math.max(d, next.min), next.max) : d))
+  }
+  /** A voice track sets the video's length, so speech and picture end together. */
+  function attachVoice(a: Asset | null) {
+    setVoiceAsset(a)
+    if (a?.durationMs && m.kind === "video")
+      setDuration(Math.min(m.max, Math.max(m.min, Math.ceil(a.durationMs / 1000))))
+  }
+  async function speak() {
+    setSpeaking(true)
+    setError("")
+    try {
+      const body = JSON.stringify({
+        scopeKey,
+        lines: lines.filter((l) => l.text.trim()).map((l) => ({ voice: l.voice, text: l.text.trim() })),
+      })
+      attachVoice(
+        (
+          await api<{ asset: Asset }>("/api/anker/studio/speech", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body,
+          })
+        ).asset,
+      )
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSpeaking(false)
+    }
+  }
+  async function uploadAudio(file: File | undefined) {
+    if (!file) return
+    if (file.size > 15 * 1024 * 1024 || !/\.(wav|mp3)$/i.test(file.name)) {
+      setError("Choose a WAV or MP3 under 15 MB.")
+      return
+    }
+    setUploading(true)
+    setError("")
+    try {
+      const body = new FormData()
+      body.set("scopeKey", scopeKey)
+      body.set("kind", "audio")
+      body.set("file", file)
+      attachVoice(
+        (
+          await api<{ asset: Asset }>("/api/anker/studio/upload", {
+            method: "POST",
+            body,
+          })
+        ).asset,
+      )
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setUploading(false)
+      if (audioUploadRef.current) audioUploadRef.current.value = ""
+    }
   }
   function reuse(j: Job) {
     choose(j.model)
@@ -210,7 +284,16 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
     promptRef.current?.focus()
   }
   async function submit() {
-    if (lock.current || uploading || !data?.ready || !data.canGenerate || !prompt.trim()) return
+    if (
+      lock.current ||
+      uploading ||
+      speaking ||
+      !data?.ready ||
+      !data.canGenerate ||
+      !prompt.trim() ||
+      (m.needsSource && !source)
+    )
+      return
     lock.current = true
     setBusy(true)
     setError("")
@@ -223,7 +306,10 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
       audio,
       enhancePrompt: enhance,
       ...(m.kind === "video" ? { duration } : {}),
-      ...(source && m.kind === "video" ? { sourceAssetId: source.id } : {}),
+      ...(source && m.canSource ? { sourceAssetId: source.id } : {}),
+      ...(negative.trim() && m.negative ? { negativePrompt: negative.trim() } : {}),
+      ...(seed.trim() !== "" && m.seed ? { seed: Number(seed) } : {}),
+      ...(voiceAsset && m.voice ? { audioAssetId: voiceAsset.id } : {}),
     }
     const value = JSON.stringify(input)
     if (pending.current?.value !== value) pending.current = { value, key: crypto.randomUUID() }
@@ -259,7 +345,14 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
       const body = new FormData()
       body.set("scopeKey", scopeKey)
       body.set("file", file)
-      setSource((await api<{ asset: Asset }>("/api/anker/studio/upload", { method: "POST", body })).asset)
+      setSource(
+        (
+          await api<{ asset: Asset }>("/api/anker/studio/upload", {
+            method: "POST",
+            body,
+          })
+        ).asset,
+      )
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -464,10 +557,188 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                       Enhance prompt
                     </label>
                   )}
-                  {m.kind === "video" && (
+                  {m.negative && (
+                    <label className="block text-sm">
+                      Leave out <span className="font-normal text-muted-foreground">(optional)</span>
+                      <input
+                        className={`${field} mt-2`}
+                        maxLength={500}
+                        value={negative}
+                        onChange={(e) => setNegative(e.target.value)}
+                        placeholder="blurry, distorted text, extra fingers…"
+                      />
+                    </label>
+                  )}
+                  {m.seed && (
+                    <label className="block text-sm">
+                      Seed{" "}
+                      <span className="font-normal text-muted-foreground">(optional, repeats a take)</span>
+                      <input
+                        className={`${field} mt-2`}
+                        type="number"
+                        min={0}
+                        max={2147483647}
+                        value={seed}
+                        onChange={(e) => setSeed(e.target.value)}
+                      />
+                    </label>
+                  )}
+                  {m.voice && (
+                    <div className="space-y-3 rounded-lg border p-3">
+                      <p className="text-sm font-medium">
+                        Voices{" "}
+                        <span className="font-normal text-muted-foreground">
+                          (speech and lip movement follow this track)
+                        </span>
+                      </p>
+                      <div className="flex gap-1">
+                        {(
+                          [
+                            ["none", "None"],
+                            ["dialogue", "Write dialogue"],
+                            ["upload", "Upload audio"],
+                          ] as const
+                        ).map(([id, label]) => (
+                          <Button
+                            key={id}
+                            type="button"
+                            size="sm"
+                            variant={voiceMode === id ? "secondary" : "ghost"}
+                            aria-pressed={voiceMode === id}
+                            onClick={() => {
+                              setVoiceMode(id)
+                              if (id === "none") attachVoice(null)
+                            }}
+                          >
+                            {label}
+                          </Button>
+                        ))}
+                      </div>
+                      {voiceMode === "dialogue" && (
+                        <div className="space-y-3">
+                          {lines.map((l, i) => (
+                            <div key={i} className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <select
+                                  aria-label={`Voice for line ${i + 1}`}
+                                  className={`${field} !p-2`}
+                                  value={l.voice}
+                                  onChange={(e) =>
+                                    setLines((p) =>
+                                      p.map((x, j) => (j === i ? { ...x, voice: e.target.value } : x)),
+                                    )
+                                  }
+                                >
+                                  {["Cherry", "Serena", "Jennifer", "Ethan", "Ryan", "Aiden"].map((v) => (
+                                    <option key={v}>{v}</option>
+                                  ))}
+                                </select>
+                                {lines.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Remove line ${i + 1}`}
+                                    onClick={() => setLines((p) => p.filter((_, j) => j !== i))}
+                                  >
+                                    <X className="size-4" />
+                                  </Button>
+                                )}
+                              </div>
+                              <textarea
+                                aria-label={`Line ${i + 1}`}
+                                className={`${field} min-h-16 resize-y`}
+                                maxLength={300}
+                                value={l.text}
+                                placeholder="What this person says…"
+                                onChange={(e) =>
+                                  setLines((p) =>
+                                    p.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)),
+                                  )
+                                }
+                              />
+                            </div>
+                          ))}
+                          <div className="flex gap-2">
+                            {lines.length < 8 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setLines((p) => [
+                                    ...p,
+                                    {
+                                      voice: p[p.length - 1]?.voice === "Ethan" ? "Cherry" : "Ethan",
+                                      text: "",
+                                    },
+                                  ])
+                                }
+                              >
+                                Add a line
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={
+                                speaking ||
+                                uploading ||
+                                !data.ready ||
+                                !data.canGenerate ||
+                                !lines.some((l) => l.text.trim())
+                              }
+                              onClick={() => void speak()}
+                            >
+                              {speaking ? "Recording…" : "Create voice track"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {voiceMode === "upload" && (
+                        <>
+                          <input
+                            ref={audioUploadRef}
+                            type="file"
+                            className="sr-only"
+                            accept=".wav,.mp3,audio/wav,audio/mpeg"
+                            aria-label="Upload voice track"
+                            onChange={(e) => void uploadAudio(e.target.files?.[0])}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full gap-2"
+                            disabled={uploading || busy || !data.ready || !data.canGenerate}
+                            onClick={() => audioUploadRef.current?.click()}
+                          >
+                            <Upload className="size-4" />
+                            {uploading ? "Uploading…" : "Upload WAV or MP3 · 2–30 s"}
+                          </Button>
+                        </>
+                      )}
+                      {voiceAsset && (
+                        <div className="space-y-1">
+                          <audio controls src={voiceAsset.url} className="w-full" aria-label="Voice track" />
+                          <p className="text-xs text-muted-foreground">
+                            {voiceAsset.durationMs
+                              ? `${(voiceAsset.durationMs / 1000).toFixed(1)} s · the video length follows it. `
+                              : ""}
+                            <button type="button" className="underline" onClick={() => attachVoice(null)}>
+                              Remove
+                            </button>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {m.canSource && (
                     <div className="space-y-3">
                       <p className="text-sm font-medium">
-                        Start frame <span className="font-normal text-muted-foreground">(optional)</span>
+                        {m.needsSource ? "Image to edit" : "Start frame"}{" "}
+                        {!m.needsSource && (
+                          <span className="font-normal text-muted-foreground">(optional)</span>
+                        )}
                       </p>
                       {source && (
                         <div className="flex items-center gap-3 rounded-lg border p-2">
@@ -518,7 +789,15 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                   <Button
                     type="submit"
                     className="w-full gap-2"
-                    disabled={busy || uploading || !data.ready || !data.canGenerate || !prompt.trim()}
+                    disabled={
+                      busy ||
+                      uploading ||
+                      speaking ||
+                      !data.ready ||
+                      !data.canGenerate ||
+                      !prompt.trim() ||
+                      (m.needsSource && !source)
+                    }
                   >
                     {busy ? (
                       <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />

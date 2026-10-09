@@ -91,6 +91,16 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
     if (a.kind !== "image") throw new WorkspaceError("Choose an image as the start frame.", 400)
     sourceUrl = `${sourceOrigin()}/api/anker/studio/source?token=${token}`
   }
+  let audioUrl: string | undefined, audioToken: string | undefined
+  if (input.audioAssetId) {
+    const a = await ownedAsset(p, input.audioAssetId)
+    if (a.kind !== "audio")
+      throw new WorkspaceError("Choose an audio file or a spoken dialogue as the voice track.", 400)
+    if ((a.duration_ms ?? 2000) < 2000 || (a.duration_ms ?? 0) > 30000)
+      throw new WorkspaceError("The voice track must be between 2 and 30 seconds.", 400)
+    audioToken = randomBytes(32).toString("hex")
+    audioUrl = `${sourceOrigin()}/api/anker/studio/source?token=${audioToken}&kind=audio`
+  }
   let reserved
   try {
     ;[reserved] =
@@ -107,7 +117,9 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
   }
   if (reserved.created) {
     try {
-      const id = await submitGeneration(input, sourceUrl)
+      if (audioToken)
+        await sql`UPDATE ai_studio_jobs SET audio_asset_id=${input.audioAssetId!},audio_token_hash=${hash(audioToken)} WHERE id=${reserved.job_id}`
+      const id = await submitGeneration(input, sourceUrl, audioUrl)
       await sql`UPDATE ai_studio_jobs SET provider_id=${id},status='queued',updated_at=now() WHERE id=${reserved.job_id} AND status IN ('submitting','uncertain')`
     } catch (e) {
       const certain = e instanceof ProviderError && e.status >= 400 && e.status < 500
@@ -159,7 +171,10 @@ export async function advanceJob(id: string) {
       return
     }
     await sql`UPDATE ai_studio_jobs SET status='saving' WHERE id=${id} AND lease_token=${lease}`
-    const file = await safeFetch(url, { maxBytes: MAX_BYTES, timeoutMs: 45000 })
+    const file = await safeFetch(url, {
+      maxBytes: MAX_BYTES,
+      timeoutMs: 45000,
+    })
     await storeAsset({ userId: j.user_id, scopeKey: j.scope_key }, j.id, file.body, j.kind, j.id)
     await finish("completed")
   } catch (e) {
