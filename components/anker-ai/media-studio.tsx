@@ -83,7 +83,7 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
   const [modelId, setModel] = useState("qwen-image-2.0"),
     [prompt, setPrompt] = useState(""),
     [ratio, setRatio] = useState("1:1"),
-    [resolution, setResolution] = useState("720p")
+    [resolution, setResolution] = useState(modelFor("qwen-image-2.0")!.resolutions[0] as string)
   const [duration, setDuration] = useState(5),
     [audio, setAudio] = useState(false),
     [enhance, setEnhance] = useState(false),
