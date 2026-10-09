@@ -65,11 +65,16 @@ export async function listJobs(p: AiPrincipal, before?: string) {
 }
 function sourceOrigin() {
   try {
-    const u = new URL(process.env.NEXT_PUBLIC_APP_URL || "")
+    // Like the rest of the app, production falls back to the canonical address when no app URL is configured.
+    const u = new URL(
+      process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.APP_URL ||
+        (process.env.VERCEL_ENV === "production" ? "https://www.an-ker.de" : ""),
+    )
     if (u.protocol !== "https:" || u.username || u.password) throw new Error()
     return u.origin
   } catch {
-    throw new WorkspaceError("Start frames need a public HTTPS app URL. Contact your administrator.", 503)
+    throw new WorkspaceError("Start frames and voice tracks need a public HTTPS app URL. Contact your administrator.", 503)
   }
 }
 export async function createJob(p: AiPrincipal, input: GenerationInput) {
