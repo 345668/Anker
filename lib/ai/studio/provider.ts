@@ -70,6 +70,8 @@ async function call(
     data = JSON.parse(text)
   } catch {}
   if (!r.ok) {
+    // The provider's own code and message go to the server log only; callers see a fixed sentence.
+    console.error("[studio provider]", path, r.status, data?.code, String(data?.message ?? "").slice(0, 300))
     const reason = `${data?.code ?? ""} ${data?.message ?? ""}`
     throw new ProviderError(
       BLOCKED.test(reason) ? 422 : r.status,

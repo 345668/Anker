@@ -76,7 +76,9 @@ export async function createSpeech(p: AiPrincipal, input: SpeechInput) {
   try {
     for (const l of input.lines) clips.push(await speakLine(l.voice, l.text, input.language))
   } catch (e) {
-    if (e instanceof ProviderError || e instanceof WorkspaceError) throw e
+    if (e instanceof ProviderError)
+      throw new WorkspaceError(e.message, e.status === 422 ? 422 : e.status === 429 ? 429 : 502)
+    if (e instanceof WorkspaceError) throw e
     throw new WorkspaceError("A spoken line could not be read back. Try again; nothing was kept.", 502)
   }
   const track = joinWavs(
