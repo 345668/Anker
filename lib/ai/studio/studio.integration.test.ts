@@ -402,6 +402,27 @@ it("speaks dialogue into one private voice track with the pause between speakers
   expect(row).toMatchObject({ kind: "audio", content_type: "audio/wav", job_id: null })
   expect(vi.mocked(put).mock.calls.at(-1)?.[2]).toMatchObject({ access: "private", contentType: "audio/wav" })
 })
+it("fetches a speech result link given as http on DashScope's own storage host over https", async () => {
+  const f = vi
+    .fn()
+    .mockImplementation(async () =>
+      Response.json({
+        output: {
+          audio: { data: "", url: "http://dashscope-result-sgp.oss-ap-southeast-1.aliyuncs.com/a.wav" },
+        },
+      }),
+    )
+  vi.stubGlobal("fetch", f)
+  vi.mocked(safeFetch).mockResolvedValueOnce({
+    body: wavBytes(tone(2500)),
+    contentType: "audio/wav",
+    finalUrl: "x",
+  } as never)
+  await createSpeech(principal(), speak([{ text: "Hello there." }]))
+  expect(vi.mocked(safeFetch).mock.calls.at(-1)?.[0]).toBe(
+    "https://dashscope-result-sgp.oss-ap-southeast-1.aliyuncs.com/a.wav",
+  )
+})
 it("pads a very short line to the two seconds a video voice track needs, and refuses a track over thirty", async () => {
   tts([wavBytes(tone(600))])
   expect((await createSpeech(principal(), speak([{ text: "Yes." }]))).asset).toMatchObject({

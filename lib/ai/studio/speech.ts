@@ -58,7 +58,11 @@ async function speakLine(voice: string, text: string, language: string) {
   // The reply carries a download link; some versions return the audio inline as base64 instead.
   if (typeof audio?.data === "string" && audio.data.length > 100)
     return parseWav(Buffer.from(audio.data, "base64"))
-  const url = audio?.url
+  // DashScope result links come back as http:// on its own storage host; fetch them over https.
+  const url =
+    typeof audio?.url === "string"
+      ? audio.url.replace(/^http:\/\/(?=[a-z0-9.-]+\.aliyuncs\.com\/)/i, "https://")
+      : null
   if (typeof url !== "string" || !url.startsWith("https://")) {
     console.error(
       "[studio speech] no audio in reply; shape:",
