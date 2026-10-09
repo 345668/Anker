@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     const jobs = await listJobs(p, before)
     return json({
       scopeKey: p.scopeKey,
-      ready: configuration().ready,
+      ready: (await configuration()).ready,
       canGenerate: !p.readonly && (p.persona === "lp" || p.canWrite),
       jobs,
       nextCursor: jobs.length === 30 ? jobs[jobs.length - 1].createdAt : null,

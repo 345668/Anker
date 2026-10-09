@@ -1,0 +1,13 @@
+# 47. Media Studio on Qwen Cloud (DashScope)
+
+**Decision (founder, 2026-10-09):** the Image & Video studio generates with Qwen Cloud models, not the Higgsfield-compatible provider it shipped with. This follows the platform's Qwen-first rule (doc 35) and removes the second credential and the unverified provider base URL.
+
+## What changes
+- **Provider:** DashScope (Alibaba Model Studio, intl endpoint) through the existing `lib/ai/dashscope-media.ts` conventions and the same key resolution as the rest of the AI stack (`readRouterConfig().qwenApiKey`, else `DASHSCOPE_API_KEY`, else `QWEN_API_KEY`). `HF_API_KEY` and `HF_API_BASE_URL` are no longer used. Setup is the DashScope key plus `MEDIA_BLOB_READ_WRITE_TOKEN` (private Blob store).
+- **Catalog** (ids from `lib/ai/model-catalog.ts`): images `qwen-image-2.0`, `qwen-image-max`, `z-image-turbo`; video `wan2.7` (text-to-video `wan2.7-t2v`, with a start frame `wan2.7-i2v`; 2-15 s, 720p or 1080p, ratios 16:9, 9:16, 1:1, 4:3, 3:4). Prompt enhancement maps to DashScope `prompt_extend`. No generated-audio switch (Wan 2.7 takes an audio file, not a switch).
+- **Job lifecycle is unchanged** (reserve, submit, poll, save, never resubmit a paid job, ambiguous submissions stay `uncertain`). Video is asynchronous: submit returns a `task_id` stored as `task:<id>`; the poller reads `/tasks/{id}` (PENDING, RUNNING, SUCCEEDED, FAILED, CANCELED). Images are synchronous in DashScope: the submit call returns the result URL, stored as `img:<url>`, and the poller goes straight to saving it. A timeout on a synchronous image call is ambiguous and becomes `uncertain`, as before.
+- **Safety:** the provider's content-moderation failures (`DataInspectionFailed`, `IPInfringementSuspect`) become `blocked`; credentials rejected (401/403) and allowance (429) keep their wording; raw provider messages are never relayed; result URLs go through the existing SSRF-guarded fetch, 64 MB cap and signature checks; result URLs expire in 24 hours, so saving happens within the job.
+- **Prices** are shown in the catalog blurbs only as provider-listed; they are not budgets (unchanged).
+
+## Not changed
+Tables, the reservation function and its limits (3 active, 20 per person, 30 per workspace daily), roles and entitlements, private Blob storage, the page and its history.

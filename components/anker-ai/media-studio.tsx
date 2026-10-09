@@ -80,7 +80,7 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
   const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true)
-  const [modelId, setModel] = useState("soul-2"),
+  const [modelId, setModel] = useState("qwen-image-2.0"),
     [prompt, setPrompt] = useState(""),
     [ratio, setRatio] = useState("1:1"),
     [resolution, setResolution] = useState("720p")
@@ -361,7 +361,7 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                       className="flex-1 gap-2"
                       variant={m.kind === k ? "default" : "outline"}
                       aria-pressed={m.kind === k}
-                      onClick={() => choose(k === "image" ? "soul-2" : "kling-3-turbo")}
+                      onClick={() => choose(k === "image" ? "qwen-image-2.0" : "wan2.7")}
                     >
                       {k === "image" ? <ImageIcon className="size-4" /> : <Film className="size-4" />}
                       {k === "image" ? "Image" : "Video"}
@@ -454,7 +454,7 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                       Generate audio
                     </label>
                   )}
-                  {modelId.startsWith("soul-") && (
+                  {m.enhance && (
                     <label className="flex gap-2 text-sm">
                       <input
                         type="checkbox"
@@ -581,7 +581,7 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                       <button
                         className="mx-auto mt-6 block max-w-md rounded-lg border p-4 text-left text-sm leading-6 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => {
-                          choose("soul-2")
+                          choose("qwen-image-2.0")
                           setPrompt(ideas[persona])
                           promptRef.current?.focus()
                         }}
@@ -660,7 +660,7 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                                     size="sm"
                                     variant="outline"
                                     onClick={() => {
-                                      choose("kling-3-turbo")
+                                      choose("wan2.7")
                                       setSource(j.assets[0])
                                       setPrompt(
                                         "Slow cinematic camera movement. Preserve the subject and visual style of this image.",

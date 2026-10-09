@@ -24,6 +24,8 @@ vi.mock("@/lib/entitlements", () => ({
   assertAllowed: vi.fn(async () => {}),
   assertWithinLimit: vi.fn(async () => {}),
 }))
+vi.mock("server-only", () => ({}))
+vi.mock("@/lib/ai/runtime-config", () => ({ readRouterConfig: async () => null }))
 vi.mock("./provider", async (orig) => ({
   ...(await orig<typeof import("./provider")>()),
   submitGeneration: vi.fn(),
@@ -69,10 +71,10 @@ const input = (extra: Partial<GenerationInput> = {}): GenerationInput =>
   inputSchema.parse({
     scopeKey: "org:one",
     requestKey: randomUUID(),
-    model: "soul-2",
+    model: "qwen-image-2.0",
     prompt: "Editorial cover",
     aspectRatio: "1:1",
-    resolution: "720p",
+    resolution: "standard",
     ...extra,
   })
 beforeAll(async () => {
@@ -83,8 +85,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await db.exec("TRUNCATE ai_studio_jobs,ai_studio_assets,ai_studio_scope_locks CASCADE")
   vi.clearAllMocks()
-  vi.stubEnv("HF_API_KEY", "test:secret")
-  vi.stubEnv("HF_API_BASE_URL", "https://provider.example")
+  vi.stubEnv("DASHSCOPE_API_KEY", "sk-test")
   vi.stubEnv("MEDIA_BLOB_READ_WRITE_TOKEN", "test")
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://anker.example")
   state.principal = principal()
@@ -163,7 +164,7 @@ it("counts failed requests toward quota but permits replays", async () => {
   expect(submitGeneration).toHaveBeenCalledTimes(20)
 })
 it("fails closed when configuration is missing", async () => {
-  vi.stubEnv("HF_API_KEY", "")
+  vi.stubEnv("DASHSCOPE_API_KEY", ""); vi.stubEnv("QWEN_API_KEY", "")
   await expect(createJob(principal(), input())).rejects.toMatchObject({ status: 503 })
   expect(submitGeneration).not.toHaveBeenCalled()
   expect(await listJobs(principal())).toHaveLength(0)
@@ -244,14 +245,14 @@ it("rejects another user's start frame", async () => {
   const id = randomUUID()
   await sql`INSERT INTO ai_studio_assets(id,user_id,scope_key,kind,pathname,filename,content_type,bytes) VALUES(${id},'other','org:one','image','private/a','a.png','image/png',20)`
   await expect(
-    createJob(principal(), input({ model: "kling-3-turbo", duration: 5, sourceAssetId: id })),
+    createJob(principal(), input({ model: "wan2.7", resolution: "720p", duration: 5, sourceAssetId: id })),
   ).rejects.toMatchObject({ status: 404 })
   expect(submitGeneration).not.toHaveBeenCalled()
 })
 it("shares only an expiring source capability", async () => {
   const id = randomUUID()
   await sql`INSERT INTO ai_studio_assets(id,user_id,scope_key,kind,pathname,filename,content_type,bytes) VALUES(${id},'u1','org:one','image','private/a','a.png','image/png',20)`
-  await createJob(principal(), input({ model: "kling-3-turbo", duration: 5, sourceAssetId: id }))
+  await createJob(principal(), input({ model: "wan2.7", resolution: "720p", duration: 5, sourceAssetId: id }))
   const url = vi.mocked(submitGeneration).mock.calls[0][1]!
   expect(url).toMatch(/^https:\/\/anker.example\/api\/anker\/studio\/source\?token=[a-f0-9]{64}$/)
   const [r] = await sql`SELECT source_token_hash FROM ai_studio_jobs`
@@ -270,7 +271,7 @@ it("saves video output as a private MP4", async () => {
     contentType: "video/mp4",
     finalUrl: "https://cdn.example/video.mp4",
   })
-  const j = await createJob(principal(), input({ model: "kling-3-turbo", duration: 5 }))
+  const j = await createJob(principal(), input({ model: "wan2.7", resolution: "720p", duration: 5 }))
   await advanceJob(j.id)
   const saved = await getJob(principal(), j.id)
   expect(saved.status).toBe("completed")

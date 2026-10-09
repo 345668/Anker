@@ -1,62 +1,14 @@
 import { z } from "zod"
-// Selected, implemented mappings from 345668/open-higgsfield @ b16a0ef.
+// Qwen Cloud (DashScope) models; ids match lib/ai/model-catalog.ts. docs/architecture/47.
+const IMAGE_RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4"] as const
 export const MODELS = [
-  {
-    id: "soul-2",
-    name: "Soul 2",
-    kind: "image",
-    path: "higgsfield-ai/soul/v2/standard",
-    ratios: ["1:1", "16:9", "9:16", "4:3", "3:4"],
-    resolutions: ["720p", "1080p"],
-    min: 0,
-    max: 0,
-    audio: false,
-  },
-  {
-    id: "soul-cinema",
-    name: "Soul Cinema",
-    kind: "image",
-    path: "higgsfield-ai/soul/cinema",
-    ratios: ["16:9", "9:16", "1:1", "4:3", "3:4"],
-    resolutions: ["720p", "1080p"],
-    min: 0,
-    max: 0,
-    audio: false,
-  },
-  {
-    id: "flux-2",
-    name: "Flux 2",
-    kind: "image",
-    path: "flux-2-pro",
-    ratios: ["1:1", "16:9", "9:16", "4:3", "3:4"],
-    resolutions: ["1k", "2k", "4k"],
-    min: 0,
-    max: 0,
-    audio: false,
-  },
-  {
-    id: "kling-3-turbo",
-    name: "Kling 3.0 Turbo",
-    kind: "video",
-    path: "kling-video/v3.0-turbo",
-    ratios: ["16:9", "9:16", "1:1"],
-    resolutions: ["720p", "1080p"],
-    min: 3,
-    max: 15,
-    audio: false,
-  },
-  {
-    id: "seedance-2-fast",
-    name: "Seedance 2.0 Fast",
-    kind: "video",
-    path: "bytedance/seedance-2.0/fast",
-    ratios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"],
-    resolutions: ["480p", "720p"],
-    min: 4,
-    max: 15,
-    audio: true,
-  },
+  { id: "qwen-image-2.0", name: "Qwen-Image 2.0", kind: "image", path: "qwen-image-2.0", ratios: IMAGE_RATIOS, resolutions: ["standard"], min: 0, max: 0, audio: false, enhance: true },
+  { id: "qwen-image-max", name: "Qwen-Image Max", kind: "image", path: "qwen-image-max", ratios: IMAGE_RATIOS, resolutions: ["standard"], min: 0, max: 0, audio: false, enhance: true },
+  { id: "z-image-turbo", name: "Z-Image Turbo", kind: "image", path: "z-image-turbo", ratios: IMAGE_RATIOS, resolutions: ["standard"], min: 0, max: 0, audio: false, enhance: true },
+  { id: "wan2.7", name: "Wan 2.7 Video", kind: "video", path: "wan2.7", ratios: IMAGE_RATIOS, resolutions: ["720p", "1080p"], min: 2, max: 15, audio: false, enhance: true },
 ] as const
+/** DashScope image sizes (width*height) per aspect ratio. */
+export const IMAGE_SIZES: Record<string, string> = { "1:1": "1328*1328", "16:9": "1664*928", "9:16": "928*1664", "4:3": "1472*1104", "3:4": "1104*1472" }
 export const modelFor = (id: string) => MODELS.find((m) => m.id === id)
 export const inputSchema = z
   .object({
@@ -83,7 +35,7 @@ export const inputSchema = z
     if (m.kind === "image" && (v.duration !== undefined || v.sourceAssetId))
       fail("This image model does not accept duration or a start frame.")
     if (v.audio && !m.audio) fail("This model does not support generated audio.")
-    if (v.enhancePrompt && !m.id.startsWith("soul-")) fail("Prompt enhancement is only available for Soul.")
+    if (v.enhancePrompt && !m.enhance) fail("Prompt enhancement is not available for this model.")
   })
 export type GenerationInput = z.infer<typeof inputSchema>
 export type MediaKind = "image" | "video"
@@ -116,25 +68,19 @@ export interface Job {
   createdAt: string
   assets: Asset[]
 }
+/** What to send to DashScope for a job. Images go to the synchronous multimodal endpoint, video to the asynchronous video-synthesis endpoint. */
 export function mapInput(v: GenerationInput, sourceUrl?: string) {
-  const m = modelFor(v.model)!,
-    body = { prompt: v.prompt, resolution: v.resolution }
+  const m = modelFor(v.model)!
   if (m.kind === "image")
-    return {
-      path: m.path,
-      body: {
-        ...body,
-        aspect_ratio: v.aspectRatio,
-        ...(m.id.startsWith("soul-") ? { batch_size: 1, enhance_prompt: v.enhancePrompt } : {}),
-      },
-    }
+    return { kind: "image" as const, model: m.path, prompt: v.prompt, size: IMAGE_SIZES[v.aspectRatio], promptExtend: v.enhancePrompt }
   return {
-    path: `${m.path}/${sourceUrl ? "image-to-video" : "text-to-video"}`,
-    body: {
-      ...body,
-      duration: v.duration,
-      ...(sourceUrl ? { image_url: sourceUrl } : { aspect_ratio: v.aspectRatio }),
-      ...(m.audio ? { generate_audio: v.audio } : {}),
-    },
+    kind: "video" as const,
+    model: sourceUrl ? "wan2.7-i2v" : "wan2.7-t2v",
+    prompt: v.prompt,
+    resolution: v.resolution.toUpperCase(),
+    ratio: v.aspectRatio,
+    duration: v.duration!,
+    promptExtend: v.enhancePrompt,
+    ...(sourceUrl ? { firstFrame: sourceUrl } : {}),
   }
 }

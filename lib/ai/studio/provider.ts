@@ -1,26 +1,16 @@
 import { WorkspaceError } from "@/lib/auth/workspace-context"
+import { dashscopeKey } from "@/lib/ai/dashscope-media"
 import { mapInput, type GenerationInput } from "./catalog"
-export function configuration() {
-  const key = process.env.HF_API_KEY?.trim()
-  let base = ""
-  try {
-    const u = new URL(process.env.HF_API_BASE_URL || "")
-    if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) throw new Error()
-    base = u.toString().replace(/\/$/, "")
-  } catch {}
-  return {
-    ready: !!(base && key && /^[^\s:]+:[^\s]+$/.test(key) && process.env.MEDIA_BLOB_READ_WRITE_TOKEN),
-    base,
-    key,
-  }
+/** Qwen Cloud (DashScope) as the generation provider. docs/architecture/47. */
+const base = () => (process.env.DASHSCOPE_BASE_API || "https://dashscope-intl.aliyuncs.com/api/v1").replace(/\/+$/, "")
+export async function configuration() {
+  const key = (await dashscopeKey().catch(() => null))?.trim() || ""
+  return { ready: !!(key && process.env.MEDIA_BLOB_READ_WRITE_TOKEN), key }
 }
-export function requireConfiguration() {
-  const c = configuration()
+export async function requireConfiguration() {
+  const c = await configuration()
   if (!c.ready)
-    throw new WorkspaceError(
-      "Media Studio needs administrator setup. Chat and saved media remain available.",
-      503,
-    )
+    throw new WorkspaceError("Media Studio needs administrator setup. Chat and saved media remain available.", 503)
   return c
 }
 export class ProviderError extends Error {
@@ -31,70 +21,84 @@ export class ProviderError extends Error {
     super(message)
   }
 }
-async function request(path: string, body?: object): Promise<Record<string, unknown>> {
-  const c = requireConfiguration()
-  const r = await fetch(`${c.base}/${path}`, {
-    method: body ? "POST" : "GET",
+const BLOCKED = /DataInspectionFailed|IPInfringementSuspect|inappropriate|sensitive/i
+async function call(path: string, init: { body?: object; async?: boolean; timeout: number }): Promise<Record<string, any>> {
+  const c = await requireConfiguration()
+  const r = await fetch(`${base()}/${path}`, {
+    method: init.body ? "POST" : "GET",
     redirect: "error",
     cache: "no-store",
-    signal: AbortSignal.timeout(25000),
-    headers: { Authorization: `Key ${c.key}`, ...(body ? { "Content-Type": "application/json" } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    signal: AbortSignal.timeout(init.timeout),
+    headers: {
+      Authorization: `Bearer ${c.key}`,
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(init.async ? { "X-DashScope-Async": "enable" } : {}),
+    },
+    ...(init.body ? { body: JSON.stringify(init.body) } : {}),
   })
-  if (!r.ok)
-    throw new ProviderError(
-      r.status,
-      r.status === 401 || r.status === 403
-        ? "Generation credentials were rejected. Contact your administrator."
-        : r.status === 429
-          ? "Provider capacity or allowance is exhausted. Try later."
-          : r.status >= 500
-            ? "The generation provider is temporarily unavailable."
-            : "The provider rejected these settings. Review the prompt and model.",
-    )
-  const chunks: Uint8Array[] = []
-  let size = 0
-  const reader = r.body?.getReader()
-  if (reader)
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > 200000) {
-        await reader.cancel()
-        throw new ProviderError(502, "Invalid provider response.")
-      }
-      chunks.push(value)
-    }
-  let data: unknown
+  const text = (await r.text()).slice(0, 200000)
+  let data: any = null
   try {
-    data = JSON.parse(Buffer.concat(chunks).toString("utf8"))
-  } catch {
-    throw new ProviderError(502, "Invalid provider response.")
+    data = JSON.parse(text)
+  } catch {}
+  if (!r.ok) {
+    const reason = `${data?.code ?? ""} ${data?.message ?? ""}`
+    throw new ProviderError(
+      BLOCKED.test(reason) ? 422 : r.status,
+      BLOCKED.test(reason)
+        ? "The provider blocked this prompt or media. Revise it before trying again."
+        : r.status === 401 || r.status === 403
+          ? "Generation credentials were rejected. Contact your administrator."
+          : r.status === 429
+            ? "Provider capacity or allowance is exhausted. Try later."
+            : r.status >= 500
+              ? "The generation provider is temporarily unavailable."
+              : "The provider rejected these settings. Review the prompt and model.",
+    )
   }
-  if (!data || typeof data !== "object" || Array.isArray(data))
-    throw new ProviderError(502, "Invalid provider response.")
-  return data as Record<string, unknown>
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new ProviderError(502, "Invalid provider response.")
+  return data
 }
+/** Returns the job's provider reference: `task:<id>` for video, `img:<url>` for an image the synchronous call already produced. */
 export async function submitGeneration(v: GenerationInput, sourceUrl?: string) {
-  const mapped = mapInput(v, sourceUrl),
-    r = await request(mapped.path, mapped.body)
-  if (typeof r.request_id !== "string" || !r.request_id || r.request_id.length > 500)
-    throw new ProviderError(502, "Submission returned no request ID and may have succeeded.")
-  return r.request_id
+  const m = mapInput(v, sourceUrl)
+  if (m.kind === "image") {
+    const j = await call("services/aigc/multimodal-generation/generation", {
+      timeout: 55000,
+      body: {
+        model: m.model,
+        input: { messages: [{ role: "user", content: [{ text: m.prompt }] }] },
+        parameters: { n: 1, watermark: false, size: m.size, prompt_extend: m.promptExtend },
+      },
+    })
+    const parts = j?.output?.choices?.[0]?.message?.content
+    const url = Array.isArray(parts) ? parts.map((p: any) => p?.image).find((u: unknown) => typeof u === "string") : null
+    if (!url) throw new ProviderError(502, "Submission returned no image and may have been charged.")
+    return `img:${url}`
+  }
+  const j = await call("services/aigc/video-generation/video-synthesis", {
+    async: true,
+    timeout: 25000,
+    body: {
+      model: m.model,
+      input: { prompt: m.prompt, ...(m.firstFrame ? { media: [{ type: "first_frame", url: m.firstFrame }] } : {}) },
+      parameters: { resolution: m.resolution, ratio: m.ratio, duration: m.duration, prompt_extend: m.promptExtend, watermark: false },
+    },
+  })
+  const id = j?.output?.task_id
+  if (typeof id !== "string" || !id || id.length > 200) throw new ProviderError(502, "Submission returned no task ID and may have succeeded.")
+  return `task:${id}`
 }
-export async function generationStatus(id: string) {
-  const r = await request(`requests/${encodeURIComponent(id)}/status`)
-  const images = Array.isArray(r.images)
-    ? r.images.flatMap((x: unknown) => {
-        const u = (x as { url?: unknown })?.url
-        return typeof u === "string" ? [u] : []
-      })
-    : []
-  const video = (r.video as { url?: unknown })?.url
+export async function generationStatus(ref: string) {
+  if (ref.startsWith("img:")) return { status: "completed", image: ref.slice(4), video: null as string | null }
+  const id = ref.replace(/^task:/, "")
+  const j = await call(`tasks/${encodeURIComponent(id)}`, { timeout: 25000 })
+  const out = j.output ?? {}
+  const s = String(out.task_status || "unknown").toUpperCase()
+  const blocked = BLOCKED.test(`${out.code ?? ""} ${out.message ?? ""}`)
   return {
-    status: String(r.status || "unknown").toLowerCase(),
-    image: images[0] || null,
-    video: typeof video === "string" ? video : null,
+    status: s === "SUCCEEDED" ? "completed" : s === "PENDING" ? "queued" : s === "RUNNING" ? "running" : s === "FAILED" ? (blocked ? "nsfw" : "failed") : s === "CANCELED" ? "canceled" : "unknown",
+    image: null as string | null,
+    video: typeof out.video_url === "string" ? (out.video_url as string) : null,
   }
 }

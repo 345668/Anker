@@ -83,7 +83,7 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
     return view(old as Row)
   }
   await assertCreation(p)
-  requireConfiguration()
+  await requireConfiguration()
   const token = randomBytes(32).toString("hex")
   let sourceUrl: string | undefined
   if (input.sourceAssetId) {

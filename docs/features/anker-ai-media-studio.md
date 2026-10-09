@@ -1,5 +1,7 @@
 # Anker AI Image & Video Studio
 
+> **2026-10-09: the studio now generates with Qwen Cloud (DashScope), not the Higgsfield-compatible provider described below. See `docs/architecture/47-media-studio-qwen-cloud.md`.** Models: Qwen-Image 2.0, Qwen-Image Max, Z-Image Turbo, Wan 2.7 video (text and start-frame, 2-15 s, 720p/1080p). `HF_API_KEY` and `HF_API_BASE_URL` are not used.
+
 Based on Anker main `741f837c852a0137603f951df017c1fd41c449bd` and the protocol/settings inspected in `345668/open-higgsfield` at `b16a0ef`.
 
 ## Delivered
@@ -18,8 +20,7 @@ Founders, VC funds and LPs use server-resolved personas. Jobs/assets require bot
 
 2. Set server environment variables:
 
-   - `HF_API_BASE_URL`: the HTTPS generation API base used with your OpenHiggsfield platform account. Do not use the studio frontend URL or invent an endpoint.
-   - `HF_API_KEY`: platform credentials as `id:secret`; never a NEXT_PUBLIC variable.
+   - `DASHSCOPE_API_KEY` (or `QWEN_API_KEY`, or the Qwen key saved in the AI router config): the same DashScope key the rest of Anker AI uses; never a NEXT_PUBLIC variable.
    - `MEDIA_BLOB_READ_WRITE_TOKEN`: token for a dedicated **private** Vercel Blob store. A public store is unsuitable.
    - `NEXT_PUBLIC_APP_URL`: public HTTPS Anker origin, used for short-lived start-frame links.
    - `CRON_SECRET`: existing cron secret.

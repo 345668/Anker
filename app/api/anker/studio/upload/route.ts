@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     }
     assertScope(p, String(f.get("scopeKey") || ""), true)
     await assertCreation(p)
-    requireConfiguration()
+    await requireConfiguration()
     const [n] =
       await sql`SELECT count(*)::int AS n FROM ai_studio_assets WHERE user_id=${p.userId} AND job_id IS NULL AND created_at>now()-interval '1 day'`
     if (n.n >= 30)
