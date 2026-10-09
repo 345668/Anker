@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
-vi.mock("@/lib/ai/runtime-config", () => ({ readRouterConfig: async () => null }))
+const cfg = vi.hoisted(() => ({ v: null as null | Record<string, string> }))
+vi.mock("@/lib/ai/runtime-config", () => ({ readRouterConfig: async () => cfg.v }))
 import { inputSchema, mapInput } from "./catalog"
 import { submitGeneration, generationStatus, configuration } from "./provider"
 import { mediaFormat } from "./assets"
@@ -12,6 +13,7 @@ const base = {
   resolution: "standard",
 }
 beforeEach(() => {
+  cfg.v = null
   vi.stubEnv("DASHSCOPE_API_KEY", "sk-test")
   vi.stubEnv("MEDIA_BLOB_READ_WRITE_TOKEN", "private-token")
 })
@@ -84,6 +86,19 @@ it("is ready only with a DashScope key and the private Blob token", async () => 
   expect((await configuration()).ready).toBe(false)
   vi.stubEnv("MEDIA_BLOB_READ_WRITE_TOKEN", "t"); vi.stubEnv("DASHSCOPE_API_KEY", ""); vi.stubEnv("QWEN_API_KEY", "")
   expect((await configuration()).ready).toBe(false)
+})
+it("uses the free-tier key first and never the token-plan key", async () => {
+  vi.stubEnv("DASHSCOPE_API_KEY", ""); vi.stubEnv("QWEN_API_KEY", "")
+  cfg.v = { qwenFreeApiKey: "sk-free", qwenPlanApiKey: "sk-sp-plan" }
+  const f = vi.fn().mockResolvedValue(Response.json({ output: { choices: [{ message: { content: [{ image: "https://oss.example/a.png" }] } }] } }))
+  vi.stubGlobal("fetch", f)
+  await submitGeneration(inputSchema.parse(base))
+  expect(f.mock.calls[0][1].headers.Authorization).toBe("Bearer sk-free")
+  expect(f.mock.calls[0][0]).toMatch(/^https:\/\/dashscope-intl\.aliyuncs\.com\/api\/v1\//)
+  cfg.v = { qwenPlanApiKey: "sk-sp-plan" } // only a plan key: not usable for media
+  expect((await configuration()).ready).toBe(false)
+  cfg.v = { qwenApiKey: "sk-std" }
+  expect((await configuration()).ready).toBe(true)
 })
 it("recognizes media signatures and refuses SVG", () => {
   expect(mediaFormat(Buffer.from('<svg onload="alert(1)"></svg>'))).toBeNull()

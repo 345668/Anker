@@ -1,11 +1,22 @@
 import { WorkspaceError } from "@/lib/auth/workspace-context"
-import { dashscopeKey } from "@/lib/ai/dashscope-media"
+import { readRouterConfig } from "@/lib/ai/runtime-config"
+import { qwenLanes } from "@/lib/ai/qwen-lanes"
 import { mapInput, type GenerationInput } from "./catalog"
-/** Qwen Cloud (DashScope) as the generation provider. docs/architecture/47. */
-const base = () => (process.env.DASHSCOPE_BASE_API || "https://dashscope-intl.aliyuncs.com/api/v1").replace(/\/+$/, "")
+/**
+ * Qwen Cloud (DashScope) as the generation provider. docs/architecture/47.
+ * The key is the pay-as-you-go key on the standard endpoint: the free-tier key, else the standard Qwen key, else DASHSCOPE_API_KEY / QWEN_API_KEY (the same order
+ * the text lanes use, doc 35). The token-plan key is never used: it is a coding plan on a different endpoint that serves text models only.
+ */
+async function endpoint(): Promise<{ key: string; base: string } | null> {
+  const cfg = await readRouterConfig().catch(() => null)
+  const lane = qwenLanes(cfg).find((l) => l.id !== "plan")
+  if (!lane) return null
+  // The text lanes use the OpenAI-compatible path; media uses the native API on the same host (or workspace host).
+  return { key: lane.apiKey.trim(), base: (process.env.DASHSCOPE_BASE_API || lane.baseUrl.replace(/\/compatible-mode\/v1$/, "/api/v1")).replace(/\/+$/, "") }
+}
 export async function configuration() {
-  const key = (await dashscopeKey().catch(() => null))?.trim() || ""
-  return { ready: !!(key && process.env.MEDIA_BLOB_READ_WRITE_TOKEN), key }
+  const e = await endpoint()
+  return { ready: !!(e?.key && process.env.MEDIA_BLOB_READ_WRITE_TOKEN), key: e?.key ?? "", base: e?.base ?? "" }
 }
 export async function requireConfiguration() {
   const c = await configuration()
@@ -24,7 +35,7 @@ export class ProviderError extends Error {
 const BLOCKED = /DataInspectionFailed|IPInfringementSuspect|inappropriate|sensitive/i
 async function call(path: string, init: { body?: object; async?: boolean; timeout: number }): Promise<Record<string, any>> {
   const c = await requireConfiguration()
-  const r = await fetch(`${base()}/${path}`, {
+  const r = await fetch(`${c.base}/${path}`, {
     method: init.body ? "POST" : "GET",
     redirect: "error",
     cache: "no-store",
