@@ -15,7 +15,8 @@ import { assertOutreachAllowed } from "@/lib/email/send-gate"
 import { enqueueAction, approveActions, claimActions, reportActionResult, reclaimStaleActions } from "@/lib/linkedin/action-queue"
 
 let db: PGlite
-let clock = new Date("2026-10-06T09:00:00Z")
+const T0 = Date.now() + 60_000 // a minute ahead, so rows approved "now" are already due // relative to the real clock: the database stamps rows with its own now()
+let clock = new Date(T0)
 let paused = false
 const sent: any[] = []
 const deps: ExecDeps = { now: () => clock, paused: async () => paused, waveRemaining: async () => 50, assertAllowed: (to, u) => assertOutreachAllowed({ to, senderUserId: u }),
@@ -26,7 +27,7 @@ const one = async (q: string, p: unknown[] = []) => (await db.query(q, p)).rows[
 const all = async (q: string, p: unknown[] = []) => (await db.query(q, p)).rows as any[]
 /** The test clock is not the database clock: make what was sent look like it went days ago. */
 const age = () => db.query("UPDATE outreach_messages SET sent_at = now() - interval '5 days' WHERE status = 'sent'").then(() => db.query("UPDATE send_items SET sent_at = now() - interval '5 days' WHERE status = 'sent'"))
-const D = (days: number) => new Date(new Date("2026-10-06T09:00:00Z").getTime() + days * 86_400_000)
+const D = (days: number) => new Date(T0 + days * 86_400_000)
 
 beforeAll(async () => {
   db = new PGlite()
@@ -50,7 +51,7 @@ beforeAll(async () => {
 afterAll(async () => db.close())
 beforeEach(async () => {
   await db.exec("DELETE FROM send_items; DELETE FROM send_authorizations; DELETE FROM outreach_messages; DELETE FROM crm_entries; DELETE FROM outreach_replies; DELETE FROM email_suppressions; DELETE FROM investors; DELETE FROM outreach_consents; DELETE FROM li_action_queue; DELETE FROM audit_events; UPDATE platform_flags SET enabled = false")
-  clock = new Date("2026-10-06T09:00:00Z"); paused = false; sent.length = 0; h.audit.mockReset(); h.audit.mockResolvedValue(undefined)
+  clock = new Date(T0); paused = false; sent.length = 0; h.audit.mockReset(); h.audit.mockResolvedValue(undefined)
 })
 
 /** One contact with the four steps of a sequence. */

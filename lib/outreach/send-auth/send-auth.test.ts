@@ -18,7 +18,10 @@ import { suppressGlobally } from "@/lib/email/unsubscribe"
 import { EntitlementRefusal } from "@/lib/entitlements"
 
 let db: PGlite
-let clock = new Date("2026-10-06T09:00:00Z")
+// Relative to the real clock: the database stamps rows with its own now(), so a fixed date goes stale as days pass.
+const T0 = Date.now() + 60_000 // a minute ahead, so rows approved "now" are already due
+const at = (days: number, mins = 0) => new Date(T0 + days * 86_400_000 + mins * 60_000)
+let clock = at(0)
 let remaining = 50, paused = false, syncs: string[] = []
 const sent: any[] = []
 let resendImpl: (i: any) => Promise<any> = async (i) => ({ resendId: `re_${sent.length}`, messageId: i.messageId ?? "<m>", finalFrom: "me@summit.test", finalSubject: i.subject, droppedRecipients: [] })
@@ -61,7 +64,7 @@ beforeAll(async () => {
 afterAll(async () => db.close())
 beforeEach(async () => {
   await db.exec("DELETE FROM send_items; DELETE FROM send_authorizations; DELETE FROM outreach_messages; DELETE FROM crm_entries; DELETE FROM outreach_replies; DELETE FROM organizations; DELETE FROM outreach_campaign_members; DELETE FROM outreach_campaigns; DELETE FROM email_oauth_accounts; DELETE FROM email_suppressions; DELETE FROM investors; DELETE FROM outreach_consents; DELETE FROM entity_memory; DELETE FROM audit_events; UPDATE platform_flags SET enabled = false")
-  clock = new Date("2026-10-06T09:00:00Z"); remaining = 50; paused = false; syncs = []; sent.length = 0; h.suppressed.clear(); h.audit.mockReset(); h.audit.mockResolvedValue(undefined); delete process.env.OUTREACH_COUNTRY_GATE
+  clock = at(0); remaining = 50; paused = false; syncs = []; sent.length = 0; h.suppressed.clear(); h.audit.mockReset(); h.audit.mockResolvedValue(undefined); delete process.env.OUTREACH_COUNTRY_GATE
   resendImpl = async (i) => ({ resendId: `re_${sent.length}`, messageId: i.messageId ?? "<m>", finalFrom: "me@summit.test", finalSubject: i.subject, droppedRecipients: [] })
   gateImpl = (to, u) => assertOutreachAllowed({ to, senderUserId: u }); _resetShadowLogForTests()
 })
@@ -238,14 +241,14 @@ describe("the executor", () => {
     await seed(5); await approve(ids(5)); remaining = 2
     expect((await runExecutor(deps)).sent).toBe(2)
     expect((await one("SELECT count(*)::int n FROM send_items WHERE status = 'approved'")).n).toBe(3)
-    remaining = 50; clock = new Date("2026-10-07T09:00:00Z"); expect((await runExecutor(deps)).sent).toBe(3)
+    remaining = 50; clock = at(1); expect((await runExecutor(deps)).sent).toBe(3)
     await seed(30, "q"); await approve(ids(30, "q"))
     expect((await runExecutor(deps)).sent).toBe(20) // PER_TICK
     expect((await runExecutor(deps)).sent).toBe(10)
   })
   it("a send time in the future waits until it arrives", async () => {
-    await seed(1); await approve(["pm0"], { sendAfter: "2026-10-08T09:00:00Z" })
-    expect((await runExecutor(deps)).sent).toBe(0); clock = new Date("2026-10-08T09:01:00Z"); expect((await runExecutor(deps)).sent).toBe(1)
+    await seed(1); await approve(["pm0"], { sendAfter: at(2).toISOString() })
+    expect((await runExecutor(deps)).sent).toBe(0); clock = at(2, 1); expect((await runExecutor(deps)).sent).toBe(1)
   })
   it("the platform flag and maintenance mode stop everything, and items wait", async () => {
     await seed(1); await approve(["pm0"])
