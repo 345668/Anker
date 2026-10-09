@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     const p = await requireAiPrincipal()
     if (!rateLimit(`studio-speech:${p.userId}`, AI_HEAVY).ok)
       throw new WorkspaceError("Too many voice requests. Wait a minute.", 429)
-    return json({ asset: await createSpeech(p, speechSchema.parse(await readJson(req))) }, 201)
+    return json(await createSpeech(p, speechSchema.parse(await readJson(req))), 201)
   } catch (e) {
     return errorResponse(e)
   }

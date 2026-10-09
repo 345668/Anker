@@ -380,7 +380,7 @@ function tts(wavs: Buffer[]) {
 }
 it("speaks dialogue into one private voice track with the pause between speakers", async () => {
   const f = tts([wavBytes(tone(1500)), wavBytes(tone(2000))])
-  const a = await createSpeech(
+  const { asset: a, timeline } = await createSpeech(
     principal(),
     speak([
       { voice: "Ethan", text: "Walk us through your retention." },
@@ -388,6 +388,10 @@ it("speaks dialogue into one private voice track with the pause between speakers
     ]),
   )
   expect(a).toMatchObject({ kind: "audio", durationMs: 1500 + 450 + 2000 })
+  expect(timeline).toEqual([
+    { startMs: 0, endMs: 1500 },
+    { startMs: 1950, endMs: 3950 },
+  ])
   expect(f).toHaveBeenCalledTimes(2)
   expect(JSON.parse(f.mock.calls[0][1].body)).toEqual({
     model: "qwen3-tts-flash",
@@ -400,7 +404,9 @@ it("speaks dialogue into one private voice track with the pause between speakers
 })
 it("pads a very short line to the two seconds a video voice track needs, and refuses a track over thirty", async () => {
   tts([wavBytes(tone(600))])
-  expect(await createSpeech(principal(), speak([{ text: "Yes." }]))).toMatchObject({ durationMs: 2000 })
+  expect((await createSpeech(principal(), speak([{ text: "Yes." }]))).asset).toMatchObject({
+    durationMs: 2000,
+  })
   tts(Array.from({ length: 4 }, () => wavBytes(tone(9000))))
   await expect(
     createSpeech(principal(), speak(Array.from({ length: 4 }, () => ({ text: "A long answer." })))),

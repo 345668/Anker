@@ -90,5 +90,13 @@ export async function createSpeech(p: AiPrincipal, input: SpeechInput) {
       400,
     )
   const asset = await storeAsset(p, randomUUID(), wavBytes(track), "audio", null, durationMs(track))
-  return publicAsset(asset)
+  // When each line starts and ends in the joined track, so captions and on-screen cues can follow the speech exactly.
+  let at = 0
+  const timeline = clips.map((c, i) => {
+    const startMs = at,
+      len = durationMs(c)
+    at += len + (i < clips.length - 1 ? input.lines[i].pauseMs : 0)
+    return { startMs, endMs: startMs + len }
+  })
+  return { asset: publicAsset(asset), timeline }
 }
