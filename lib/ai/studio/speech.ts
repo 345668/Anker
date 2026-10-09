@@ -54,9 +54,20 @@ async function speakLine(voice: string, text: string, language: string) {
       input: { text, voice, language_type: language },
     },
   })
-  const url = j?.output?.audio?.url
-  if (typeof url !== "string" || !url.startsWith("https://"))
+  const audio = j?.output?.audio
+  // The reply carries a download link; some versions return the audio inline as base64 instead.
+  if (typeof audio?.data === "string" && audio.data.length > 100)
+    return parseWav(Buffer.from(audio.data, "base64"))
+  const url = audio?.url
+  if (typeof url !== "string" || !url.startsWith("https://")) {
+    console.error(
+      "[studio speech] no audio in reply; shape:",
+      JSON.stringify(j, (k, v) =>
+        typeof v === "string" && v.length > 60 ? `${v.slice(0, 30)}…(${v.length})` : v,
+      ).slice(0, 600),
+    )
     throw new ProviderError(502, "Speech returned no audio and may have been charged.")
+  }
   const file = await safeFetch(url, {
     maxBytes: 8 * 1024 * 1024,
     timeoutMs: 30000,
