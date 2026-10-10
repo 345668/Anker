@@ -136,6 +136,13 @@ you configure. Full privacy policy:
   a background tab, extract HTML, close the tab.
 - **activeTab:** read the current profile when the user clicks the
   toolbar action.
+- **alarms:** pace the optional "Start sending" worker. The user approves
+  each connection request or message in Anker first; the extension then
+  runs one approved action at a time, with a delay between actions, and
+  an alarm schedules the next one because background service workers are
+  suspended when idle. It runs only after the user presses Start.
+- **host_permissions (an-ker.de):** fetch the user's approved actions and
+  report their result to their own Anker workspace.
 
 ## Remote code use
 
