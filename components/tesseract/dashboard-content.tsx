@@ -7,6 +7,8 @@ import { ArrowUpRight, ArrowRight, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import styles from "@/components/shell/workspace-home.module.css";
 import { formatMoney } from "@/lib/platform/money";
+import { RaisePathCard } from "@/components/vc/raise-path-card";
+import type { RaiseState } from "@/lib/vc/raise-path";
 
 interface RecentDeal {
   id: string;
@@ -34,6 +36,7 @@ interface DashboardStats {
   pipelineAvailable?: boolean;
   currency?: string | null;
   scope?: string;
+  raise?: RaiseState | null;
 }
 
 function amount(value: number, currency?: string | null): string {
@@ -67,6 +70,11 @@ export function DashboardContent({
   const pipelineHref = stats.pipelineHref ?? "/dashboard/fundraising/pipeline";
   const founder = stats.persona === "founder";
   const fund = stats.persona === "vc";
+  // A fund that is still raising and has no deals yet leads with the way to a first wave, not an empty deal list (docs/architecture/50).
+  const raising = fund && !!stats.raise && !stats.raise.complete && stats.activeDeals === 0;
+  // The card stays for a fund that is mid-raise even once it has deals; a fund that only runs deals and never raised through Anker is not nagged.
+  const showRaise = fund && !!stats.raise && !stats.raise.complete && (stats.activeDeals === 0 || stats.raise.counts.lpContacts > 0);
+  const nextStep = stats.raise?.next ?? null;
   const metrics = [
     {
       label: founder ? "Active investor conversations" : "Active deals",
@@ -98,18 +106,20 @@ export function DashboardContent({
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>{stats.workspaceName || "ANKER WORKSPACE"} / {founder ? "FOUNDER OVERVIEW" : fund ? "FUND OVERVIEW" : "OVERVIEW"}</p>
-          <h1>{founder ? "Move your raise forward." : fund ? "Your fund, in focus." : "Your next move, in focus."}</h1>
+          <h1>{founder ? "Move your raise forward." : raising ? "Raise your fund." : fund ? "Your fund, in focus." : "Your next move, in focus."}</h1>
           <p className={styles.intro}>
             {name ? `Welcome back, ${name}.` : "Welcome back."}{" "}
-            {founder ? "Review investor conversations, follow-ups and the next steps toward your round." : fund ? "Review investment decisions, portfolio work and investor responsibilities." : "Choose a workspace to focus your work."}
+            {founder ? "Review investor conversations, follow-ups and the next steps toward your round." : raising ? "Find the right LPs, write to them, approve and send. Each step below does the work for you." : fund ? "Review investment decisions, portfolio work and investor responsibilities." : "Choose a workspace to focus your work."}
           </p>
         </div>
         <Button asChild className="min-h-11">
-          <Link href={stats.pipelineAvailable === false ? founder ? "/dashboard/fundraising/pipeline" : "/onboarding" : pipelineHref}>
-            {stats.pipelineAvailable === false ? "Complete setup" : founder ? "Open fundraising round" : "Review deal pipeline"} <ArrowRight className="h-4 w-4" />
+          <Link href={raising && nextStep ? (nextStep.href ?? "#raise-path") : stats.pipelineAvailable === false ? founder ? "/dashboard/fundraising/pipeline" : "/onboarding" : pipelineHref}>
+            {raising && nextStep ? nextStep.button : stats.pipelineAvailable === false ? "Complete setup" : founder ? "Open fundraising round" : "Review deal pipeline"} <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
       </header>
+
+      {showRaise && stats.raise && <RaisePathCard initial={stats.raise} />}
 
       <section aria-label="Platform overview" className={styles.overview}>
         <div className={styles.metrics}>

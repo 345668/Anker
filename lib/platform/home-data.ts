@@ -2,6 +2,7 @@ import { sql } from "@/lib/db"
 import { resolveActiveMembership } from "@/lib/org/active"
 import { listRaiseRounds } from "@/lib/fundraising/rounds"
 import { resolveWorkspaceFund } from "@/lib/auth/fund-access"
+import { raiseState } from "@/lib/vc/raise-path"
 
 /** Personal CRM and fund deal flow are distinct datasets; never read legacy global deals. */
 export async function getHomeData(userId: string) {
@@ -37,7 +38,10 @@ export async function getHomeData(userId: string) {
     aggregate = totals[0] ?? {}; recent = rows
   }
   const [contacts] = await sql`SELECT COUNT(*)::int total FROM crm_entries WHERE org_id = ${active?.orgId ?? null}`
+  // A fund workspace that is raising sees the way from an empty account to a first approved wave (docs/architecture/50). A failure here never blocks the home page.
+  const raise = isFund && active ? await raiseState(active.orgId).catch(() => null) : null
   return {
+    raise,
     persona: active?.persona ?? null, workspaceName: active?.name ?? null, roundName: round?.name ?? null, target: round?.target ?? null,
     decisionsAwaitingReview: Number(aggregate.decisions ?? 0),
     totalFirms: 0, totalInvestors: 0, totalContacts: Number(contacts?.total ?? 0),
