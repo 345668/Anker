@@ -63,4 +63,10 @@ Three things stopped a partner from finishing on the card; each now has its own 
 
 Shipped in `f536727`, CI green, deployed. Covered by unit tests on PGlite (`lib/vc/second-slice.test.ts`) and the shortlist query was run read-only against the real production matching session (75 firm-distinct picks, 72 with an email).
 
-**Not yet verified:** a click-through on production (inline fund form, one-click shortlist insert against production column types, LinkedIn queue to the review queue). **Not measured:** no real partner has used the path; Summit/Winner workspaces still have 0 contacts.
+**Walked through on production (2026-10-10)** in a throwaway fund workspace (sending paused; everything removed afterwards):
+1. The inline fund form created the profile (name, GP, target raise, base, sectors, geography saved). This found a real fault: `fund_profiles.id` is a uuid column and the form wrote an `fp_` prefixed id, which the PGlite tests (text column) did not catch. Fixed in `bd4e4cc`.
+2. A 14-firm matching run was added; "Add the top 25 to your pipeline" added 14 LPs in one click (3 of 5 steps done).
+3. "Write drafts" wrote 10 drafts in about 30 seconds, using "5M" with no currency; "Approve all" saved them. The card then offered "Review and send 9 emails" (9 of the 14 had an address) and the LinkedIn row "10 saved messages ready".
+4. "Queue for review" queued 10 connection requests; the LinkedIn Review Queue listed them as pending approval under the user's sender profile. Nothing was sent.
+
+**Not verified:** approving a LinkedIn request through to the extension; the 9-email send review (it was verified in the first walk-through). **Not measured:** no real partner has used the path; Summit/Winner workspaces still have 0 contacts.
