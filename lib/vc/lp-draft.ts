@@ -57,7 +57,7 @@ ${lp || "(limited information: keep it honest and brief)"}`
 }
 
 const MONEY_TOKEN =
-  /\$\s?\d[\d,.]*\s?(?:[kKmMbB]|million|billion)?|\d[\d,.]*\s?(?:%|percent|million|billion|[mMbB]\b)|[€£]\s?\d[\d,.]*|\d+(?:\.\d+)?\s?x\b/gi
+  /\$\s?\d[\d,.]*\s?(?:[kKmMbB]|million|billion)?|\d[\d,.]*\s?(?:%|percent|million|billion|[mMbB]\b)|[€£]\s?\d[\d,.]*\s?(?:[kKmMbB]\b|million|billion)?|\d+(?:\.\d+)?\s?x\b/gi
 const digits = (s: string) => s.replace(/[^0-9.]/g, "").replace(/^0+(?=\d)/, "")
 /** Figures in a message that are not in the fund facts: a draft that quotes an invented number must not be proposed. */
 export function inventedFigures(text: string, f: FundFacts): string[] {
