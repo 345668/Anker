@@ -93,6 +93,9 @@ function connectRoutine(note: string | null, sel: ConnectSel): Promise<ExecResul
     }
     if (!connectBtn) {
       if (byText(document, "button, span", rx(sel.alreadyConnected_re))) return { ok: false, error: "Already connected or invite pending" };
+      // They invited us first: the page offers Accept / Ignore instead of Connect. Nothing is clicked; the user decides.
+      if (byText(document, "button", rx("^(accept|annehmen|accepter|aceptar)$")) && byText(document, "button", rx("^(ignore|ignorieren|ignorer|ignorar)$")))
+        return { ok: false, error: "This person has already invited you. Accept the invitation in LinkedIn; no request was sent." };
       return { ok: false, error: "Connect button not found" };
     }
     connectBtn.click();

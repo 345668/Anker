@@ -102,6 +102,7 @@ export async function onActionTick(): Promise<void> {
     // Claim exactly one approved action.
     const q = await fetchActionQueue(1);
     if (!q.ok) { await setState({ lastError: q.error || "fetch failed" }); scheduleNext(jitterMin()); return; }
+    if (st.lastError) await setState({ lastError: null }); // the poll worked, so an earlier poll error is no longer current
     const item = q.items?.[0];
     if (!item) { await setState({ running: false }); try { await chrome.alarms.clear(ACTION_ALARM); } catch {} return; } // queue drained
 
