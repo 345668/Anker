@@ -3,6 +3,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { ArrowRight, Check, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { SendReview } from "@/components/outreach/send-review"
 import type { RaiseState } from "@/lib/vc/raise-path"
 
 interface Wave {
@@ -16,6 +17,7 @@ export function RaisePathCard({ initial }: { initial: RaiseState }) {
   const [busy, setBusy] = useState(false)
   const [wave, setWave] = useState<Wave | null>(null)
   const [error, setError] = useState("")
+  const [reviewing, setReviewing] = useState(false)
   const done = state.steps.filter((s) => s.done && s.id !== "follow").length
   const total = state.steps.length - 1
   async function refresh() {
@@ -80,7 +82,11 @@ export function RaisePathCard({ initial }: { initial: RaiseState }) {
             <p className="text-sm font-medium">Next: {next.label}</p>
             <p className="mt-1 text-sm text-muted-foreground">{next.detail}</p>
           </div>
-          {next.action === "drafts" ? (
+          {next.action === "send" ? (
+            <Button onClick={() => setReviewing(true)} className="min-h-11 gap-2">
+              {next.button} <ArrowRight className="size-4" />
+            </Button>
+          ) : next.action === "drafts" ? (
             <Button
               onClick={() => void writeDrafts()}
               disabled={busy || state.counts.draftable === 0}
@@ -126,6 +132,13 @@ export function RaisePathCard({ initial }: { initial: RaiseState }) {
             </p>
           )}
         </div>
+      )}
+      {reviewing && (
+        <SendReview
+          messageIds={state.draftEmailIds}
+          onClose={() => setReviewing(false)}
+          onDone={() => void refresh()}
+        />
       )}
     </section>
   )

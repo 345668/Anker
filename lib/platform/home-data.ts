@@ -39,7 +39,7 @@ export async function getHomeData(userId: string) {
   }
   const [contacts] = await sql`SELECT COUNT(*)::int total FROM crm_entries WHERE org_id = ${active?.orgId ?? null}`
   // A fund workspace that is raising sees the way from an empty account to a first approved wave (docs/architecture/50). A failure here never blocks the home page.
-  const raise = isFund && active ? await raiseState(active.orgId).catch(() => null) : null
+  const raise = isFund && active ? await raiseState(active.orgId, userId).catch(() => null) : null
   return {
     raise,
     persona: active?.persona ?? null, workspaceName: active?.name ?? null, roundName: round?.name ?? null, target: round?.target ?? null,

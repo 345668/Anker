@@ -61,7 +61,7 @@ beforeAll(async () => {
   await db.exec(`CREATE TABLE fund_profiles (id text PRIMARY KEY, org_id text, is_active boolean, name text, gp_name text, target_raise numeric, minimum_commitment numeric, thesis_description text, sectors jsonb, geographic_focus jsonb, gp_commitment numeric, fund_number int, headquarters_location text, target_lp_types jsonb, value_proposition text, updated_at timestamptz DEFAULT now());
     CREATE TABLE lp_match_sessions (id serial PRIMARY KEY, fund_profile_id text, total_firms_matched int, total_contacts_matched int);
     CREATE TABLE crm_entries (id text PRIMARY KEY, org_id text, source text, display_name text, display_email text, display_linkedin text, display_score int, stage text, added_at timestamptz, display_title text, display_type text, display_location text, why_match text, research_summary text);
-    CREATE TABLE outreach_messages (id serial PRIMARY KEY, crm_entry_id text, kind text);
+    CREATE TABLE outreach_messages (id serial PRIMARY KEY, crm_entry_id text, kind text, user_id text, channel text, status text, created_at timestamptz DEFAULT now());
     CREATE TABLE action_proposals (id serial PRIMARY KEY, org_id text, capability text, status text, input jsonb, run_id text, created_at timestamptz DEFAULT now());
     CREATE TABLE send_authorizations (id serial PRIMARY KEY, org_id text);
     CREATE TABLE outreach_replies (id serial PRIMARY KEY, crm_entry_id text);`)
@@ -122,8 +122,38 @@ describe("raise path state", () => {
       href: "/dashboard/actions",
       action: null,
     })
-    expect(s.next?.id).toBe("send")
+    expect(s.next).toMatchObject({ id: "send", href: "/dashboard/actions", button: "Approve the drafts" })
     expect(s.counts).toMatchObject({ pendingProposals: 1, draftable: 9 })
+    // Drafts saved by approval: the send step now opens the review for the sender's own email drafts, with an address, best match first.
+    await db.exec("UPDATE action_proposals SET status = 'applied'")
+    await db.exec(
+      "INSERT INTO outreach_messages (crm_entry_id, kind, user_id, channel, status) VALUES ('l1','email_intro','u1','email','draft'), ('l3','email_intro','u1','email','draft'), ('l0','email_intro','u1','email','draft'), ('l2','email_intro','u2','email','draft'), ('l0','dm_intro','u1','linkedin','draft')",
+    )
+    s = await raiseState(ORG, "u1")
+    expect(s.counts.draftEmails).toBe(3)
+    expect(s.draftEmailIds).toHaveLength(3)
+    expect(s.next).toMatchObject({
+      id: "send",
+      action: "send",
+      href: null,
+      button: "Review and send 3 emails",
+    })
+    expect((await raiseState(ORG)).draftEmailIds).toEqual([]) // without a sender there is nothing to review
+    // Drafts saved by approval: the send step now opens the review for the sender's own email drafts, with an address, best match first.
+    await db.exec("UPDATE action_proposals SET status = 'applied'")
+    await db.exec(
+      "INSERT INTO outreach_messages (crm_entry_id, kind, user_id, channel, status) VALUES ('l1','email_intro','u1','email','draft'), ('l3','email_intro','u1','email','draft'), ('l0','email_intro','u1','email','draft'), ('l2','email_intro','u2','email','draft'), ('l0','dm_intro','u1','linkedin','draft')",
+    )
+    s = await raiseState(ORG, "u1")
+    expect(s.counts.draftEmails).toBe(3)
+    expect(s.draftEmailIds).toHaveLength(3)
+    expect(s.next).toMatchObject({
+      id: "send",
+      action: "send",
+      href: null,
+      button: "Review and send 3 emails",
+    })
+    expect((await raiseState(ORG)).draftEmailIds).toEqual([]) // without a sender there is nothing to review
     await db.exec("INSERT INTO send_authorizations (org_id) VALUES ('org-a')")
     s = await raiseState(ORG)
     expect(s.complete).toBe(true)

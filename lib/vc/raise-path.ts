@@ -10,7 +10,7 @@ export interface RaiseStep {
   done: boolean
   detail: string
   href: string | null
-  action: "drafts" | null
+  action: "drafts" | "send" | null
   button: string
 }
 export interface FundFacts {
@@ -41,7 +41,10 @@ export interface RaiseState {
     authorizations: number
     replies: number
     draftable: number
+    draftEmails: number
   }
+  /** Up to 25 email drafts of the signed-in sender, ready for the send review. */
+  draftEmailIds: string[]
   fund: { id: string; name: string; missing: string[] } | null
 }
 export const SHORTLIST_MIN = 10
@@ -85,7 +88,7 @@ export function missingForDrafts(f: FundFacts): string[] {
   return m
 }
 
-export async function raiseState(orgId: string): Promise<RaiseState> {
+export async function raiseState(orgId: string, userId: string | null = null): Promise<RaiseState> {
   const [fr] =
     (await sql`SELECT * FROM fund_profiles WHERE org_id = ${orgId} AND is_active = true ORDER BY updated_at DESC NULLS LAST LIMIT 1`) as any[]
   const fund = fr ? toFundFacts(fr) : null
@@ -106,6 +109,13 @@ export async function raiseState(orgId: string): Promise<RaiseState> {
     (await sql`SELECT count(*)::int AS n FROM crm_entries e WHERE e.org_id = ${orgId} AND e.source = 'lp_matching' AND e.stage = 'queued' AND (e.display_email LIKE '%@%' OR e.display_linkedin IS NOT NULL)
       AND NOT EXISTS (SELECT 1 FROM outreach_messages x WHERE x.crm_entry_id = e.id AND x.kind IN ('email_intro','dm_intro'))
       AND NOT EXISTS (SELECT 1 FROM action_proposals q WHERE q.org_id = e.org_id AND q.capability = 'outreach_save_drafts' AND q.status = 'pending' AND q.input->>'entryId' = e.id)`) as any[]
+  const ready = userId
+    ? (
+        (await sql`SELECT m.id FROM outreach_messages m JOIN crm_entries e ON e.id = m.crm_entry_id
+      WHERE e.org_id = ${orgId} AND m.user_id = ${userId} AND m.kind = 'email_intro' AND m.channel = 'email' AND m.status = 'draft' AND e.display_email LIKE '%@%'
+      ORDER BY e.display_score DESC NULLS LAST, m.created_at LIMIT 25`) as any[]
+      ).map((x) => String(x.id))
+    : []
   const counts = {
     lpContacts: Number(c.n),
     withEmail: Number(c.emails),
@@ -114,6 +124,7 @@ export async function raiseState(orgId: string): Promise<RaiseState> {
     authorizations: Number(a.n),
     replies: Number(r.n),
     draftable: Number(dr.n),
+    draftEmails: ready.length,
   }
   const fundDone = !!fund && missing.length === 0
   const matchDone = Number(m.n) > 0
@@ -176,12 +187,21 @@ export async function raiseState(orgId: string): Promise<RaiseState> {
       id: "send",
       label: "Review and send",
       done: sendDone,
-      href: "/dashboard/send-center",
-      action: null,
-      button: "Review and send",
+      // Drafts waiting for approval come first; once saved, the send review opens right here with the sender's own email drafts.
+      href: counts.pendingProposals ? "/dashboard/actions" : ready.length ? null : "/dashboard/send-center",
+      action: !counts.pendingProposals && ready.length ? "send" : null,
+      button: counts.pendingProposals
+        ? "Approve the drafts"
+        : ready.length
+          ? `Review and send ${ready.length} email${ready.length === 1 ? "" : "s"}`
+          : "Review and send",
       detail: sendDone
         ? "You have approved a send."
-        : "Approve the drafts, then review exactly who will get what before anything goes.",
+        : counts.pendingProposals
+          ? "Approve the drafts in Actions (one click for all), then review exactly who will get what before anything goes."
+          : ready.length
+            ? "See each recipient, the text and what will be refused, then approve. Nothing goes without it. LinkedIn messages go through the LinkedIn review queue."
+            : "Review exactly who will get what, then approve. Nothing goes without it.",
     },
     {
       id: "follow",
@@ -204,6 +224,7 @@ export async function raiseState(orgId: string): Promise<RaiseState> {
     steps,
     next: complete ? null : next,
     counts,
+    draftEmailIds: ready,
     fund: fund ? { id: fund.id, name: fund.name, missing } : null,
   }
 }
