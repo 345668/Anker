@@ -160,10 +160,12 @@ describe("what the writer may say", () => {
     expect(fundFactLines(toFundFacts(fundRow({ target_raise: null }))).join("\n")).not.toContain("Raising")
   })
   it("catches a figure that is not in the profile and accepts the ones that are", () => {
-    expect(inventedFigures("We are raising $5M and the minimum is $250K.", fund)).toEqual([])
+    expect(inventedFigures("We are raising 5M and the minimum is 250K.", fund)).toEqual([])
     expect(inventedFigures("Our first fund returned 3x with a 28% IRR.", fund).length).toBeGreaterThan(0)
-    expect(inventedFigures("We manage $200M.", fund)).toEqual(["$200M"])
+    expect(inventedFigures("We manage 200M.", fund)).toEqual(["200M"])
     expect(inventedFigures("a 20-minute call", fund)).toEqual([])
+    expect(inventedFigures("We are raising €5M.", fund)).toEqual(["€5M"]) // the profile states no currency, so the message may not add one
+    expect(inventedFigures("We are raising 5M.", fund)).toEqual([])
   })
   it("accepts a good draft and refuses an unusable answer, a short email and an invented return", () => {
     const e = { display_name: "Pat Lee" }

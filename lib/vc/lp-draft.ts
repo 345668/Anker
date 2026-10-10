@@ -40,7 +40,7 @@ export function buildLpPrompt(entry: DraftEntry, f: FundFacts): string {
     .join("\n")
   const first = firstWord(entry.display_name) || "there"
   return `You write outreach from a venture fund manager to a prospective limited partner (LP) for the fund's raise. Be specific to this LP: use one real detail from the LP section, not a generic compliment. Plain, respectful, no hype, no em-dashes.
-HARD RULE: use ONLY the facts under FUND FACTS. Do not state any number, track record, past fund result, portfolio company or regulatory claim that is not listed there. If a fact is not listed, leave it out.
+HARD RULE: use ONLY the facts under FUND FACTS. Write amounts exactly as listed (for example "5M"), with no currency symbol and no currency name: the profile does not say which currency. Do not state any number, track record, past fund result, portfolio company or regulatory claim that is not listed there. If a fact is not listed, leave it out.
 
 Return ONLY a JSON object, no prose around it:
 {
@@ -77,7 +77,11 @@ export function inventedFigures(text: string, f: FundFacts): string[] {
     allowed.add(String(f.minimumCommitment))
     allowed.add(String(Math.round(f.minimumCommitment / 1e3)))
   }
-  return (text.match(MONEY_TOKEN) ?? []).filter((t) => !allowed.has(digits(t)))
+  // The profile does not state a currency, so a message may not add one: "5M" is a fact, "€5M" is a guess.
+  const symbols = new Set(facts.match(/[€£$]/g) ?? [])
+  return (text.match(MONEY_TOKEN) ?? []).filter(
+    (t) => !allowed.has(digits(t)) || [...t.matchAll(/[€£$]/g)].some((m) => !symbols.has(m[0])),
+  )
 }
 
 export type LpDraft = IntroDraft & { skip?: string }
