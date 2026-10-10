@@ -1,6 +1,7 @@
 import { requireAiPrincipal } from "@/lib/assistant/principal"
 import { inputSchema } from "@/lib/ai/studio/catalog"
-import { configuration } from "@/lib/ai/studio/provider"
+import { comfyBlocker, configuration } from "@/lib/ai/studio/provider"
+import { offeredRecipes } from "@/lib/ai/studio/comfy/recipes"
 import { assertScope, createJob, listJobs } from "@/lib/ai/studio/service"
 import { readJson, errorResponse, json } from "@/lib/ai/studio/http"
 import { WorkspaceError } from "@/lib/auth/workspace-context"
@@ -19,6 +20,10 @@ export async function GET(req: Request) {
     return json({
       scopeKey: p.scopeKey,
       ready: (await configuration()).ready,
+      // Self-hosted recipes that can run right now (switch on, gateway set up, licences and screening in place). Usually none.
+      comfyRecipes: (
+        await Promise.all(offeredRecipes().map(async (r) => ((await comfyBlocker(r)) ? null : r.id)))
+      ).filter(Boolean),
       canGenerate: !p.readonly && (p.persona === "lp" || p.canWrite),
       jobs,
       nextCursor: jobs.length === 30 ? jobs[jobs.length - 1].createdAt : null,

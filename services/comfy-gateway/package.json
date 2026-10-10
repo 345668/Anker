@@ -1,0 +1,10 @@
+{
+  "name": "anker-comfy-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Authenticated, allow-listed front door for a private ComfyUI worker (docs/architecture/49)",
+  "main": "server.mjs",
+  "scripts": { "start": "node server.mjs", "test": "node --test server.test.mjs" },
+  "engines": { "node": ">=20" }
+}

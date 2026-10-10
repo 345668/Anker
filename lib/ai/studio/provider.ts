@@ -1,7 +1,11 @@
 import { WorkspaceError } from "@/lib/auth/workspace-context"
 import { readRouterConfig } from "@/lib/ai/runtime-config"
 import { qwenLanes } from "@/lib/ai/qwen-lanes"
-import { mapInput, type GenerationInput } from "./catalog"
+import { ProviderError } from "./errors"
+import { mapInput, modelFor, type GenerationInput } from "./catalog"
+import { comfyConfig, comfyEnabled, comfySubmit, comfyJob, comfyUpload, comfyView } from "./comfy/client"
+import { fill, RecipeError, UNLICENSED, type Recipe } from "./comfy/recipes"
+import { screenOutput, screenPrompt, screensReady } from "./comfy/moderation"
 /**
  * Qwen Cloud (DashScope) as the generation provider. docs/architecture/47.
  * The key is the pay-as-you-go key on the standard endpoint: the free-tier key, else the standard Qwen key, else DASHSCOPE_API_KEY / QWEN_API_KEY (the same order
@@ -36,14 +40,7 @@ export async function requireConfiguration() {
     )
   return c
 }
-export class ProviderError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message)
-  }
-}
+export { ProviderError }
 export const providerCall = (path: string, init: { body?: object; async?: boolean; timeout: number }) =>
   call(path, init)
 const BLOCKED = /DataInspectionFailed|IPInfringementSuspect|inappropriate|sensitive/i
@@ -91,7 +88,14 @@ async function call(
   return data
 }
 /** Returns the job's provider reference: `task:<id>` for video, `img:<url>` for an image the synchronous call already produced. */
-export async function submitGeneration(v: GenerationInput, sourceUrl?: string, audioUrl?: string) {
+export async function submitGeneration(
+  v: GenerationInput,
+  sourceUrl?: string,
+  audioUrl?: string,
+  ctx: { jobId?: string; sourceBytes?: Buffer } = {},
+) {
+  const recipe = modelFor(v.model)?.recipe
+  if (recipe) return submitComfy(recipe, v, ctx)
   const m = mapInput(v, sourceUrl, audioUrl)
   if (m.kind === "image") {
     const content: Array<{ image: string } | { text: string }> = [
@@ -150,7 +154,60 @@ export async function submitGeneration(v: GenerationInput, sourceUrl?: string, a
     throw new ProviderError(502, "Submission returned no task ID and may have succeeded.")
   return `task:${id}`
 }
-export async function generationStatus(ref: string) {
+/** Why a self-hosted recipe cannot run right now, or null: the platform switch, the gateway settings, the licences, and content screening for free text. */
+export async function comfyBlocker(r: Recipe): Promise<string | null> {
+  if (!(await comfyEnabled()) || !comfyConfig()) return "Self-hosted generation is not available yet."
+  if (UNLICENSED(r).length) return "This recipe uses a model that may not be used commercially."
+  if (r.freeText && !screensReady())
+    return "Self-hosted generation is waiting for content screening to be set up."
+  return null
+}
+async function submitComfy(r: Recipe, v: GenerationInput, ctx: { jobId?: string; sourceBytes?: Buffer }) {
+  const why = await comfyBlocker(r)
+  if (why) throw new ProviderError(503, why)
+  const cfg = comfyConfig()!
+  if (!ctx.jobId) throw new ProviderError(400, "A job id is required.")
+  if (r.freeText) {
+    const sc = await screenPrompt(`${v.prompt}\n${v.negativePrompt ?? ""}`)
+    if (!sc.ok)
+      throw new ProviderError(
+        422,
+        "The provider blocked this prompt or media. Revise it before trying again.",
+      )
+  }
+  let sourceName: string | undefined
+  if (v.sourceAssetId && r.slots.source) {
+    if (!ctx.sourceBytes) throw new ProviderError(400, "The source image is missing.")
+    const png = ctx.sourceBytes[0] === 137
+    sourceName = `anker-${ctx.jobId}.${png ? "png" : "jpg"}`
+    await comfyUpload(cfg, ctx.sourceBytes, sourceName, png ? "image/png" : "image/jpeg")
+  }
+  let graph
+  try {
+    graph = fill(r, {
+      prompt: v.prompt,
+      negative: v.negativePrompt,
+      seed: v.seed,
+      ratio: v.aspectRatio,
+      sourceName,
+    })
+  } catch (e) {
+    if (e instanceof RecipeError) throw new ProviderError(400, e.message)
+    throw e
+  }
+  await comfySubmit(cfg, graph, ctx.jobId)
+  return `comfy:${ctx.jobId}`
+}
+export async function generationStatus(
+  ref: string,
+  model?: string,
+): Promise<{
+  status: string
+  image: string | null
+  video: string | null
+  file?: { bytes: Buffer; kind: "image" | "video" }
+}> {
+  if (ref.startsWith("comfy:")) return comfyStatus(ref.slice(6), model)
   if (ref.startsWith("img:"))
     return {
       status: "completed",
@@ -180,4 +237,18 @@ export async function generationStatus(ref: string) {
     image: null as string | null,
     video: typeof out.video_url === "string" ? (out.video_url as string) : null,
   }
+}
+
+async function comfyStatus(id: string, model?: string) {
+  const r = model ? modelFor(model)?.recipe : undefined
+  const cfg = comfyConfig()
+  if (!r || !cfg) throw new ProviderError(503, "Self-hosted generation is not available.")
+  const j = await comfyJob(cfg, id, r.output.node, r.output.key)
+  const none = { image: null as string | null, video: null as string | null }
+  if (j.state === "missing") return { status: "failed", ...none }
+  if (j.state !== "completed") return { status: j.state, ...none }
+  if (!j.files.length) return { status: "failed", ...none }
+  const bytes = await comfyView(cfg, j.files[0])
+  if (r.freeText && !(await screenOutput(bytes, r.output.kind)).ok) return { status: "nsfw", ...none }
+  return { status: "completed", ...none, file: { bytes, kind: r.output.kind } }
 }

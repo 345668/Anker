@@ -92,3 +92,13 @@ export async function assetResponse(a: AssetRow, download = false) {
     },
   })
 }
+/** The stored bytes of an asset (a source image for a self-hosted recipe). */
+export async function assetBytes(a: AssetRow): Promise<Buffer> {
+  const file = await get(a.pathname, {
+    access: "private",
+    token: process.env.MEDIA_BLOB_READ_WRITE_TOKEN,
+    abortSignal: AbortSignal.timeout(45000),
+  })
+  if (!file || file.statusCode !== 200) throw new WorkspaceError("File unavailable. Please try again.", 404)
+  return Buffer.from(await new Response(file.stream).arrayBuffer())
+}

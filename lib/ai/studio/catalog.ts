@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { offeredRecipes, type Recipe } from "./comfy/recipes"
 // Qwen Cloud (DashScope) models; ids match lib/ai/model-catalog.ts. docs/architecture/47 and 48.
 const R5 = ["1:1", "16:9", "9:16", "4:3", "3:4"] as const
 /** DashScope image sizes (width*height) per aspect ratio, by model family. */
@@ -107,7 +108,49 @@ export const MODELS = [
 ] as const
 export type ModelDef = (typeof MODELS)[number]
 export const IMAGE_SIZES = QWEN_SIZES
-export const modelFor = (id: string) => MODELS.find((m) => m.id === id)
+export interface ModelLike {
+  id: string
+  name: string
+  kind: "image" | "video"
+  path: string
+  ratios: readonly string[]
+  resolutions: readonly string[]
+  min: number
+  max: number
+  audio: boolean
+  enhance: boolean
+  negative: boolean
+  seed: boolean
+  voice: boolean
+  needsSource: boolean
+  canSource: boolean
+  sizes: Record<string, string> | undefined
+  /** Set for self-hosted recipes (docs/architecture/49); absent for hosted Qwen Cloud models. */
+  recipe?: Recipe
+}
+/** A verified, customer-facing recipe as a studio model. */
+export const recipeModel = (r: Recipe): ModelLike => ({
+  id: r.id,
+  name: r.name,
+  kind: r.kind,
+  path: r.id,
+  ratios: r.ratios,
+  resolutions: ["standard"],
+  min: 0,
+  max: 0,
+  audio: false,
+  enhance: false,
+  negative: !!r.slots.negative,
+  seed: !!r.slots.seed,
+  voice: false,
+  needsSource: false,
+  canSource: !!r.slots.source,
+  sizes: undefined,
+  recipe: r,
+})
+export const recipeModels = (): ModelLike[] => offeredRecipes().map(recipeModel)
+export const modelFor = (id: string): ModelLike | undefined =>
+  MODELS.find((m) => m.id === id) ?? recipeModels().find((m) => m.id === id)
 export const inputSchema = z
   .object({
     scopeKey: z.string().min(1).max(200),

@@ -147,6 +147,11 @@ export const liveCases: EvalCase[] = [
     const n = await count(sql`SELECT count(*)::int AS n FROM li_action_queue q WHERE q.status IN ('claimed','done') AND q.claimed_at > ${c.since}
       AND NOT EXISTS (SELECT 1 FROM send_items i WHERE i.message_id = q.id AND i.status IN ('sending','sent','failed'))`)
     return n ? fail(`${n} LinkedIn action(s) claimed without a send authorization`) : pass() } },
+  { name: "self-hosted generation jobs are recorded with their recipe and none is stuck", run: async () => {
+    // docs/architecture/49: a job on the ComfyUI worker names its recipe and version, and none sits unsettled for over an hour.
+    const unnamed = await count(sql`SELECT count(*)::int AS n FROM ai_studio_jobs WHERE provider = 'comfy' AND (recipe_id IS NULL OR recipe_version IS NULL)`)
+    const stuck = await count(sql`SELECT count(*)::int AS n FROM ai_studio_jobs WHERE provider = 'comfy' AND status IN ('submitting','queued','running','saving','uncertain') AND created_at < now() - interval '1 hour'`)
+    return unnamed || stuck ? fail(`${unnamed} self-hosted job(s) without a recipe, ${stuck} unsettled for over an hour`) : pass() } },
   { name: "if enforcement is on, no send has skipped authorization since", run: async () => {
     const [f] = (await sql`SELECT enabled, updated_at FROM platform_flags WHERE key = 'outreach_require_authorization'`) as any[]
     if (!f?.enabled) return pass("enforcement is off")

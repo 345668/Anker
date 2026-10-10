@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest"
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest"
 import { PGlite } from "@electric-sql/pglite"
 import { readFileSync } from "node:fs"
 import { randomUUID } from "node:crypto"
@@ -52,7 +52,9 @@ import { assertAllowed } from "@/lib/entitlements"
 import { WorkspaceError } from "@/lib/auth/workspace-context"
 import { inputSchema, type GenerationInput } from "./catalog"
 import { ProviderError, submitGeneration, generationStatus } from "./provider"
-import { createJob, getJob, listJobs, advanceJob, assertScope } from "./service"
+import { createJob, getJob, listJobs, advanceJob, assertScope, reconcileComfy } from "./service"
+import { RECIPES, recipeFor } from "./comfy/recipes"
+import { _resetComfyFlagCache } from "./comfy/client"
 import { ownedAsset, hash } from "./assets"
 import { createSpeech, speechSchema, MAX_TRACK_MS } from "./speech"
 import { wavBytes } from "./wav"
@@ -90,7 +92,14 @@ const input = (extra: Partial<GenerationInput> = {}): GenerationInput =>
 beforeAll(async () => {
   db = new PGlite()
   state.query = async (q: string, v: unknown[]) => (await db.query(q, v)).rows
-  for (const f of ["2026-10-07b-ai-media-studio", "2026-10-09-ai-media-studio-v2"])
+  await db.exec(
+    "CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text)",
+  )
+  for (const f of [
+    "2026-10-07b-ai-media-studio",
+    "2026-10-09-ai-media-studio-v2",
+    "2026-10-10-ai-media-studio-comfy",
+  ])
     await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
 }, 30000)
 beforeEach(async () => {
@@ -403,15 +412,13 @@ it("speaks dialogue into one private voice track with the pause between speakers
   expect(vi.mocked(put).mock.calls.at(-1)?.[2]).toMatchObject({ access: "private", contentType: "audio/wav" })
 })
 it("fetches a speech result link given as http on DashScope's own storage host over https", async () => {
-  const f = vi
-    .fn()
-    .mockImplementation(async () =>
-      Response.json({
-        output: {
-          audio: { data: "", url: "http://dashscope-result-sgp.oss-ap-southeast-1.aliyuncs.com/a.wav" },
-        },
-      }),
-    )
+  const f = vi.fn().mockImplementation(async () =>
+    Response.json({
+      output: {
+        audio: { data: "", url: "http://dashscope-result-sgp.oss-ap-southeast-1.aliyuncs.com/a.wav" },
+      },
+    }),
+  )
   vi.stubGlobal("fetch", f)
   vi.mocked(safeFetch).mockResolvedValueOnce({
     body: wavBytes(tone(2500)),
@@ -498,4 +505,140 @@ it("refuses someone else's voice track, and an image offered as a voice track", 
     status: 400,
   })
   expect(submitGeneration).not.toHaveBeenCalled()
+})
+
+// ── self-hosted ComfyUI (docs/architecture/49) ───────────────────────────────────────────────────────────────────────────────────────────
+const cardRecipe = () => ({
+  ...recipeFor("smoke.card")!,
+  id: "test.card",
+  internal: false,
+  freeText: false,
+  ratios: ["16:9"],
+  sizes: { "16:9": [512, 288] as [number, number] },
+})
+const comfyFlag = (on: boolean) =>
+  db
+    .exec(`UPDATE platform_flags SET enabled=${on} WHERE key='ai_studio_comfy'`)
+    .then(() => _resetComfyFlagCache())
+const comfyInput = () => input({ model: "test.card", resolution: "standard", aspectRatio: "16:9" })
+beforeEach(() => {
+  RECIPES.push(cardRecipe())
+  vi.stubEnv("COMFY_BASE_URL", "https://gw.example")
+  vi.stubEnv("COMFY_API_KEY", "gk")
+})
+afterEach(() => {
+  RECIPES.splice(
+    RECIPES.findIndex((r) => r.id === "test.card"),
+    1,
+  )
+  _resetComfyFlagCache()
+})
+it("the migration adds the self-hosted columns and an off switch", async () => {
+  expect((await db.query("SELECT enabled FROM platform_flags WHERE key='ai_studio_comfy'")).rows[0]).toEqual({
+    enabled: false,
+  })
+  const cols = (
+    await db.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name='ai_studio_jobs' AND column_name IN ('provider','recipe_id','recipe_version')",
+    )
+  ).rows
+  expect(cols).toHaveLength(3)
+})
+it("a self-hosted model is refused while the platform switch is off, or the gateway is not configured, and nothing is submitted", async () => {
+  await comfyFlag(false)
+  await expect(createJob(principal(), comfyInput())).rejects.toMatchObject({ status: 503 })
+  await comfyFlag(true)
+  vi.stubEnv("COMFY_API_KEY", "")
+  await expect(createJob(principal(), comfyInput())).rejects.toMatchObject({ status: 503 })
+  expect(submitGeneration).not.toHaveBeenCalled()
+  expect((await db.query<{ n: number }>("SELECT count(*)::int AS n FROM ai_studio_jobs")).rows[0].n).toBe(0)
+})
+it("with the switch on, a self-hosted job records its recipe, uses its own id as the worker's job id, and needs no hosted-provider setup", async () => {
+  await comfyFlag(true)
+  vi.stubEnv("DASHSCOPE_API_KEY", "")
+  vi.stubEnv("QWEN_API_KEY", "")
+  vi.mocked(submitGeneration).mockImplementationOnce(async (_v, _s, _a, ctx) => `comfy:${ctx?.jobId}`)
+  const j = await createJob(principal(), comfyInput())
+  expect(vi.mocked(submitGeneration).mock.calls[0][3]).toMatchObject({ jobId: j.id })
+  const [row] =
+    await sql`SELECT provider, recipe_id, recipe_version, provider_id, status FROM ai_studio_jobs WHERE id=${j.id}`
+  expect(row).toMatchObject({
+    provider: "comfy",
+    recipe_id: "test.card",
+    recipe_version: 1,
+    provider_id: `comfy:${j.id}`,
+    status: "queued",
+  })
+})
+it("a refused prompt is recorded as blocked, and a refused setting as failed", async () => {
+  await comfyFlag(true)
+  vi.mocked(submitGeneration).mockRejectedValueOnce(
+    new ProviderError(422, "The provider blocked this prompt or media. Revise it before trying again."),
+  )
+  expect(await createJob(principal(), comfyInput())).toMatchObject({ status: "blocked" })
+  vi.mocked(submitGeneration).mockRejectedValueOnce(
+    new ProviderError(400, "The image worker refused these settings."),
+  )
+  expect(
+    await createJob(
+      principal(),
+      input({ model: "test.card", resolution: "standard", aspectRatio: "16:9", prompt: "Another" }),
+    ),
+  ).toMatchObject({ status: "failed" })
+})
+it("a self-hosted result arrives as bytes and is saved privately without a public link", async () => {
+  await comfyFlag(true)
+  vi.mocked(submitGeneration).mockImplementationOnce(async (_v, _s, _a, ctx) => `comfy:${ctx?.jobId}`)
+  const j = await createJob(principal(), comfyInput())
+  vi.mocked(generationStatus).mockResolvedValueOnce({
+    status: "completed",
+    image: null,
+    video: null,
+    file: { bytes: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]), kind: "image" },
+  })
+  await advanceJob(j.id)
+  expect(generationStatus).toHaveBeenCalledWith(`comfy:${j.id}`, "test.card")
+  expect(safeFetch).not.toHaveBeenCalled()
+  expect((await getJob(principal(), j.id)).status).toBe("completed")
+  expect(vi.mocked(put).mock.calls.at(-1)?.[2]).toMatchObject({ access: "private", contentType: "image/png" })
+})
+it("an unconfirmed submit is settled by asking the worker: found means queued, missing for five minutes means it never arrived", async () => {
+  await comfyFlag(true)
+  vi.mocked(submitGeneration).mockRejectedValueOnce(new Error("timeout"))
+  const j = await createJob(principal(), comfyInput())
+  expect(j.status).toBe("uncertain")
+  expect(j.error).toMatch(/check the worker/)
+  const worker = (code: number, body: object) =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async () => Response.json(body, { status: code })),
+    )
+  worker(404, {})
+  await reconcileComfy(j.id)
+  expect((await getJob(principal(), j.id)).status).toBe("uncertain") // too soon to say
+  await db.exec("UPDATE ai_studio_jobs SET created_at=now()-interval '6 minutes'")
+  await reconcileComfy(j.id)
+  expect(await getJob(principal(), j.id)).toMatchObject({
+    status: "failed",
+    error: expect.stringMatching(/nothing ran and nothing is owed/),
+  })
+  vi.mocked(submitGeneration).mockRejectedValueOnce(new Error("timeout"))
+  const k = await createJob(
+    principal(),
+    input({ model: "test.card", resolution: "standard", aspectRatio: "16:9", prompt: "Second try" }),
+  )
+  worker(200, { id: k.id, status: "in_progress" })
+  await reconcileComfy(k.id)
+  const [row] = await sql`SELECT status, provider_id FROM ai_studio_jobs WHERE id=${k.id}`
+  expect(row).toEqual({ status: "queued", provider_id: `comfy:${k.id}` })
+})
+it("hosted jobs are untouched: provider defaults to dashscope and reconcile ignores them", async () => {
+  const j = await createJob(principal(), input())
+  expect((await sql`SELECT provider, recipe_id FROM ai_studio_jobs WHERE id=${j.id}`)[0]).toEqual({
+    provider: "dashscope",
+    recipe_id: null,
+  })
+  vi.stubGlobal("fetch", vi.fn())
+  await reconcileComfy(j.id)
+  expect(fetch).not.toHaveBeenCalled()
 })

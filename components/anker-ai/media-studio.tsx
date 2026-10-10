@@ -6,6 +6,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogDescription } 
 import {
   MODELS,
   modelFor,
+  recipeModels,
   isActive,
   type Job,
   type Asset,
@@ -16,6 +17,7 @@ interface Data {
   ready: boolean
   canGenerate: boolean
   jobs: Job[]
+  comfyRecipes?: string[]
   nextCursor: string | null
 }
 const field =
@@ -475,11 +477,13 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                       value={modelId}
                       onChange={(e) => choose(e.target.value)}
                     >
-                      {MODELS.filter((v) => v.kind === m.kind).map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.name}
-                        </option>
-                      ))}
+                      {[...MODELS, ...recipeModels().filter((r) => data?.comfyRecipes?.includes(r.id))]
+                        .filter((v) => v.kind === m.kind)
+                        .map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
                     </select>
                   </label>
                   <label className="block text-sm font-medium">

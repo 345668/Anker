@@ -12,7 +12,7 @@ let db: PGlite
 beforeAll(async () => {
   db = new PGlite()
   await db.exec("CREATE TABLE memberships (org_id text, user_id text, org_role text); CREATE TABLE audit_events (action text, target_label text, created_at timestamptz DEFAULT now()); CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text, updated_at timestamptz DEFAULT now()); CREATE TABLE outreach_messages (id text PRIMARY KEY, status text, sent_at timestamptz);")
-  for (const f of ["2026-10-05-action-proposals", "2026-10-05b-agent-runtime", "2026-10-05c-agents-complete", "2026-10-06-send-authorizations", "2026-10-06b-send-auth-sources"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
+  for (const f of ["2026-10-05-action-proposals", "2026-10-05b-agent-runtime", "2026-10-05c-agents-complete", "2026-10-06-send-authorizations", "2026-10-06b-send-auth-sources", "2026-10-07b-ai-media-studio", "2026-10-09-ai-media-studio-v2", "2026-10-10-ai-media-studio-comfy"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
   h.sql.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => (await db.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values.map((v) => (Array.isArray(v) ? v : v)))).rows)
 }, 30000)
 afterAll(async () => db.close())

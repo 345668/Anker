@@ -5,8 +5,15 @@ import { WorkspaceError } from "@/lib/auth/workspace-context"
 import { assertAllowed, assertWithinLimit } from "@/lib/entitlements"
 import { safeFetch } from "@/lib/net/safe-fetch"
 import { isActive, modelFor, type GenerationInput, type Job, type JobStatus } from "./catalog"
-import { generationStatus, ProviderError, requireConfiguration, submitGeneration } from "./provider"
-import { MAX_BYTES, ownedAsset, publicAsset, storeAsset, hash, type AssetRow } from "./assets"
+import {
+  comfyBlocker,
+  generationStatus,
+  ProviderError,
+  requireConfiguration,
+  submitGeneration,
+} from "./provider"
+import { comfyConfig, comfyJob } from "./comfy/client"
+import { MAX_BYTES, assetBytes, ownedAsset, publicAsset, storeAsset, hash, type AssetRow } from "./assets"
 type Row = {
   id: string
   user_id: string
@@ -74,7 +81,10 @@ function sourceOrigin() {
     if (u.protocol !== "https:" || u.username || u.password) throw new Error()
     return u.origin
   } catch {
-    throw new WorkspaceError("Start frames and voice tracks need a public HTTPS app URL. Contact your administrator.", 503)
+    throw new WorkspaceError(
+      "Start frames and voice tracks need a public HTTPS app URL. Contact your administrator.",
+      503,
+    )
   }
 }
 export async function createJob(p: AiPrincipal, input: GenerationInput) {
@@ -88,7 +98,11 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
     return view(old as Row)
   }
   await assertCreation(p)
-  await requireConfiguration()
+  const recipe = modelFor(input.model)?.recipe
+  if (recipe) {
+    const why = await comfyBlocker(recipe)
+    if (why) throw new WorkspaceError(why, 503)
+  } else await requireConfiguration()
   const token = randomBytes(32).toString("hex")
   let sourceUrl: string | undefined
   if (input.sourceAssetId) {
@@ -122,13 +136,19 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
   }
   if (reserved.created) {
     try {
+      if (recipe)
+        await sql`UPDATE ai_studio_jobs SET provider='comfy',recipe_id=${recipe.id},recipe_version=${recipe.version} WHERE id=${reserved.job_id}`
       if (audioToken)
         await sql`UPDATE ai_studio_jobs SET audio_asset_id=${input.audioAssetId!},audio_token_hash=${hash(audioToken)} WHERE id=${reserved.job_id}`
-      const id = await submitGeneration(input, sourceUrl, audioUrl)
+      let sourceBytes: Buffer | undefined
+      if (recipe && input.sourceAssetId)
+        sourceBytes = await assetBytes(await ownedAsset(p, input.sourceAssetId))
+      const id = await submitGeneration(input, sourceUrl, audioUrl, { jobId: reserved.job_id, sourceBytes })
       await sql`UPDATE ai_studio_jobs SET provider_id=${id},status='queued',updated_at=now() WHERE id=${reserved.job_id} AND status IN ('submitting','uncertain')`
     } catch (e) {
-      const certain = e instanceof ProviderError && e.status >= 400 && e.status < 500
-      await sql`UPDATE ai_studio_jobs SET status=${certain ? "failed" : "uncertain"},error=${certain ? e.message : "Submission could not be confirmed and may have been charged. Contact support before generating again."},updated_at=now() WHERE id=${reserved.job_id} AND status='submitting'`
+      const code = e instanceof ProviderError ? e.status : 0
+      const certain = code >= 400 && code < 500
+      await sql`UPDATE ai_studio_jobs SET status=${certain ? (code === 422 ? "blocked" : "failed") : "uncertain"},error=${certain ? (e as Error).message : recipe ? "Submission could not be confirmed. Anker will check the worker and settle it." : "Submission could not be confirmed and may have been charged. Contact support before generating again."},updated_at=now() WHERE id=${reserved.job_id} AND status='submitting'`
     }
   }
   return view(await ownedJob(p, reserved.job_id))
@@ -156,7 +176,7 @@ export async function advanceJob(id: string) {
       )
       return
     }
-    const r = await generationStatus(j.provider_id!)
+    const r = await generationStatus(j.provider_id!, j.model)
     if (["failed", "nsfw", "canceled", "cancelled"].includes(r.status)) {
       await finish(
         r.status === "nsfw" ? "blocked" : r.status.startsWith("cancel") ? "canceled" : "failed",
@@ -171,16 +191,16 @@ export async function advanceJob(id: string) {
       return
     }
     const url = j.kind === "image" ? r.image : r.video
-    if (!url) {
+    if (!url && !r.file) {
       await finish("failed", "The provider returned no usable output. Contact support with the job ID.")
       return
     }
     await sql`UPDATE ai_studio_jobs SET status='saving' WHERE id=${id} AND lease_token=${lease}`
-    const file = await safeFetch(url, {
-      maxBytes: MAX_BYTES,
-      timeoutMs: 45000,
-    })
-    await storeAsset({ userId: j.user_id, scopeKey: j.scope_key }, j.id, file.body, j.kind, j.id)
+    // A self-hosted worker hands the bytes over directly (it sits on a private network the public-URL fetcher refuses); hosted providers give a link.
+    const body = r.file
+      ? r.file.bytes
+      : (await safeFetch(url!, { maxBytes: MAX_BYTES, timeoutMs: 45000 })).body
+    await storeAsset({ userId: j.user_id, scopeKey: j.scope_key }, j.id, body, j.kind, j.id)
     await finish("completed")
   } catch (e) {
     await sql`UPDATE ai_studio_jobs SET error=${e instanceof ProviderError ? e.message : "Status or storage is temporarily unavailable. Anker will retry without generating again."},lease_until=NULL,lease_token=NULL,next_poll_at=now()+interval '30 seconds',updated_at=now() WHERE id=${id} AND lease_token=${lease}`
@@ -196,4 +216,21 @@ export async function setFavorite(p: AiPrincipal, id: string, favorite: boolean)
   await ownedJob(p, id)
   await sql`UPDATE ai_studio_jobs SET favorite=${favorite} WHERE id=${id} AND user_id=${p.userId} AND scope_key=${p.scopeKey}`
   return getJob(p, id)
+}
+
+/**
+ * A self-hosted submit that was not confirmed (a timeout, a restart): ask the worker whether it has the job. The job id is the worker's prompt id, so it can always be
+ * found. Found: carry on as queued. Not found after five minutes: it never arrived, nothing ran, nothing is owed. (Resubmitting the same id would queue it twice, so it is not retried.)
+ */
+export async function reconcileComfy(id: string) {
+  const [row] =
+    await sql`SELECT id,model,created_at FROM ai_studio_jobs WHERE id=${id} AND provider='comfy' AND provider_id IS NULL AND status IN ('submitting','uncertain')`
+  const r = row ? modelFor(row.model)?.recipe : undefined
+  const cfg = comfyConfig()
+  if (!row || !r || !cfg) return
+  const j = await comfyJob(cfg, id, r.output.node, r.output.key)
+  if (j.state !== "missing")
+    await sql`UPDATE ai_studio_jobs SET provider_id=${`comfy:${id}`},status='queued',error=NULL,next_poll_at=now(),updated_at=now() WHERE id=${id} AND provider_id IS NULL`
+  else if (Date.now() - new Date(row.created_at).getTime() > 300000)
+    await sql`UPDATE ai_studio_jobs SET status='failed',error='The worker never received this job, so nothing ran and nothing is owed. Try again.',updated_at=now() WHERE id=${id} AND provider_id IS NULL`
 }
