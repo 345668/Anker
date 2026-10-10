@@ -139,21 +139,6 @@ describe("raise path state", () => {
       button: "Review and send 3 emails",
     })
     expect((await raiseState(ORG)).draftEmailIds).toEqual([]) // without a sender there is nothing to review
-    // Drafts saved by approval: the send step now opens the review for the sender's own email drafts, with an address, best match first.
-    await db.exec("UPDATE action_proposals SET status = 'applied'")
-    await db.exec(
-      "INSERT INTO outreach_messages (crm_entry_id, kind, user_id, channel, status) VALUES ('l1','email_intro','u1','email','draft'), ('l3','email_intro','u1','email','draft'), ('l0','email_intro','u1','email','draft'), ('l2','email_intro','u2','email','draft'), ('l0','dm_intro','u1','linkedin','draft')",
-    )
-    s = await raiseState(ORG, "u1")
-    expect(s.counts.draftEmails).toBe(3)
-    expect(s.draftEmailIds).toHaveLength(3)
-    expect(s.next).toMatchObject({
-      id: "send",
-      action: "send",
-      href: null,
-      button: "Review and send 3 emails",
-    })
-    expect((await raiseState(ORG)).draftEmailIds).toEqual([]) // without a sender there is nothing to review
     await db.exec("INSERT INTO send_authorizations (org_id) VALUES ('org-a')")
     s = await raiseState(ORG)
     expect(s.complete).toBe(true)
