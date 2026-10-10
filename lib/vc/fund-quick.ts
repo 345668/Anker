@@ -47,7 +47,7 @@ export async function saveQuickFund(
     (await sql`SELECT id FROM fund_profiles WHERE org_id = ${scope.orgId} AND is_active = true ORDER BY updated_at DESC NULLS LAST LIMIT 1`) as any[]
   if (!cur) {
     if (!input.name) throw new QuickFundError("Give the fund a name to create the profile.")
-    const id = `fp_${randomUUID()}`
+    const id = randomUUID()
     const sectors = input.sectors ?? []
     await sql`INSERT INTO fund_profiles (id, name, fund_name, gp_name, target_raise, thesis_description, sectors, primary_sectors, geographic_focus, headquarters_location, user_id, org_id, is_active, created_at, updated_at)
       VALUES (${id}, ${input.name}, ${input.name}, ${input.gpName ?? null}, ${input.targetRaise ?? null}, ${input.thesisDescription ?? null}, ${JSON.stringify(sectors)}::jsonb, ${JSON.stringify(sectors.slice(0, 3))}::jsonb,
