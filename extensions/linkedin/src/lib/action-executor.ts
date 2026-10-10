@@ -70,9 +70,16 @@ function connectRoutine(note: string | null, sel: ConnectSel): Promise<ExecResul
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     const jitter = (min: number, max: number) => sleep(min + Math.random() * (max - min));
     const rx = (s: string) => new RegExp(s, "i");
-    const visible = (el: Element | null): el is HTMLElement => !!el && (el as HTMLElement).offsetParent !== null;
+    // LinkedIn renders its app (including the messaging overlay) inside open shadow roots, so search through them.
+    const deepAll = (root: ParentNode, selector: string): HTMLElement[] => {
+      const out: HTMLElement[] = Array.from(root.querySelectorAll<HTMLElement>(selector));
+      for (const host of Array.from(root.querySelectorAll<HTMLElement>("*"))) if (host.shadowRoot) out.push(...deepAll(host.shadowRoot, selector));
+      return out;
+    };
+    const deepFirst = (selector: string): HTMLElement | null => deepAll(document, selector).find((el) => el.getClientRects().length > 0) || null;
+    const visible = (el: Element | null): el is HTMLElement => !!el && (el as HTMLElement).getClientRects().length > 0;
     const byText = (root: ParentNode, selector: string, re: RegExp): HTMLElement | null => {
-      for (const el of Array.from(root.querySelectorAll<HTMLElement>(selector))) {
+      for (const el of deepAll(root, selector)) {
         const label = (el.getAttribute("aria-label") || el.textContent || "").trim();
         if (re.test(label) && visible(el)) return el;
       }
@@ -105,7 +112,7 @@ function connectRoutine(note: string | null, sel: ConnectSel): Promise<ExecResul
       const addNote = await waitFor(() => byText(document, sel.addNoteButton, rx(sel.addNoteButton_re)), 3000);
       if (addNote) {
         addNote.click(); await jitter(500, 1000);
-        const textarea = document.querySelector<HTMLTextAreaElement>(sel.noteTextarea);
+        const textarea = deepFirst(sel.noteTextarea) as HTMLTextAreaElement | null;
         if (textarea && visible(textarea)) {
           const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
           setter?.call(textarea, note.slice(0, 300));
@@ -129,9 +136,16 @@ function messageRoutine(message: string, sel: MessageSel): Promise<ExecResult> {
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     const jitter = (min: number, max: number) => sleep(min + Math.random() * (max - min));
     const rx = (s: string) => new RegExp(s, "i");
-    const visible = (el: Element | null): el is HTMLElement => !!el && (el as HTMLElement).offsetParent !== null;
+    // LinkedIn renders its app (including the messaging overlay) inside open shadow roots, so search through them.
+    const deepAll = (root: ParentNode, selector: string): HTMLElement[] => {
+      const out: HTMLElement[] = Array.from(root.querySelectorAll<HTMLElement>(selector));
+      for (const host of Array.from(root.querySelectorAll<HTMLElement>("*"))) if (host.shadowRoot) out.push(...deepAll(host.shadowRoot, selector));
+      return out;
+    };
+    const deepFirst = (selector: string): HTMLElement | null => deepAll(document, selector).find((el) => el.getClientRects().length > 0) || null;
+    const visible = (el: Element | null): el is HTMLElement => !!el && (el as HTMLElement).getClientRects().length > 0;
     const byText = (root: ParentNode, selector: string, re: RegExp): HTMLElement | null => {
-      for (const el of Array.from(root.querySelectorAll<HTMLElement>(selector))) {
+      for (const el of deepAll(root, selector)) {
         const label = (el.getAttribute("aria-label") || el.textContent || "").trim();
         if (re.test(label) && visible(el)) return el;
       }
@@ -146,12 +160,12 @@ function messageRoutine(message: string, sel: MessageSel): Promise<ExecResult> {
     if (rx(sel.frictionUrl).test(location.href)) return { ok: false, friction: "captcha", error: "LinkedIn checkpoint/challenge page" };
     if (!message || !message.trim()) return { ok: false, error: "Empty message" };
 
-    let box = document.querySelector<HTMLElement>(sel.composer);
+    let box = deepFirst(sel.composer);
     if (!box || !visible(box)) {
       const msgBtn = byText(document, sel.messageButton, rx(sel.messageButton_re));
       if (!msgBtn) return { ok: false, error: "Message button not found" };
       msgBtn.click();
-      box = await waitFor(() => document.querySelector<HTMLElement>(sel.composer), 6000);
+      box = await waitFor(() => deepFirst(sel.composer), 8000);
     }
     if (!box || !visible(box)) return { ok: false, error: "Message composer did not open" };
 
