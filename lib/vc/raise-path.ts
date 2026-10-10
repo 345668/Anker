@@ -3,6 +3,7 @@
  * Every step is read from records the product already writes, so nothing new is stored to know where a workspace is.
  */
 import { sql } from "@/lib/db"
+import { linkedinCounts } from "./linkedin-wave"
 export type StepId = "fund" | "match" | "shortlist" | "draft" | "send" | "follow"
 export interface RaiseStep {
   id: StepId
@@ -10,7 +11,7 @@ export interface RaiseStep {
   done: boolean
   detail: string
   href: string | null
-  action: "drafts" | "send" | null
+  action: "drafts" | "send" | "shortlist" | "profile" | null
   button: string
 }
 export interface FundFacts {
@@ -42,10 +43,26 @@ export interface RaiseState {
     replies: number
     draftable: number
     draftEmails: number
+    sessionContacts: number
+    linkedinReady: number
+    linkedinPending: number
   }
   /** Up to 25 email drafts of the signed-in sender, ready for the send review. */
   draftEmailIds: string[]
-  fund: { id: string; name: string; missing: string[] } | null
+  fund: {
+    id: string
+    name: string
+    missing: string[]
+    form: {
+      name: string
+      gpName: string
+      targetRaise: string
+      thesis: string
+      sectors: string
+      geography: string
+      hq: string
+    }
+  } | null
 }
 export const SHORTLIST_MIN = 10
 const list = (v: unknown): string[] => (Array.isArray(v) ? v.map(String).filter(Boolean) : [])
@@ -116,6 +133,12 @@ export async function raiseState(orgId: string, userId: string | null = null): P
       ORDER BY e.display_score DESC NULLS LAST, m.created_at LIMIT 25`) as any[]
       ).map((x) => String(x.id))
     : []
+  const [sc] = fund
+    ? ((await sql`SELECT count(*)::int AS n FROM lp_contact_matches c WHERE c.session_id = (SELECT s.id FROM lp_match_sessions s WHERE s.fund_profile_id = ${fund.id} AND s.status = 'completed' AND EXISTS (SELECT 1 FROM lp_contact_matches x WHERE x.session_id = s.id) ORDER BY s.created_at DESC LIMIT 1)`) as any[])
+    : [{ n: 0 }]
+  const li = userId
+    ? await linkedinCounts({ orgId, userId }).catch(() => ({ ready: 0, pending: 0 }))
+    : { ready: 0, pending: 0 }
   const counts = {
     lpContacts: Number(c.n),
     withEmail: Number(c.emails),
@@ -125,6 +148,9 @@ export async function raiseState(orgId: string, userId: string | null = null): P
     replies: Number(r.n),
     draftable: Number(dr.n),
     draftEmails: ready.length,
+    sessionContacts: Number(sc.n),
+    linkedinReady: li.ready,
+    linkedinPending: li.pending,
   }
   const fundDone = !!fund && missing.length === 0
   const matchDone = Number(m.n) > 0
@@ -138,13 +164,14 @@ export async function raiseState(orgId: string, userId: string | null = null): P
       label: "Describe the fund",
       done: fundDone,
       href: "/dashboard/matchmaking",
-      action: null,
+      // The short form opens on the card; the full profile and deck extraction stay on the matchmaking page.
+      action: fundDone ? null : "profile",
       button: fund ? "Complete the fund profile" : "Create the fund profile",
       detail: fundDone
         ? `${fund!.name}${fund!.targetRaise ? `, raising ${money(fund!.targetRaise)}` : ""}`
         : fund
-          ? `Still needed: ${missing.join(", ")}. Upload the fund deck and the fields fill themselves.`
-          : "A fund profile is what the matching and the messages are written from. Upload the fund deck to fill it.",
+          ? `Still needed: ${missing.join(", ")}. Fill them in here, or upload the fund deck on the matchmaking page and they fill themselves.`
+          : "A fund profile is what the matching and the messages are written from. Fill in a few lines here, or upload the fund deck on the matchmaking page.",
     },
     {
       id: "match",
@@ -162,11 +189,13 @@ export async function raiseState(orgId: string, userId: string | null = null): P
       label: "Shortlist",
       done: shortDone,
       href: "/dashboard/matchmaking",
-      action: null,
-      button: "Add the top LPs to your pipeline",
+      action: !shortDone && matchDone && counts.sessionContacts > 0 ? "shortlist" : null,
+      button: "Add the top 25 to your pipeline",
       detail: shortDone
         ? `${counts.lpContacts} LPs in your pipeline${counts.withEmail ? `, ${counts.withEmail} with an email address` : ", none with an email address yet"}.`
-        : `Add at least ${SHORTLIST_MIN} from the ranked list to your pipeline (${counts.lpContacts} so far).`,
+        : matchDone && counts.sessionContacts > 0
+          ? `Adds the best contact at each of the top 25 firms from your latest run, preferring an email address. Anyone already in your pipeline is skipped (${counts.lpContacts} there now).`
+          : `Add at least ${SHORTLIST_MIN} from the ranked list to your pipeline (${counts.lpContacts} so far).`,
     },
     {
       id: "draft",
@@ -225,6 +254,21 @@ export async function raiseState(orgId: string, userId: string | null = null): P
     next: complete ? null : next,
     counts,
     draftEmailIds: ready,
-    fund: fund ? { id: fund.id, name: fund.name, missing } : null,
+    fund: fund
+      ? {
+          id: fund.id,
+          name: fund.name,
+          missing,
+          form: {
+            name: fund.name,
+            gpName: fund.gpName ?? "",
+            targetRaise: fund.targetRaise ? String(fund.targetRaise) : "",
+            thesis: fund.thesis ?? "",
+            sectors: fund.sectors.join(", "),
+            geography: fund.geography.join(", "),
+            hq: fund.hq ?? "",
+          },
+        }
+      : null,
   }
 }

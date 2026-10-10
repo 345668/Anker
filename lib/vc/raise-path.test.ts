@@ -59,7 +59,9 @@ const lp = (id: string, name: string, over: Record<string, unknown> = {}) =>
 beforeAll(async () => {
   db = new PGlite()
   await db.exec(`CREATE TABLE fund_profiles (id text PRIMARY KEY, org_id text, is_active boolean, name text, gp_name text, target_raise numeric, minimum_commitment numeric, thesis_description text, sectors jsonb, geographic_focus jsonb, gp_commitment numeric, fund_number int, headquarters_location text, target_lp_types jsonb, value_proposition text, updated_at timestamptz DEFAULT now());
-    CREATE TABLE lp_match_sessions (id serial PRIMARY KEY, fund_profile_id text, total_firms_matched int, total_contacts_matched int);
+    CREATE TABLE lp_match_sessions (id text PRIMARY KEY DEFAULT gen_random_uuid()::text, fund_profile_id text, status text DEFAULT 'completed', total_firms_matched int, total_contacts_matched int, created_at timestamptz DEFAULT now());
+    CREATE TABLE lp_contact_matches (id serial PRIMARY KEY, session_id text);
+    CREATE TABLE li_action_queue (id serial PRIMARY KEY, user_id text, crm_entry_id text, action_type text, status text);
     CREATE TABLE crm_entries (id text PRIMARY KEY, org_id text, source text, display_name text, display_email text, display_linkedin text, display_score int, stage text, added_at timestamptz, display_title text, display_type text, display_location text, why_match text, research_summary text);
     CREATE TABLE outreach_messages (id serial PRIMARY KEY, crm_entry_id text, kind text, user_id text, channel text, status text, created_at timestamptz DEFAULT now());
     CREATE TABLE action_proposals (id serial PRIMARY KEY, org_id text, capability text, status text, input jsonb, run_id text, created_at timestamptz DEFAULT now());
