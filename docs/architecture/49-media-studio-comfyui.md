@@ -104,3 +104,53 @@ Decision recorded: the studio uses the job id as `prompt_id`, polls `/api/jobs/{
 - Anker tests: 72 studio tests (including 7 on the self-hosted path), 14 on recipes, client, screening and smoke.
 
 **Not done, needs a decision or hardware:** a GPU host and weights (decision 1); the Qwen-Image and Wan 2.2 recipes stay `draft` until run there, so **no recipe is offered to customers yet**; the content screens (decision 4); inpaint, upscale, LoRA, extend and chaining recipes (P2 onward); GPU-second metering and the SAIL page (P4); Comfy Cloud adapter (only if chosen in decision 1).
+
+## 13. Option B in detail: renting a GPU (kept in the spec; decision 1 is still open)
+Everything from section 4 is the same on rented hardware; only where the worker runs changes. This section is what has to be true to choose it.
+
+### 13.1 What the models need (from ComfyUI's own tutorials, read 2026-10-10)
+| Recipe | Weights | Memory and speed on record | Consequence |
+|---|---|---|---|
+| Qwen-Image text-to-image (fp8) | diffusion model 20.4 GB (fp8) or 40.9 GB (bf16), plus a text encoder and a VAE | on an RTX 4090-class 24 GB card it used about 86% of VRAM; 94 s first run, 71 s warm; 55 s then 34 s with the 8-step "Lightning" LoRA; the distilled fp8 model (about 15 GB, 15 steps) ran 69 s then 36 s | a **24 GB card is the floor** for images; the first run after a cold start is slower because weights load |
+| Wan 2.2 TI2V-5B (video, text or image) | 5B hybrid model | documented to fit **8 GB** with ComfyUI's native offloading (slow) | the cheapest video path; quality below the 14B models |
+| Wan 2.2 T2V-A14B and I2V-A14B | 14B models | the tutorial gives no tested GPUs or times; fp8 repacks and community GGUF files exist for smaller cards | **needs measuring in P0**; plan on 48 GB or more for comfortable 720p, and on minutes per clip |
+Unknown until the spike: time per 5-second clip, the largest clip that fits, and whether a 24 GB card is enough for the 14B models with fp8 and offloading. These numbers set everything below.
+
+### 13.2 Shapes of rented capacity
+1. **Always-on single GPU** (a rented box by the hour or month). Simplest: models stay on the disk and in memory, no cold start. Cost is paid whether or not anyone generates. Fits a steady load and the P0 and P1 phases.
+2. **Serverless GPU** (a worker that starts per job or per burst and stops after it idles). You pay for seconds used, but each cold start loads tens of GB of weights from a network volume, which can add minutes to the first job. Needs weights on a persistent volume in the same region and a keep-warm window.
+3. **Reserved or dedicated** (a contract for a card or a server). Cheapest per hour at high use; only after P3 shows the load.
+Recommendation: **start with one always-on card for the spike, then decide between shapes 1 and 2 on the measured job rate and the cold-start time**, not on list prices.
+
+### 13.3 Choosing a provider: the questions that matter
+- **Data location and terms.** Anker is a German platform with EU customers: where does the host run, is there an EU region, does the provider process or keep inputs and outputs, and will it sign a data-processing agreement. Customer images and prompts must not leave the chosen region.
+- **Network isolation.** A private network or tunnel so only the gateway reaches the worker (section 5 depends on this); no public port for ComfyUI itself.
+- **Persistent storage** for the model store, large enough for the models in use (plan on 100 to 200 GB for two image models, two video models and their text encoders), in the same region as the GPU.
+- **Image control.** Run a container that Anker pins (ComfyUI release, nodes, weights by hash), not a provider's mutable template.
+- **GPU supply.** Availability of 24 GB and 48 GB or larger cards at the hour they are needed, spot versus on-demand interruption, and how the provider behaves when a card is not available.
+- **Billing and limits.** Per-second or per-hour billing, minimums, egress charges, and a hard spending cap on the account.
+- **Support and exit.** How quickly a stuck host is replaced, and how the whole stack moves to another provider (it must: weights and recipes live in Anker's control, the worker is a container).
+Candidate types to quote: GPU marketplaces and serverless GPU platforms, the big clouds' GPU instances, and European GPU hosts. Prices move; **collect written quotes for the same three workloads during P0** rather than relying on any list here.
+
+### 13.4 Cost model (to fill with measured numbers)
+- **Per job:** GPU seconds x price per second, plus a share of idle and warm-up time. Record GPU seconds on every job so this is measured, not estimated.
+- **Per month:** (always-on hours x hourly price) + storage + egress, or (jobs x average GPU seconds x price) + keep-warm. Compare both against the DashScope price list for the same outputs (for example about $0.035 per Qwen-Image 2.0 image and roughly $0.10 to $0.15 per video second at list price) to find the monthly volume where renting pays off. Below that volume the hosted route is cheaper and simpler; above it self-hosting wins; data-location needs can override the arithmetic.
+- **Guardrails:** a monthly GPU ceiling (decision 3), an account-level hard cap at the provider, and the existing `ai_spend_usd_month` workspace limit extended to count GPU seconds (P4).
+
+### 13.5 Operating it
+- **One container image**, built from the pinned ComfyUI release, with the gateway in front (`infra/comfy/`). A second tiny health container is not needed: `GET /health` on the gateway plus the smoke recipe cover it.
+- **Provisioning script** that creates the model volume by downloading each file by SHA-256 from its approved source and refusing anything unlisted, so a rebuilt worker is identical.
+- **Observability:** the gateway's request log (no bodies), per-job GPU seconds and queue wait written to the job row, the live eval that flags stuck jobs, and a SAIL page for queue depth and failures (P4).
+- **Failure handling:** a worker that dies mid-job leaves the job unsettled; the cron's reconcile step and the one-hour stuck check handle it; a job is never resubmitted automatically.
+- **Updates:** ComfyUI is updated on a schedule, not on its release day: a new pinned image runs the smoke recipe and the golden-prompt set on a spare worker before traffic moves.
+
+### 13.6 The GPU spike, step by step (P0, when a host is chosen)
+1. Rent one 24 GB card and one 48 GB or larger card for a day each, in the intended region, with a persistent volume.
+2. Start the pinned image behind the gateway; run `npx tsx scripts/ai/comfy-smoke.mts` (expect PASS).
+3. Download the Qwen-Image fp8 files and the Wan 2.2 files by hash; add their exact file names and licence text to `licences.ts`.
+4. Run each draft recipe at three sizes and three seeds; record cold and warm seconds, peak memory and any error; confirm a fixed seed and pinned image give the same picture.
+5. Run the 14B video recipes at 5 s and 10 s on both cards; record the largest clip that fits and the time.
+6. Run the same prompts through DashScope and compare cost, time and quality side by side (a short written comparison with the pictures).
+7. Fill the cost model in 13.4 from the measurements and write down the break-even volume.
+8. Mark the recipes that passed as `verified` (still behind the flag) and keep the report with the repo.
+Exit criteria for choosing self-hosting: a verified recipe, a measured cost per output below the hosted route at an expected volume or a data-location reason, the screening hook in place, and a working failure drill (kill the worker mid-job and confirm the job settles).
