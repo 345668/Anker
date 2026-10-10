@@ -914,3 +914,38 @@ Still open: cross-channel suppression (email opt-out to LinkedIn and back) and a
 - **Consent screen for senders:** `/dashboard/outreach/consent` (founder and VC personas) records, lists and withdraws attestations.
 
 **Revision 2026-10-04:** inbound deal intake designed and built as [39](39-fund-inbound-deal-intake.md): per-fund public form (`/intake/<slug>`, embeddable), a configurable two-layer engine (gates then AI rubric, thesis and free-text instructions, presets, test run), and a ranked, categorised pipeline (Passed, Review, Not a fit). The hard-coded flagship in `/api/public/submit` remains for Anker's own founder campaign.
+
+---
+
+## 19. Implementation status, read from the repository and production on 2026-10-10 (fourth edition)
+
+Doc 37 said "nothing built". Since 2026-10-03 the platform layers of section 5 were built (docs 43 to 46). **What is real, what is empty, and what is next:**
+
+| Spec item | Status | Evidence |
+| --- | --- | --- |
+| §5.1 action layer, proposals, risk classes, approval inbox, undo | **Built** (doc 43; capabilities `crm_update_stage`, `crm_add_task`, `memory_remember`, `outreach_save_drafts`, `outreach_send_batch`; R2/R3 never auto-commit; untrusted runs capped) | production table `action_proposals`: **0 rows ever**, so unused in production |
+| §5.2 agent runtime: definitions as data, schedule and event triggers, durable runs, kill switches, memory, model steps | **Built** (docs 44, 45; four definitions: pipeline keeper, weekly brief, reply keeper, outreach drafter) | `agent_executions`: **1 row** |
+| §5.3 entity memory | **Built** (`entity_memory`, written through a capability) | table exists; identity service and review queue: **not built** (`entities` does not exist) |
+| §5.4 run traces and cost; cron tracking; dependency check; evals | **Built** (`ai_calls.run_id` and `cost_usd`, `cron_runs` 9,144 rows, dependency check, 116 `eval_runs` including live read-only evals) | production |
+| §5.4 evals with an injection case; scale budget in CI | evals built; **the 21,000-firm CI fixture is not verified here** | — |
+| §5.5 entitlements: one `can` and `meter`; AI credits debited from a ledger | `assertAllowed`, `assertWithinLimit`, `ai_spend_usd_month` exist and are used by the studio and assistant; **no credit ledger** (`credit_ledger` does not exist) | production |
+| Send governance (not in the original spec; added by this work) | **Built** (doc 46 P0 to P4): every outreach send runs under a recorded send authorization, one approver (the sender), exact recipients and text hashed, 7-day expiry, platform pause, shadow log, enforcement flag (off), dated sequences, LinkedIn actions recorded | `send_authorizations`: 1 row |
+| §8.3 `List-Unsubscribe`, global suppression registry, country send gate | **Built** (`unsubscribeHeaders`, `email_suppressions`, `assertOutreachAllowed`) | code; suppressions: 0 rows |
+| §8.2 data-subject requests, retention, erasure for the 50,000 directory persons | **Not built** (`dsar_requests`, `erasure_requests` do not exist; tenant erasure exists for workspaces) | production |
+| §8.4 per-workspace provider policy ("refuse third-country providers") | **Not built** | grep |
+| §8.5 MFA | **Built in SAIL** (TOTP step-up; enrolment is a founder action) | SAIL |
+| Phase A activation and truth | Instrumentation **built in SAIL** (`/activation`, derived from product records) and **extended today** with the governed-work counts and a per-workspace view `activation_by_workspace` in Anker (`2026-10-10b`) | see below |
+
+### 19.1 What production says about adoption (the finding that matters)
+From `activation_by_workspace` on 2026-10-10 (14 live workspaces):
+- **One** workspace has ever emailed a contact: the founder's own ("Anker": 641 contacts, mail sent). It is the only one with activity in the last month.
+- The two **design-partner workspaces** (Summit Venture Studio and Winner Capital, created 2026-10-04) have **0 contacts**; "Anker Fund I" has 50 contacts and nothing else; the other ten workspaces are empty accounts created on 2026-08-08 or 2026-09-30.
+- **0 proposals** have ever been created, **1 agent run** ever finished, **1 send authorization** (the founder's own test).
+So the platform layers exist and are tested, and **no customer or partner has used them**. This is gap G0 and risk R1 of this document, unchanged: "building an operator for a firm that does not exist." More platform work will not move this number. What moves it is in sections 7.1 and 13.1: the partners using it. Two things engineering can do that serve that directly: make the first session produce something (section 19.2), and make adoption visible weekly (done).
+
+### 19.2 What to build next, in order
+1. **First-run value for the design partners (Phase A, week 3 to 4 of 13.1).** A partner who signs in should reach "a reviewed list of investors, a draft wave waiting for approval, and a brief" without configuration: guided setup from a deck or fund thesis, the first drafts created for them, and the approval screen as the landing page. Measure with `activation_by_workspace` (time from workspace created to first contact, first draft, first approved send).
+2. **The directory privacy work (Phase 3, G12, G14):** `dsar_requests` and erasure for directory persons, a per-batch source and licence record, and the workspace provider switch. These are the compliance blockers named before any wider launch and before the first paid customer.
+3. **Credit ledger and the single `can`/`meter`** (G11), once a paying customer is in sight.
+4. **Entity identity service and review queue** (G6, G7), when the partners' data shows duplicate firms hurting a real run.
+Items 2 to 4 are real work with real value, but each one waits behind getting a single partner through item 1.
