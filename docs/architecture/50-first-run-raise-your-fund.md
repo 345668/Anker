@@ -58,3 +58,9 @@ Three things stopped a partner from finishing on the card; each now has its own 
 2. **LinkedIn messages (step 5).** The first-wave draft pair includes a LinkedIn message of at most 300 characters. LinkedIn does not allow a message to a stranger, but it does allow a connection request with a note of that length, so each saved message is queued as a **connection request with that note** in the LinkedIn Review Queue (status pending approval, never auto-approved) for the contacts that have a LinkedIn page. The card shows "LinkedIn: N messages ready" with a button that queues them, then "N waiting in the LinkedIn Review Queue". Approving there is the same governed path as before (the approval is recorded, caps and windows apply). Without a connected sender profile the actions wait; the card says so.
 3. **The fund profile on the card (step 1).** A short form on the card (fund name, GP name, target raise, a two-to-three sentence thesis, sectors, geography, headquarters) creates the profile or fills only what was typed into the existing one; nothing else in the profile is overwritten. The full profile and deck extraction stay on the matchmaking page for the rest.
 4. **Measurement.** `activation_by_workspace` and the SAIL Activation page already show each workspace's first contact, first draft, first approved send and first reply. Nothing new was needed; what is missing is a partner using it.
+
+### Build status, second slice (2026-10-10)
+
+Shipped in `f536727`, CI green, deployed. Covered by unit tests on PGlite (`lib/vc/second-slice.test.ts`) and the shortlist query was run read-only against the real production matching session (75 firm-distinct picks, 72 with an email).
+
+**Not yet verified:** a click-through on production (inline fund form, one-click shortlist insert against production column types, LinkedIn queue to the review queue). **Not measured:** no real partner has used the path; Summit/Winner workspaces still have 0 contacts.
