@@ -1,6 +1,6 @@
 # 51. Spec: subject replacement and staged video pipelines in the Anker Media Studio
 
-Status: **decided 2026-10-11 (section 8); P1 slice 1 built (section 12); P0 spike open (section 11).** Source analysed: <https://github.com/345668/Genjustsu-Open-Source-Workflow> (MIT, about 1,200 lines of Python, last push 2026-10-08, 0 stars), cloned and read on 2026-10-11. Builds on docs 47, 48 and 49.
+Status: **decided 2026-10-11 (section 8); P1 slices 1 and 2 built (section 12); ffmpeg delivery decision open (section 12.1); P0 spike open (section 11).** Source analysed: <https://github.com/345668/Genjustsu-Open-Source-Workflow> (MIT, about 1,200 lines of Python, last push 2026-10-08, 0 stars), cloned and read on 2026-10-11. Builds on docs 47, 48 and 49.
 
 **What was read, and what was not.** Read in full: `README.md`, `AGENTS.md`, `docs/MODELS.md`, `docs/ENHANCOR-API.md`, `docs/VALIDATION.md`, `THIRD-PARTY.md`, `pipeline.py`, `seedance_bridge.py`, `mask_review.py`, `raw_masks.py`, `audio_workflow.py`, `media_host.py`, `.env.example`. Skimmed: `app.py` routes. Not read: `static/index.html`, `face_mesh.py`, `mesh_worker.py`, `workflow.py`, the tests. **Nothing was run.** Its own validation notes claim one live end-to-end run on macOS and say other systems and failure conditions are not exhaustively tested; we treat the repo as a design reference, not as proven code.
 
@@ -125,9 +125,23 @@ Real-time or live replacement; voice cloning; replacing people without consent a
 - Tenant registry: pipelines and consents are exported and erased with the workspace, and files held in Blob by pipelines are erased with it (`mediaRefs` in the executor); the child tables are classified as cascade children.
 - 20 integration tests on PGlite with the real migration cover: the full attestation, consent per person and workspace, stage order, no double start, review on stale files, approval of the exact files, a one-byte change voiding it, a consent change voiding it, rejection ending the pipeline, the final approval, no automatic retry of a paid stage, isolation between workspaces, the flag, and the set hash. Full suite: 1567 tests pass.
 
+**Slice 2 (2026-10-11): stages, storage and routes. Built and tested; the ffmpeg binary is not yet deployable (section 12.1).**
+- `ffmpeg.ts`: runs the bundled `@ffmpeg-installer/ffmpeg` (loaded lazily; it ships inside an npm platform package, so no install-time download that CI or Vercel may skip) and reads media with `ffmpeg -i` (no ffprobe).
+- `storage.ts`: private Blob under `ai-studio-pipelines/<hash of user and workspace>/<pipeline>/...`, with an in-memory twin for tests.
+- `stages.ts`: **ingest** (the uploaded file must hash to what the consent names; 1 to 30 s, at least 128 px, an MP4 with video; references must be real images that match their consent hashes; the incoming copies are then deleted), **normalise** (24 fps, at most 960 px, even sides, audio kept), **restore_audio** (the original audio under the generated picture; a gap up to half a second is closed by holding the last frame; a larger gap is refused, never trimmed, looped or stretched; the voice is pitched +3 semitones with the timing kept only if the consent says it is altered) and **deliver** (a plain "synthetic media" note, the consent id and whether the voice was altered are written into the file; no names). Measured, not assumed: a 440 Hz test tone comes out at about 523 Hz after the shift, with the length unchanged.
+- Routes under `/api/anker/studio/pipelines`: `consent`, create and list, `upload` (a direct-to-Blob token for the exact incoming names of the caller's own pipeline, with type and size limits), `[id]` (status, files without their storage paths, the consent summary, and the hash to send back at each gate), `[id]/run`, `[id]/review`, `[id]/artifacts/[kind]` (owner only, streamed, no cache, only the delivery may be downloaded) and `health`. **Every route answers "not available" while `ai_studio_replace` is off.**
+- 21 new tests (41 for the pipeline in all), including a real ffmpeg on generated clips, an odd-sized tall clip, upload name validation (other names, other pipelines, other people, path tricks), cross-user and cross-workspace refusals and a stale review hash. CI is green on the full suite.
+
+### 12.1 Finding: the ffmpeg binary does not fit in a function as built
+The first deployment that carried the binary failed: one function reached **287 MB uncompressed against Vercel's 250 MB limit** (so the rest of the app weighs about 215 MB before ffmpeg is added). Two earlier attempts taught the same lesson: `ffmpeg-static` downloads its binary in an install script that CI and Vercel skipped (so the binary was absent), and the Linux build in `@ffmpeg-installer` is ffmpeg 4.1, older than the 4.4 on the development machine, which is why the scale options were rewritten to be version-safe. For now the binary is **not** bundled: deploys are green and the pipeline routes cannot run ffmpeg in production (they are off anyway). Options:
+1. **Vercel's large functions beta** (`VERCEL_SUPPORT_LARGE_FUNCTIONS=1`; the project reports itself eligible) and the binary included only on the `run` and `health` routes. One setting, no code. A platform change to production.
+2. **Fetch the binary at run time** from our private Blob into `/tmp`, pinned by SHA-256 so a swapped file is refused, cached per instance. No limit change and the functions stay small; adds roughly a second or two to a cold start and a one-time upload of the binary.
+3. **Slim the functions** until the binary fits. Uncertain and touches unrelated code.
+*Recommendation: option 2 if the platform setting should stay as it is; option 1 if a platform change is acceptable, since it needs no code.*
+
 **Not built yet (next slices):**
-1. **Slice 2, stages and routes:** the ffmpeg stages in Vercel functions (ingest checks, normalise, audio restore with hold-frame alignment, voice shift), Blob storage of artifacts with signed fetch links, HTTP routes for consent, create, review, run and status, behind `replaceEnabled`.
-2. **Slice 3, the generation stages:** the Qwen animate call as a child job under the existing reservation, spend and `uncertain` handling. **Blocked on the P0 spike** (section 11): the model's inputs and quality are not yet verified.
-3. **Slice 4, the person-facing screens:** consent, review player with the exact-files hash, draft and final approval, library with provenance.
-4. **Slice 5, the safety screens:** likeness and age screen, provenance mark and C2PA on deliveries.
-Customers cannot reach any of this: no route exists yet, and the flag is off.
+1. **Slice 3, the generation stages:** the Qwen animate call as a child job under the existing reservation, spend and `uncertain` handling. **Blocked on the P0 spike** (section 11).
+2. **Slice 4, the person-facing screens:** consent, upload, review player with the exact-files hash, draft and final approval, library with provenance.
+3. **Slice 5, the safety screens:** likeness and age screen, provenance mark and C2PA on deliveries.
+4. **Known gap:** files uploaded but never ingested (an abandoned upload) are not yet swept; they are erased with the workspace only once ingested. A sweep belongs with slice 4.
+Customers cannot reach any of this: the flag is off.
