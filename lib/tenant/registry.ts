@@ -31,6 +31,9 @@ export const RULES: Rule[] = [
   { scope: O, table: "ai_studio_jobs", where: MEDIA_WORKSPACE_WHERE, secret: ["source_token_hash", "lease_token", "provider_id"] },
   { scope: O, table: "ai_studio_assets", where: MEDIA_WORKSPACE_WHERE, secret: ["pathname"] },
   { scope: O, table: "ai_studio_scope_locks", where: MEDIA_WORKSPACE_WHERE },
+  // Pipelines (doc 51): deleting a pipeline cascades to its stages, artifacts and reviews; the consents are deleted after it (pipelines reference them).
+  { scope: O, table: "ai_studio_pipelines", where: MEDIA_WORKSPACE_WHERE },
+  { scope: O, table: "ai_studio_consents", where: MEDIA_WORKSPACE_WHERE },
   // ── fund: children whose parent would otherwise refuse the delete ──
   { scope: F, table: "deal_room_documents", where: "room_id::text IN (SELECT id::text FROM deal_rooms WHERE deal_id::text IN (SELECT id::text FROM deal_opportunities WHERE fund_id::text = $2))" },
   { scope: F, table: "deal_room_access_grants", where: "room_id::text IN (SELECT id::text FROM deal_rooms WHERE deal_id::text IN (SELECT id::text FROM deal_opportunities WHERE fund_id::text = $2))" },
@@ -177,6 +180,9 @@ export const RULES: Rule[] = [
 
 /** Tables that carry a workspace, fund or user key but are NOT the customer's data, with the reason. The coverage test accepts these. */
 export const EXCLUDED: { table: string; reason: string }[] = [
+  { table: "ai_studio_stages", reason: "Child of ai_studio_pipelines (ON DELETE CASCADE)." },
+  { table: "ai_studio_artifacts", reason: "Child of ai_studio_pipelines (ON DELETE CASCADE); its files are removed as blobs (mediaRefs in the executor)." },
+  { table: "ai_studio_reviews", reason: "Child of ai_studio_pipelines (ON DELETE CASCADE)." },
   { table: "crm_migration_plan", reason: "A VIEW over crm_entries: it cannot be deleted from, and is removed with its source rows." },
   { table: "investors", reason: "The shared investor directory (50,000 rows), not tenant data. user_id there is the importer, never an owner." },
   { table: "email_suppressions", reason: "The do-not-contact list protects third parties and must survive any erasure." },

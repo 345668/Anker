@@ -76,8 +76,13 @@ export const totalRows = (c: TableCount[], action?: TableCount["action"]) => c.f
 
 async function mediaRefs(s: Scope): Promise<string[]> {
   const b = bind(MEDIA_WORKSPACE_WHERE, s)
-  try { return (await q(`SELECT pathname FROM ai_studio_assets WHERE ${b.where}`, b.values)).map((r) => String(r.pathname)) }
-  catch (e) { if (missingTable(e)) return []; throw e }
+  const refs: string[] = []
+  try { refs.push(...(await q(`SELECT pathname FROM ai_studio_assets WHERE ${b.where}`, b.values)).map((r) => String(r.pathname))) }
+  catch (e) { if (!missingTable(e)) throw e }
+  // Client footage held by staged pipelines (docs/architecture/51) is erased with the workspace too.
+  try { refs.push(...(await q(`SELECT pathname FROM ai_studio_artifacts WHERE pipeline_id IN (SELECT id FROM ai_studio_pipelines WHERE ${b.where})`, b.values)).map((r) => String(r.pathname))) }
+  catch (e) { if (!missingTable(e)) throw e }
+  return refs
 }
 
 /** Blob references this workspace owns, found through its own rows, plus its named prefixes. Counts only, for the dry run. */
