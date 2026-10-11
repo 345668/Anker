@@ -8,6 +8,11 @@ const nextConfig = {
   // The loader degrades gracefully if they're absent (skills simply disabled).
   outputFileTracingIncludes: {
     "/**": ["./skills/**/*", "./lib/branding/fonts/*.ttf", "./lib/branding/anker-silver.png"],
+    // The bundled ffmpeg for the Media Studio pipelines (docs/architecture/51): only these routes carry the ~45 MB binary.
+    "/api/anker/studio/pipelines/**": [
+      "./node_modules/ffmpeg-static/ffmpeg",
+      "./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg",
+    ],
   },
   images: {
     unoptimized: true,
@@ -26,6 +31,8 @@ const nextConfig = {
     // error from Turbopack at module-eval time.
     "@napi-rs/canvas",
     "pdfjs-dist",
+    // A native binary, resolved at runtime rather than bundled.
+    "ffmpeg-static",
   ],
 }
 
