@@ -167,7 +167,10 @@ function messageRoutine(message: string, sel: MessageSel): Promise<ExecResult> {
       msgBtn.click();
       box = await waitFor(() => deepFirst(sel.composer), 8000);
     }
-    if (!box || !visible(box)) return { ok: false, error: "Message composer did not open" };
+    if (!box || !visible(box)) {
+      const editables = deepAll(document, "[contenteditable]").length;
+      return { ok: false, error: `Message composer did not open (tab ${document.hidden ? "hidden" : "visible"}, ${editables} editable fields, ${location.pathname})` };
+    }
 
     box.focus();
     await jitter(300, 700);

@@ -152,7 +152,15 @@ async function processItem(item: LiActionItem): Promise<ExecResult> {
     const note = typeof item.payload?.message === "string" ? (item.payload.message as string) : null;
     let res: ExecResult;
     if (item.actionType === "connect_request") res = await executeConnect(tab.id, note);
-    else if (item.actionType === "message" || item.actionType === "follow_up") res = await executeMessage(tab.id, note || "");
+    else if (item.actionType === "message" || item.actionType === "follow_up") {
+      res = await executeMessage(tab.id, note || "");
+      // LinkedIn may not build the messaging overlay in a background tab: bring the tab forward once and try again.
+      if (!res.ok && /composer did not open/i.test(res.error || "")) {
+        try { await chrome.tabs.update(tab.id, { active: true }); } catch {}
+        await new Promise((r) => setTimeout(r, 1500));
+        res = await executeMessage(tab.id, note || "");
+      }
+    }
     else res = { ok: false, error: `Unsupported action_type: ${item.actionType}` };
 
     await reportActionResult(item.id, { ok: res.ok, error: res.error, result: res.detail });
