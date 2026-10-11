@@ -15,6 +15,10 @@ export async function GET() {
     )
     return json({ ok: r.code === 0, binary: basename(await ffmpegBinary()) })
   } catch (e) {
+    // A missing or unrunnable binary is the one failure worth explaining to a signed-in user (the text is trimmed and carries no secrets).
+    const m = (e as Error)?.message ?? ""
+    if (/ffmpeg/i.test(m) && !(e as { status?: number }).status)
+      return json({ ok: false, reason: m.slice(0, 300) })
     return errorResponse(e)
   }
 }
