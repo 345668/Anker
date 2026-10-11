@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { sql } from "@/lib/db"
 import { listSenders } from "@/lib/linkedin/senders"
+import { extensionVersionState } from "@/lib/extension/version"
 import { PageShell, PageHeader } from "@/components/shell/page-header"
 import { ExtensionTokensClient, type TokenSummary } from "@/components/settings/extension-tokens-client"
 
@@ -31,10 +32,13 @@ export default async function LinkedOutExtensionPage() {
   if (!user) redirect("/auth/login")
 
   let tokens: TokenSummary[] = []
+  let installed: string | null = null
   try {
     const rows: any[] = await sql`
-      SELECT id, COALESCE(prefix, token_prefix) AS prefix, label, created_at, last_used_at, revoked_at
+      SELECT id, COALESCE(prefix, token_prefix) AS prefix, label, created_at, last_used_at, revoked_at, last_version
         FROM extension_tokens WHERE user_id = ${user.id}::uuid ORDER BY created_at DESC`
+    // The version of whichever build called most recently (the one in use now).
+    installed = rows.filter((r) => !r.revoked_at && r.last_version && r.last_used_at).sort((a, b) => +new Date(b.last_used_at) - +new Date(a.last_used_at))[0]?.last_version ?? null
     tokens = rows.map((r) => ({
       id: String(r.id),
       prefix: String(r.prefix ?? "").slice(0, 12),
@@ -64,13 +68,14 @@ export default async function LinkedOutExtensionPage() {
       />
 
       {/* Connection status */}
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatusCard
           label="Extension"
           value={connected ? "Connected" : activeTokens.length ? "Token minted" : "Not set up"}
           tone={connected ? "good" : activeTokens.length ? "warn" : "muted"}
           sub={lastUsed ? `Last seen ${new Date(lastUsed).toLocaleString()}` : "No calls yet"}
         />
+        <StatusCard label="Version" {...extensionVersionState(installed, activeTokens.length > 0)} />
         <StatusCard
           label="Active tokens"
           value={String(activeTokens.length)}

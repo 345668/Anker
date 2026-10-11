@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { createHash, randomBytes } from "node:crypto";
+import { cleanVersion } from "@/lib/extension/version";
 
 export const TOKEN_PREFIX = "ank_";
 
@@ -53,7 +54,8 @@ export async function authenticateExtension(req: NextRequest): Promise<Extension
     return { ok: false, response: NextResponse.json({ error: "Unknown or revoked token" }, { status: 401, headers: corsHeaders() }) };
   }
   // Update last_used_at (fire and forget — don't block the request)
-  sql`update extension_tokens set last_used_at = now() where id = ${rows[0].id}`.catch(() => {});
+  const version = cleanVersion(req.headers.get("x-anker-extension-version"));
+  sql`update extension_tokens set last_used_at = now(), last_version = coalesce(${version}, last_version) where id = ${rows[0].id}`.catch(() => {});
   return { ok: true, userId: rows[0].user_id, tokenId: rows[0].id };
 }
 
@@ -62,7 +64,7 @@ export function corsHeaders(): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Anker-Workspace",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Anker-Workspace, X-Anker-Extension-Version",
     "Access-Control-Max-Age": "86400",
   };
 }

@@ -55,6 +55,7 @@ async function ankerFetch(path: string, init: RequestInit = {}): Promise<Respons
   const workspaceId = await storage.get(KEYS.workspaceId);
   const headers: Record<string, string> = {
     ...(workspaceId ? { "X-Anker-Workspace": workspaceId } : {}),
+    "X-Anker-Extension-Version": chrome.runtime.getManifest().version,
     "Authorization": `Bearer ${token}`,
     "Content-Type": "application/json",
     ...((init.headers as Record<string, string>) || {}),
