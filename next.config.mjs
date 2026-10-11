@@ -26,8 +26,6 @@ const nextConfig = {
     // error from Turbopack at module-eval time.
     "@napi-rs/canvas",
     "pdfjs-dist",
-    // A native binary, resolved at runtime rather than bundled.
-    "@ffmpeg-installer/ffmpeg",
   ],
 }
 

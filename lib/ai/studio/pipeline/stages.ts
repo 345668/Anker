@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { sql } from "@/lib/db"
 import { mediaFormat } from "../assets"
-import { ffmpegOk, probe } from "./ffmpeg"
+import { ffmpegOk, mp4Input, probe } from "./ffmpeg"
 import { pipelinePath, sha256, type PipelineStorage } from "./storage"
 import type { NewArtifact, Runners, StageContext } from "./runner"
 
@@ -119,8 +119,7 @@ export function stageRunners(storage: PipelineStorage): Runners {
         await writeFile(join(dir, "in.mp4"), bytes)
         await ffmpegOk([
           "-y",
-          "-i",
-          join(dir, "in.mp4"),
+          ...mp4Input(join(dir, "in.mp4")),
           "-t",
           String(MAX_SECONDS),
           "-vf",
@@ -187,10 +186,8 @@ export function stageRunners(storage: PipelineStorage): Runners {
           : ["-c:a", "copy"]
         await ffmpegOk([
           "-y",
-          "-i",
-          join(dir, "gen.mp4"),
-          "-i",
-          join(dir, "src.mp4"),
+          ...mp4Input(join(dir, "gen.mp4")),
+          ...mp4Input(join(dir, "src.mp4")),
           "-map",
           "0:v:0",
           "-map",
@@ -219,8 +216,7 @@ export function stageRunners(storage: PipelineStorage): Runners {
         const note = `Synthetic media made with Anker Media Studio. Consent record ${consent.id}. Voice altered: ${consent.voice_altered ? "yes" : "no"}.`
         await ffmpegOk([
           "-y",
-          "-i",
-          join(dir, "in.mp4"),
+          ...mp4Input(join(dir, "in.mp4")),
           "-c",
           "copy",
           "-metadata",
