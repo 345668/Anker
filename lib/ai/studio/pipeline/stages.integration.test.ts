@@ -165,6 +165,23 @@ describe("ingest and normalise, with a real ffmpeg", () => {
     expect(info.hasAudio).toBe(true)
     expect(info.durationS).toBeGreaterThan(2.8)
   })
+  it("handles a tall clip with odd dimensions: both sides come out even and within 960", async () => {
+    const { store, pipe } = await upload(
+      await makeClip("tall.mp4", 2, "502x1002", 25, false),
+      await makePng(),
+    )
+    const r = stageRunners(store)
+    await runNextStage(p, pipe.id, r)
+    await runNextStage(p, pipe.id, r)
+    const out = [...store.files.entries()].find(([k]) => k.endsWith("prepared.mp4"))!
+    const f = join(dir, "tall-check.mp4")
+    await writeFile(f, out[1].bytes)
+    const info = await probe(f)
+    expect(info.height).toBeLessThanOrEqual(960)
+    expect(info.width! % 2).toBe(0)
+    expect(info.height! % 2).toBe(0)
+    expect(info.height!).toBeGreaterThan(info.width!)
+  })
 })
 
 /** Runs a pipeline through the review and puts a generated clip in place of the (not yet built) generation stages. */

@@ -124,7 +124,7 @@ export function stageRunners(storage: PipelineStorage): Runners {
           "-t",
           String(MAX_SECONDS),
           "-vf",
-          "scale='min(960,iw)':'min(960,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,fps=24,format=yuv420p",
+          "scale=w='if(gt(iw,ih),trunc(min(960,iw)/2)*2,-2)':h='if(gt(iw,ih),-2,trunc(min(960,ih)/2)*2)',fps=24,format=yuv420p",
           "-c:v",
           "libx264",
           "-crf",
