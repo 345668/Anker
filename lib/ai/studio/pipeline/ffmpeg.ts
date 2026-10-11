@@ -1,10 +1,20 @@
 import { spawn } from "node:child_process"
-import ffmpegPath from "ffmpeg-static"
 
-/** The bundled ffmpeg (docs/architecture/51 section 5.4): no new infrastructure, it runs inside the function. */
-export function ffmpegBinary(): string {
-  if (!ffmpegPath) throw new Error("ffmpeg is not available in this runtime.")
-  return ffmpegPath
+/**
+ * The bundled ffmpeg (docs/architecture/51 section 5.4): no new infrastructure, it runs inside the function. It ships inside an npm platform package
+ * (no install-time download, which CI and Vercel builds may skip). Loaded lazily, so a missing binary fails the step, not every route.
+ */
+export async function ffmpegBinary(): Promise<string> {
+  try {
+    const m = (await import("@ffmpeg-installer/ffmpeg")) as { path?: string; default?: { path?: string } }
+    const path = m.path ?? m.default?.path
+    if (!path) throw new Error("no path")
+    return path
+  } catch (e) {
+    throw new Error(
+      "ffmpeg is not available in this runtime: " + String((e as Error)?.message ?? e).slice(0, 200),
+    )
+  }
 }
 
 export interface Ran {
@@ -13,9 +23,10 @@ export interface Ran {
 }
 
 /** Runs ffmpeg and returns its exit code and the tail of its log. Never throws on a non-zero exit: callers decide. */
-export function ffmpeg(args: string[], timeoutMs = 240_000): Promise<Ran> {
+export async function ffmpeg(args: string[], timeoutMs = 240_000): Promise<Ran> {
+  const binary = await ffmpegBinary()
   return new Promise((resolve, reject) => {
-    const child = spawn(ffmpegBinary(), ["-hide_banner", "-nostdin", ...args], {
+    const child = spawn(binary, ["-hide_banner", "-nostdin", ...args], {
       stdio: ["ignore", "ignore", "pipe"],
     })
     let stderr = ""

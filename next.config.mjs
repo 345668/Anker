@@ -10,8 +10,8 @@ const nextConfig = {
     "/**": ["./skills/**/*", "./lib/branding/fonts/*.ttf", "./lib/branding/anker-silver.png"],
     // The bundled ffmpeg for the Media Studio pipelines (docs/architecture/51): only these routes carry the ~45 MB binary.
     "/api/anker/studio/pipelines/**": [
-      "./node_modules/ffmpeg-static/ffmpeg",
-      "./node_modules/.pnpm/ffmpeg-static@*/node_modules/ffmpeg-static/ffmpeg",
+      "./node_modules/@ffmpeg-installer/**/*",
+      "./node_modules/.pnpm/@ffmpeg-installer+*/node_modules/@ffmpeg-installer/**/*",
     ],
   },
   images: {
@@ -32,7 +32,7 @@ const nextConfig = {
     "@napi-rs/canvas",
     "pdfjs-dist",
     // A native binary, resolved at runtime rather than bundled.
-    "ffmpeg-static",
+    "@ffmpeg-installer/ffmpeg",
   ],
 }
 

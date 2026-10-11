@@ -13,7 +13,7 @@ export async function GET() {
       ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono", "-t", "0.1", "-f", "null", "-"],
       15_000,
     )
-    return json({ ok: r.code === 0, binary: basename(ffmpegBinary()) })
+    return json({ ok: r.code === 0, binary: basename(await ffmpegBinary()) })
   } catch (e) {
     return errorResponse(e)
   }
