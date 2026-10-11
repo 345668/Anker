@@ -15,6 +15,7 @@
  */
 import { fetchActionQueue, reportActionResult, type LiActionItem } from "./anker-client";
 import { executeConnect, executeMessage, type ExecResult } from "./action-executor";
+import { showAssistPanel } from "./assist-panel";
 
 export const ACTION_ALARM = "anker-action-tick";
 const STATE_KEY = "ankerActionState";
@@ -25,6 +26,7 @@ const MIN_GAP_MIN = 0.6;
 const MAX_GAP_MIN = 1.5;
 const FIRST_GAP_MIN = 0.5; // first action ~30s after Start
 const PER_TAB_TIMEOUT_MS = 30_000;
+const ASSIST_TIMEOUT_MS = 8 * 60_000; // under the server's 10 minute claim window
 
 export interface WorkerState {
   running: boolean;
@@ -34,6 +36,8 @@ export interface WorkerState {
   lastFriction: string | null;
   startedAt: number | null;
   lastActionAt: number | null;
+  /** An assisted-send action waiting for the person to press Send and confirm. */
+  awaiting?: { id: string; tabId: number; since: number } | null;
 }
 
 const DEFAULT_STATE: WorkerState = {
@@ -99,6 +103,13 @@ export async function onActionTick(): Promise<void> {
     const st = await getState();
     if (!st.running) { try { await chrome.alarms.clear(ACTION_ALARM); } catch {} return; }
 
+    // An assisted send is waiting for the person: do not claim anything else until they answer or it expires.
+    if (st.awaiting) {
+      if (Date.now() - st.awaiting.since > ASSIST_TIMEOUT_MS) await resolveAssisted(st.awaiting.id, "timeout");
+      else scheduleNext(0.5);
+      return;
+    }
+
     // Claim exactly one approved action.
     const q = await fetchActionQueue(1);
     if (!q.ok) { await setState({ lastError: q.error || "fetch failed" }); scheduleNext(jitterMin()); return; }
@@ -107,6 +118,11 @@ export async function onActionTick(): Promise<void> {
     if (!item) { await setState({ running: false }); try { await chrome.alarms.clear(ACTION_ALARM); } catch {} return; } // queue drained
 
     const res = await processItem(item);
+    if (res.detail?.assisted === true) { // panel is up; the result is reported when the person answers
+      await setState({ awaiting: { id: item.id, tabId: Number(res.detail.tabId), since: Date.now() } });
+      scheduleNext(0.5);
+      return;
+    }
 
     const patch: Partial<WorkerState> = { lastActionAt: Date.now() };
     if (res.ok) patch.processed = st.processed + 1;
@@ -144,7 +160,8 @@ function waitTabComplete(tabId: number, timeoutMs: number): Promise<void> {
 async function processItem(item: LiActionItem): Promise<ExecResult> {
   let tab: chrome.tabs.Tab | null = null;
   try {
-    tab = await chrome.tabs.create({ url: item.targetUrl, active: false });
+    const assisted = item.actionType === "message" || item.actionType === "follow_up";
+    tab = await chrome.tabs.create({ url: item.targetUrl, active: assisted });
     if (!tab?.id) throw new Error("no tab id");
     await waitTabComplete(tab.id, PER_TAB_TIMEOUT_MS);
     await new Promise((r) => setTimeout(r, 2000)); // let LinkedIn hydrate
@@ -152,14 +169,11 @@ async function processItem(item: LiActionItem): Promise<ExecResult> {
     const note = typeof item.payload?.message === "string" ? (item.payload.message as string) : null;
     let res: ExecResult;
     if (item.actionType === "connect_request") res = await executeConnect(tab.id, note);
-    else if (item.actionType === "message" || item.actionType === "follow_up") {
-      res = await executeMessage(tab.id, note || "");
-      // LinkedIn may not build the messaging overlay in a background tab: bring the tab forward once and try again.
-      if (!res.ok && /composer did not open/i.test(res.error || "")) {
-        try { await chrome.tabs.update(tab.id, { active: true }); } catch {}
-        await new Promise((r) => setTimeout(r, 1500));
-        res = await executeMessage(tab.id, note || "");
-      }
+    else if (assisted) {
+      const shown = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: "ISOLATED", func: showAssistPanel, args: [item.id, item.targetName || "", note || ""] });
+      if (!shown?.[0]?.result) throw new Error("could not show the send panel");
+      const keep = tab; tab = null; // leave the tab open for the person
+      return { ok: true, detail: { assisted: true, tabId: keep.id } };
     }
     else res = { ok: false, error: `Unsupported action_type: ${item.actionType}` };
 
@@ -172,4 +186,20 @@ async function processItem(item: LiActionItem): Promise<ExecResult> {
   } finally {
     if (tab?.id != null) { try { await chrome.tabs.remove(tab.id); } catch {} }
   }
+}
+
+/** The person answered the send panel (or it expired): report the outcome and move on. */
+export async function resolveAssisted(actionId: string, outcome: "sent" | "skipped" | "timeout"): Promise<void> {
+  const st = await getState();
+  if (!st.awaiting || st.awaiting.id !== actionId) return;
+  const tabId = st.awaiting.tabId;
+  const ok = outcome === "sent";
+  const error = outcome === "skipped" ? "Skipped by the user in the send panel" : outcome === "timeout" ? "Timed out waiting for the user to send" : undefined;
+  await reportActionResult(actionId, { ok, error, result: ok ? { assisted: true, confirmedByUser: true } : undefined });
+  const next = await setState({
+    awaiting: null, lastActionAt: Date.now(),
+    ...(ok ? { processed: st.processed + 1 } : { failed: st.failed + 1, lastError: error || "not sent" }),
+  });
+  if (tabId != null) { try { await chrome.tabs.remove(tabId); } catch {} }
+  if (next.running) scheduleNext(jitterMin());
 }

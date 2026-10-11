@@ -26,7 +26,7 @@
  */
 import { ingestProfile, draftByName, whoami, syncConnections, syncMutuals, getContext, createDealFromProfile, storage, KEYS } from "~lib/anker-client";
 import { startCrawl, stopCrawl, status as crawlStatus } from "~lib/crawl-worker";
-import { startActions, stopActions, status as actionStatus, onActionTick, ensureArmedIfRunning, ACTION_ALARM } from "~lib/action-worker";
+import { startActions, stopActions, status as actionStatus, onActionTick, ensureArmedIfRunning, resolveAssisted, ACTION_ALARM } from "~lib/action-worker";
 import { syncInboxNow } from "~lib/inbox-sync";
 import { syncInvitesNow } from "~lib/invites-sync";
 import { refreshSelectors } from "~lib/selectors";
@@ -83,6 +83,9 @@ chrome.runtime.onMessage.addListener((msg: { type: string; [k: string]: any }, _
         sendResponse(await startActions());
       } else if (msg.type === "actionStop") {
         sendResponse(await stopActions());
+      } else if (msg.type === "assistedOutcome") {
+        await resolveAssisted(String(msg.actionId), msg.outcome === "sent" ? "sent" : "skipped");
+        sendResponse({ ok: true });
       } else if (msg.type === "actionStatus") {
         sendResponse(await actionStatus());
       } else if (msg.type === "syncInbox") {

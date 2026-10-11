@@ -106,3 +106,13 @@ The extension talks to these routes in the Anker Next.js app
 
 All extension routes accept CORS (`Access-Control-Allow-Origin: *`) and
 bearer-token auth via `Authorization: Bearer ank_…`.
+
+## Assisted send for messages (v0.11.0)
+
+LinkedIn only opens its message composer for a genuine (trusted) click, so a script cannot press **Message**
+(a scripted click navigates to a full-page composer the extension cannot read). For `message` and `follow_up`
+actions the worker therefore does not automate the composer. It opens the profile in front, shows a panel with
+the approved text (Copy text / I sent it / Skip), and waits. The person clicks Message, pastes, presses Send and
+confirms. "I sent it" reports the action as done with `confirmedByUser`; Skip reports it failed; no answer within
+8 minutes reports a timeout (under the server's 10 minute claim window). Only one action is handled at a time;
+nothing else is claimed while a panel is open. Connection requests still run automatically.
