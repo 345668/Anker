@@ -1,6 +1,6 @@
 # 51. Spec: subject replacement and staged video pipelines in the Anker Media Studio
 
-Status: **spec for decision, nothing built.** Source analysed: <https://github.com/345668/Genjustsu-Open-Source-Workflow> (MIT, about 1,200 lines of Python, last push 2026-10-08, 0 stars), cloned and read on 2026-10-11. Builds on docs 47, 48 and 49.
+Status: **decided 2026-10-11 (section 8); P0 spike in progress (section 11).** Source analysed: <https://github.com/345668/Genjustsu-Open-Source-Workflow> (MIT, about 1,200 lines of Python, last push 2026-10-08, 0 stars), cloned and read on 2026-10-11. Builds on docs 47, 48 and 49.
 
 **What was read, and what was not.** Read in full: `README.md`, `AGENTS.md`, `docs/MODELS.md`, `docs/ENHANCOR-API.md`, `docs/VALIDATION.md`, `THIRD-PARTY.md`, `pipeline.py`, `seedance_bridge.py`, `mask_review.py`, `raw_masks.py`, `audio_workflow.py`, `media_host.py`, `.env.example`. Skimmed: `app.py` routes. Not read: `static/index.html`, `face_mesh.py`, `mesh_worker.py`, `workflow.py`, the tests. **Nothing was run.** Its own validation notes claim one live end-to-end run on macOS and say other systems and failure conditions are not exhaustively tested; we treat the repo as a design reference, not as proven code.
 
@@ -91,16 +91,27 @@ The reason for DashScope first: it is the provider we already integrate, run und
 - **P3, polish and scale.** Optional audio separation, face-mesh mode if the P0 numbers justify it, queue and spend page in SAIL, nightly golden-clip evals.
 - **P4, customers.** Terms and counsel sign-off, paid workspaces, rate limits, takedown route.
 
-## 8. Decisions for the founder
-1. **Go or no-go on person replacement as a customer feature** after reading section 3. *Recommendation: build the pipeline foundation (section 6 gains) regardless; keep the replacement recipe staff-only until counsel has signed off.*
-2. **Generation provider:** DashScope first (recommended), a ComfyUI Wan recipe later, Enhancor only after a vendor review.
-3. **Where the heavy stages run** (section 5.4) and the monthly ceiling for the P0 spike.
-4. **Pitch shifting of voices:** leave out of the first release (recommended), or build it behind the same consent rule.
-5. **Provenance:** C2PA manifests (more work, better evidence) or a visible mark plus metadata (simpler). *Recommendation: both on final deliveries.*
-6. **Who may use it first:** staff and the platform owner only (recommended) or the two design partners as well.
+## 8. Decisions (founder, 2026-10-11)
+1. **Ship person replacement to customers, together with the staged-pipeline foundation.** Built as one programme. The safety controls in section 3 are **not optional and not deferred**: consent attestation, likeness screening, provenance and the review gate ship with it. Enabling it for customers stays behind the platform flag `ai_studio_replace` until counsel has reviewed the terms and the transparency duties; the flag, not the code, is the legal gate.
+2. **Qwen Cloud (DashScope) first.** The **Artlist MCP** (`https://mcp.artlist.io/mcp`) is noted: an MCP server is a tool for an agent in an editor, signed in as a person, so it cannot be a provider that Anker's production server calls. It stays a **manual or agent-assisted route** (for example stock footage or music for ads, used from VS Code) until Artlist offers an API with commercial terms for generated work. Nothing in production depends on it. Artlist content is licensed to the account holder, so redistributing it to our customers' videos needs its own licence check.
+3. **Run it the cheapest way: no new infrastructure in P1.** Decided from the design, not from a price list (Runway was **not** priced):
+   - **Artifacts and outputs in the private Vercel Blob we already run.** It is storage, not compute, and it is the cheapest place for this footage because it costs nothing extra to operate and keeps media under our own control.
+   - **ffmpeg stages (ingest, normalise, composite, audio restore, hold-frame) run in Vercel functions** with the bundled ffmpeg, one stage per invocation, on clips of 30 s or less at 960 px, where each stage takes seconds to a minute. Heavier stages go to a job runner only if measured to exceed the function limit.
+   - **Model stages are Qwen Cloud calls.** The Wan animate models take the source video and the character image directly, so **our own depth and mask stages are not needed for the first version** (section 5.2 shortens accordingly). The mask and depth recipes stay as a later option on ComfyUI.
+   - **Runway** is not added now: it would be another third party seeing client faces and a second bill, and we have not priced it. Revisit only if Qwen's models fail the P0 quality bar.
+4. **Keep the voice shifting**, with the same consent rule as the footage: the person whose voice is shifted is covered by the attestation, the shifted voice is never presented as that person's real voice, and the provenance record says the audio was altered. Implemented with ffmpeg pitch filters (no GPL dependency), with a measured comparison against Rubber Band quality in P0.
+5. **Provenance:** both a visible or metadata mark and a C2PA manifest on final deliveries (recommended default, accepted by silence on this point; say if you want it narrower).
+6. **First users:** staff and the platform owner, then paid workspaces behind the flag (recommended default, accepted by silence).
+
+**Revised stage list for the first version** (decision 3): `ingest` → `normalise` → **`review` (the source, the character reference and the consent)** → `generate_draft` (Qwen animate model) → **`approve_final`** → `generate_final` → `restore_audio` (original audio, or the shifted vocals if chosen) → `deliver`. The review gate is bound to the hashes of the prepared video, the reference and the consent record; the mask review of section 5.3 returns if and when we add our own masks.
 
 ## 9. Tests and evals
 Stage idempotency (re-run is a no-op; failure resumes at the right stage); review gate (refuses without approval, refuses after a one-byte change, accepts the exact hash); no paid call without an approval row; consent required and stored; block-list and age screen fail closed; provenance marker present on every delivery; signed-link-only fetches (no public host); tenant isolation on all new tables; ffmpeg audio restore produces byte-identical audio packets and aligned duration (golden clips); adapter contract tests with fake providers; nightly eval that no pipeline is stuck and that every model used appears in the licence register.
 
 ## 10. Not in scope
 Real-time or live replacement; voice cloning; replacing people without consent attestation; accepting customer-written workflows; training identity models for customers; building to evade a provider's moderation; copying the repo's code or assets into ours.
+
+## 11. P0 findings (2026-10-11)
+- **The candidate Qwen models are recognised.** Posting an empty request to the DashScope video endpoint for `wan2.2-animate-mix`, `wan2.2-animate-move`, `wan2.1-vace-plus` and `wan2.7-videoedit` returned an account-status error, while an invented model name returned "Model not exist". That is evidence the four names exist on the international endpoint, **not** proof that they accept our inputs or give acceptable quality. No task was created and nothing was billed.
+- **A key in the local environment file is refused for overdue payment** (`Arrearage`). That is the local `DASHSCOPE_API_KEY`, which may not be the key production uses (production reads the free-tier or standard key from the router configuration). It needs the account owner to check the Alibaba Cloud billing standing before any paid spike call. The production keys have not been probed.
+- **Still to do in P0:** (a) confirm with a good key that an animate model accepts a 5 s clip and one character image and returns a usable result; (b) measure seconds, cost and quality; (c) compare ffmpeg pitch shifting against Rubber Band on a vocal sample; (d) read the DashScope terms on faces, retention and training; (e) read the licence of every file used. The paid call in (a) uses **our own consented footage** (a clip of the founder and an image the founder owns), not anyone else's.
