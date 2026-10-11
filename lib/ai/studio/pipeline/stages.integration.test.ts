@@ -28,6 +28,8 @@ import { currentSetHash, submitReview } from "./review"
 import { INCOMING_SOURCE, incomingReference, stageRunners } from "./stages"
 import { memoryStorage, pipelinePath, sha256 } from "./storage"
 
+// These tests run a real ffmpeg (several encodes each); a shared CI runner needs more than vitest's 5 s.
+vi.setConfig({ testTimeout: 90_000 })
 let db: PGlite
 let dir: string
 const p: AiPrincipal = {
