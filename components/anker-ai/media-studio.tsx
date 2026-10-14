@@ -6,6 +6,8 @@ import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogDescription } 
 import {
   MODELS,
   modelFor,
+  modelForReferences,
+  REFERENCE_MODEL,
   recipeModels,
   isActive,
   type Job,
@@ -138,6 +140,8 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
     [audio, setAudio] = useState(false),
     [enhance, setEnhance] = useState(false),
     [source, setSource] = useState<Asset | null>(null),
+    [refs, setRefs] = useState<Asset[]>([]),
+    [refNotice, setRefNotice] = useState(""),
     [negative, setNegative] = useState(""),
     [seed, setSeed] = useState(""),
     [voiceMode, setVoiceMode] = useState<"none" | "upload" | "dialogue">("none"),
@@ -157,6 +161,7 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
     pending = useRef<{ value: string; key: string } | null>(null),
     promptRef = useRef<HTMLTextAreaElement>(null),
     uploadRef = useRef<HTMLInputElement>(null),
+    refInputRef = useRef<HTMLInputElement>(null),
     audioUploadRef = useRef<HTMLInputElement>(null)
   const m = modelFor(modelId)!,
     query = `scopeKey=${encodeURIComponent(scopeKey)}`
@@ -172,6 +177,9 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
     }
   })()
   const credits = data?.credits
+  /** Reference images only go with models that use them; an edit model needs its images before it can run. */
+  const refsBlocked = m.kind === "image" && refs.length > 0 && m.refs === 0
+  const missingSource = m.needsSource && !(m.kind === "image" ? refs.length > 0 : !!source)
   const short = !!credits && credits.remaining !== null && cost !== null && cost > credits.remaining
   const refreshCredits = useCallback(async () => {
     try {
@@ -274,7 +282,8 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
     setDuration(5)
     setAudio(false)
     setEnhance(false)
-    if (!next.canSource) setSource(null)
+    if (!next.canSource || next.kind === "image") setSource(null)
+    setRefNotice("")
     if (!next.voice) {
       setVoiceMode("none")
       setVoiceAsset(null)
@@ -358,6 +367,14 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
           }
         : null,
     )
+    setRefs(
+      (j.settings.referenceAssetIds ?? []).map((id, i) => ({
+        id,
+        kind: "image" as const,
+        name: `Reference image ${i + 1}`,
+        url: `/api/anker/studio/assets/${id}`,
+      })),
+    )
     promptRef.current?.focus()
   }
   async function submit() {
@@ -368,7 +385,8 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
       !data?.ready ||
       !data.canGenerate ||
       !prompt.trim() ||
-      (m.needsSource && !source)
+      refsBlocked ||
+      missingSource
     )
       return
     lock.current = true
@@ -383,7 +401,8 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
       audio,
       enhancePrompt: enhance,
       ...(m.kind === "video" ? { duration } : {}),
-      ...(source && m.canSource ? { sourceAssetId: source.id } : {}),
+      ...(source && m.canSource && m.kind === "video" ? { sourceAssetId: source.id } : {}),
+      ...(m.kind === "image" && refs.length ? { referenceAssetIds: refs.map((a) => a.id) } : {}),
       ...(negative.trim() && m.negative ? { negativePrompt: negative.trim() } : {}),
       ...(seed.trim() !== "" && m.seed ? { seed: Number(seed) } : {}),
       ...(voiceAsset && m.voice ? { audioAssetId: voiceAsset.id } : {}),
@@ -436,6 +455,41 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
     } finally {
       setUploading(false)
       if (uploadRef.current) uploadRef.current.value = ""
+    }
+  }
+  /** Attach up to three images; if the chosen model cannot use them, switch to the one that can and say so. */
+  async function addReferences(files: FileList | null) {
+    const list = Array.from(files ?? []).slice(0, 3 - refs.length)
+    if (!list.length) return
+    for (const f of list)
+      if (f.size > 3 * 1024 * 1024 || !["image/png", "image/jpeg", "image/webp"].includes(f.type)) {
+        setError("Choose PNG, JPG or WebP images under 3 MB each.")
+        if (refInputRef.current) refInputRef.current.value = ""
+        return
+      }
+    setUploading(true)
+    setError("")
+    const added: Asset[] = []
+    try {
+      for (const f of list) {
+        const body = new FormData()
+        body.set("scopeKey", scopeKey)
+        body.set("file", f)
+        added.push((await api<{ asset: Asset }>("/api/anker/studio/upload", { method: "POST", body })).asset)
+      }
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setUploading(false)
+      if (refInputRef.current) refInputRef.current.value = ""
+    }
+    if (!added.length) return
+    const all = [...refs, ...added]
+    setRefs(all)
+    const target = modelForReferences(modelId, all.length)
+    if (target !== modelId) {
+      choose(target)
+      setRefNotice(`Switched to ${modelFor(target)!.name}, which uses reference images.`)
     }
   }
   async function favorite(j: Job) {
@@ -813,7 +867,93 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                       )}
                     </div>
                   )}
-                  {m.canSource && (
+                  {m.kind === "image" && (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">
+                        Reference images{" "}
+                        <span className="font-normal text-muted-foreground">
+                          {m.needsSource ? "(needed for this model)" : "(optional)"}
+                        </span>
+                      </p>
+                      {refs.length > 0 && (
+                        <ul className="grid grid-cols-3 gap-2">
+                          {refs.map((a, i) => (
+                            <li key={a.id} className="relative overflow-hidden rounded-lg border">
+                              <img
+                                src={a.url}
+                                alt={`Reference image ${i + 1}`}
+                                className="aspect-square w-full object-cover"
+                              />
+                              <span className="absolute left-1 top-1 rounded bg-background/90 px-1.5 text-xs font-medium">
+                                {i + 1}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="icon"
+                                className="absolute right-1 top-1 size-6"
+                                aria-label={`Remove reference image ${i + 1}`}
+                                onClick={() => setRefs((r) => r.filter((x) => x.id !== a.id))}
+                              >
+                                <X className="size-3" />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        Attach up to 3 images to guide the result: a pose, a style, a product, a logo. Mention
+                        them in your prompt as image 1, image 2 and image 3. They are sent to the generation
+                        provider with your prompt; attach only images you may use.
+                      </p>
+                      {refNotice && (
+                        <p role="status" className="text-xs">
+                          {refNotice}
+                        </p>
+                      )}
+                      <input
+                        ref={refInputRef}
+                        type="file"
+                        multiple
+                        className="sr-only"
+                        accept="image/png,image/jpeg,image/webp"
+                        aria-label="Add reference images"
+                        onChange={(e) => void addReferences(e.target.files)}
+                      />
+                      {refs.length < 3 && (
+                        <Button
+                          className="w-full gap-2"
+                          variant="outline"
+                          type="button"
+                          disabled={uploading || busy || !data.ready || !data.canGenerate}
+                          onClick={() => refInputRef.current?.click()}
+                        >
+                          <Upload className="size-4" />
+                          {uploading
+                            ? "Uploading…"
+                            : `Add images · up to ${3 - refs.length} more, under 3 MB each`}
+                        </Button>
+                      )}
+                      {refsBlocked && (
+                        <p role="alert" className="text-xs text-destructive">
+                          This model does not use reference images.{" "}
+                          <button
+                            type="button"
+                            className="underline"
+                            onClick={() => {
+                              choose(REFERENCE_MODEL)
+                              setRefNotice(
+                                `Switched to ${modelFor(REFERENCE_MODEL)!.name}, which uses reference images.`,
+                              )
+                            }}
+                          >
+                            Use {modelFor(REFERENCE_MODEL)!.name}
+                          </button>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {m.canSource && m.kind === "video" && (
                     <div className="space-y-3">
                       <p className="text-sm font-medium">
                         {m.needsSource ? "Image to edit" : "Start frame"}{" "}
@@ -878,7 +1018,8 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                       !data.canGenerate ||
                       !prompt.trim() ||
                       short ||
-                      (m.needsSource && !source)
+                      refsBlocked ||
+                      missingSource
                     }
                   >
                     {busy ? (

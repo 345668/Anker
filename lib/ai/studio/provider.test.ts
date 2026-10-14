@@ -3,7 +3,7 @@ const cfg = vi.hoisted(() => ({ v: null as null | Record<string, string> }))
 vi.mock("@/lib/ai/runtime-config", () => ({
   readRouterConfig: async () => cfg.v,
 }))
-import { inputSchema, mapInput, MODELS } from "./catalog"
+import { inputSchema, mapInput, MODELS, modelFor, modelForReferences, REFERENCE_MODEL } from "./catalog"
 import { submitGeneration, generationStatus, configuration } from "./provider"
 import { mediaFormat } from "./assets"
 const base = {
@@ -30,6 +30,7 @@ it("maps a Qwen image to the DashScope size", () => {
     prompt: base.prompt,
     size: "1328*1328",
     promptExtend: false,
+    images: [],
   })
   expect(mapInput(inputSchema.parse({ ...base, aspectRatio: "16:9", enhancePrompt: true }))).toMatchObject({
     size: "1664*928",
@@ -267,7 +268,7 @@ it("the edit models need an image to edit, and other image models refuse one", (
   expect(m).toMatchObject({
     kind: "image",
     model: "qwen-image-edit-max",
-    sourceImage: "https://anker.example/s",
+    images: ["https://anker.example/s"],
   })
   expect((m as { size?: string }).size).toBeUndefined()
 })
@@ -313,4 +314,62 @@ it("maps HappyHorse without a ratio or a voice track", async () => {
   const b = JSON.parse(f.mock.calls[0][1].body)
   expect(b).toMatchObject({ model: "happyhorse-1.1-t2v", parameters: { resolution: "1080P", duration: 5 } })
   expect(b.parameters.ratio).toBeUndefined()
+})
+it("reference images: up to three, only for models that take them, never with an image to edit", () => {
+  const id = () => crypto.randomUUID()
+  const edit = { ...base, model: "qwen-image-edit-plus-2025-12-15" }
+  expect(inputSchema.safeParse({ ...edit, referenceAssetIds: [id()] }).success).toBe(true)
+  expect(inputSchema.safeParse({ ...edit, referenceAssetIds: [id(), id(), id()] }).success).toBe(true)
+  expect(inputSchema.safeParse({ ...edit, referenceAssetIds: [id(), id(), id(), id()] }).success).toBe(false)
+  const dup = id()
+  expect(inputSchema.safeParse({ ...edit, referenceAssetIds: [dup, dup] }).success).toBe(false)
+  expect(inputSchema.safeParse({ ...edit, referenceAssetIds: [id()], sourceAssetId: id() }).success).toBe(
+    false,
+  )
+  expect(inputSchema.safeParse({ ...edit, referenceAssetIds: ["not-a-uuid"] }).success).toBe(false)
+  // a text-to-image model and a video model refuse them, with the reason
+  const t2i = inputSchema.safeParse({ ...base, referenceAssetIds: [id()] })
+  expect(t2i.success).toBe(false)
+  expect(JSON.stringify(t2i.error?.issues)).toMatch(/Qwen-Image Edit/)
+  expect(
+    inputSchema.safeParse({
+      ...base,
+      model: "wan2.7",
+      resolution: "720p",
+      duration: 5,
+      referenceAssetIds: [id()],
+    }).success,
+  ).toBe(false)
+  // an edit model is satisfied by references alone, and still needs something
+  expect(inputSchema.safeParse(edit).success).toBe(false)
+  expect(inputSchema.safeParse({ ...edit, referenceAssetIds: [] }).success).toBe(false)
+})
+it("attaching images switches to a model that takes them, and keeps one that already does", () => {
+  expect(modelForReferences("qwen-image-2.0", 0)).toBe("qwen-image-2.0")
+  expect(modelForReferences("qwen-image-2.0", 2)).toBe(REFERENCE_MODEL)
+  expect(modelForReferences("qwen-image-edit-max", 3)).toBe("qwen-image-edit-max")
+  expect(modelForReferences("wan2.7", 1)).toBe(REFERENCE_MODEL)
+  expect(modelFor(REFERENCE_MODEL)?.refs).toBe(3)
+})
+it("sends the reference images first, in order, then the prompt", async () => {
+  const f = vi
+    .fn()
+    .mockResolvedValue(
+      Response.json({
+        output: { choices: [{ message: { content: [{ image: "https://oss.example/out.png" }] } }] },
+      }),
+    )
+  vi.stubGlobal("fetch", f)
+  const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()]
+  const urls = ids.map(
+    (id) => `https://anker.example/api/anker/studio/source?token=${"a".repeat(64)}&asset=${id}`,
+  )
+  await submitGeneration(
+    inputSchema.parse({ ...base, model: "qwen-image-edit-plus-2025-12-15", referenceAssetIds: ids }),
+    undefined,
+    undefined,
+    { referenceUrls: urls },
+  )
+  const body = JSON.parse(f.mock.calls[0][1].body)
+  expect(body.input.messages[0].content).toEqual([...urls.map((image) => ({ image })), { text: base.prompt }])
 })

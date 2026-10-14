@@ -111,6 +111,17 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
     if (a.kind !== "image") throw new WorkspaceError("Choose an image as the start frame.", 400)
     sourceUrl = `${sourceOrigin()}/api/anker/studio/source?token=${token}`
   }
+  let referenceUrls: string[] | undefined
+  if (input.referenceAssetIds?.length) {
+    for (const id of input.referenceAssetIds) {
+      const a = await ownedAsset(p, id)
+      if (a.kind !== "image") throw new WorkspaceError("Reference files must be images.", 400)
+    }
+    // One short-lived link token per job; the link route serves only the assets this job lists.
+    referenceUrls = input.referenceAssetIds.map(
+      (id) => `${sourceOrigin()}/api/anker/studio/source?token=${token}&asset=${id}`,
+    )
+  }
   let audioUrl: string | undefined, audioToken: string | undefined
   if (input.audioAssetId) {
     const a = await ownedAsset(p, input.audioAssetId)
@@ -126,7 +137,7 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
   let reserved
   try {
     ;[reserved] =
-      await sql`SELECT * FROM reserve_ai_studio_job_v2(${randomUUID()},${p.userId},${p.scopeKey},${p.orgId},${input.requestKey},${digest},${input.model},${modelFor(input.model)!.kind},${input.prompt},${JSON.stringify(input)}::jsonb,${input.sourceAssetId ?? null},${sourceUrl ? hash(token) : null},${cost},${allowance})`
+      await sql`SELECT * FROM reserve_ai_studio_job_v2(${randomUUID()},${p.userId},${p.scopeKey},${p.orgId},${input.requestKey},${digest},${input.model},${modelFor(input.model)!.kind},${input.prompt},${JSON.stringify(input)}::jsonb,${input.sourceAssetId ?? null},${sourceUrl || referenceUrls ? hash(token) : null},${cost},${allowance})`
   } catch (e) {
     if ((e as { code?: string }).code === "22023")
       throw new WorkspaceError("Request key already used for different input.", 409)
@@ -149,7 +160,11 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
       let sourceBytes: Buffer | undefined
       if (recipe && input.sourceAssetId)
         sourceBytes = await assetBytes(await ownedAsset(p, input.sourceAssetId))
-      const id = await submitGeneration(input, sourceUrl, audioUrl, { jobId: reserved.job_id, sourceBytes })
+      const id = await submitGeneration(input, sourceUrl, audioUrl, {
+        jobId: reserved.job_id,
+        sourceBytes,
+        referenceUrls,
+      })
       await sql`UPDATE ai_studio_jobs SET provider_id=${id},status='queued',updated_at=now() WHERE id=${reserved.job_id} AND status IN ('submitting','uncertain')`
     } catch (e) {
       const code = e instanceof ProviderError ? e.status : 0

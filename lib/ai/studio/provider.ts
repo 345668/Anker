@@ -92,14 +92,14 @@ export async function submitGeneration(
   v: GenerationInput,
   sourceUrl?: string,
   audioUrl?: string,
-  ctx: { jobId?: string; sourceBytes?: Buffer } = {},
+  ctx: { jobId?: string; sourceBytes?: Buffer; referenceUrls?: string[] } = {},
 ) {
   const recipe = modelFor(v.model)?.recipe
   if (recipe) return submitComfy(recipe, v, ctx)
-  const m = mapInput(v, sourceUrl, audioUrl)
+  const m = mapInput(v, sourceUrl, audioUrl, ctx.referenceUrls)
   if (m.kind === "image") {
     const content: Array<{ image: string } | { text: string }> = [
-      ...(m.sourceImage ? [{ image: m.sourceImage }] : []),
+      ...m.images.map((image) => ({ image })),
       { text: m.prompt },
     ]
     const j = await call("services/aigc/multimodal-generation/generation", {

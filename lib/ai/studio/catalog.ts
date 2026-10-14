@@ -29,6 +29,8 @@ type Img = {
   name: string
   sizes?: Record<string, string>
   edit?: boolean
+  /** How many reference images this model takes with the prompt (0: none). */
+  refs?: number
 }
 const image = (m: Img) => ({
   kind: "image" as const,
@@ -44,6 +46,7 @@ const image = (m: Img) => ({
   voice: false,
   needsSource: !!m.edit,
   canSource: !!m.edit,
+  refs: m.refs ?? (m.edit ? 3 : 0),
   ...m,
   sizes: m.sizes,
 })
@@ -74,6 +77,7 @@ export const MODELS = [
     name: "Wan 2.7 Video",
     kind: "video",
     path: "wan2.7",
+    refs: 0,
     ratios: R5,
     resolutions: ["720p", "1080p"],
     min: 2,
@@ -92,6 +96,7 @@ export const MODELS = [
     name: "HappyHorse 1.1 Video",
     kind: "video",
     path: "happyhorse-1.1",
+    refs: 0,
     ratios: ["16:9"],
     resolutions: ["720p", "1080p"],
     min: 3,
@@ -124,6 +129,8 @@ export interface ModelLike {
   voice: boolean
   needsSource: boolean
   canSource: boolean
+  /** Reference images accepted with the prompt (image models only). */
+  refs: number
   sizes: Record<string, string> | undefined
   /** Set for self-hosted recipes (docs/architecture/49); absent for hosted Qwen Cloud models. */
   recipe?: Recipe
@@ -145,6 +152,7 @@ export const recipeModel = (r: Recipe): ModelLike => ({
   voice: false,
   needsSource: false,
   canSource: !!r.slots.source,
+  refs: 0,
   sizes: undefined,
   recipe: r,
 })
@@ -163,6 +171,8 @@ export const inputSchema = z
     audio: z.boolean().default(false),
     enhancePrompt: z.boolean().default(false),
     sourceAssetId: z.string().uuid().optional(),
+    /** Up to three images the person attached to guide an image (docs/architecture/52 section 7). */
+    referenceAssetIds: z.array(z.string().uuid()).max(3, "Attach up to 3 reference images.").optional(),
     negativePrompt: z.string().trim().max(500).optional(),
     seed: z.number().int().min(0).max(2147483647).optional(),
     /** A voice track (uploaded, or spoken from dialogue) that drives the video's speech and lip movement. */
@@ -179,7 +189,15 @@ export const inputSchema = z
       fail(`Choose ${m.min}–${m.max} seconds.`)
     if (m.kind === "image" && v.duration !== undefined) fail("This image model does not accept a duration.")
     if (v.sourceAssetId && !m.canSource) fail("This model does not accept a start frame or source image.")
-    if (m.needsSource && !v.sourceAssetId) fail("Add the image to edit.")
+    const refs = v.referenceAssetIds ?? []
+    if (refs.length) {
+      if (m.kind !== "image") fail("Reference images are for image generation.")
+      else if (m.refs === 0) fail("This model does not use reference images. Choose Qwen-Image Edit.")
+      else if (refs.length > m.refs) fail(`This model takes up to ${m.refs} reference images.`)
+      if (new Set(refs).size !== refs.length) fail("The same image is attached twice.")
+      if (v.sourceAssetId) fail("Use either an image to edit or reference images, not both.")
+    }
+    if (m.needsSource && !v.sourceAssetId && !refs.length) fail("Add the image to edit.")
     if (v.negativePrompt && !m.negative) fail("This model does not accept a negative prompt.")
     if (v.seed !== undefined && !m.seed) fail("This model does not accept a seed.")
     if (v.audioAssetId && !m.voice) fail("This model does not accept a voice track.")
@@ -187,6 +205,12 @@ export const inputSchema = z
     if (v.enhancePrompt && !m.enhance) fail("Prompt enhancement is not available for this model.")
   })
 export type GenerationInput = z.infer<typeof inputSchema>
+/** The model that takes reference images when the chosen one does not: attaching images switches to it, and the screen says so. */
+export const REFERENCE_MODEL = "qwen-image-edit-plus-2025-12-15"
+export function modelForReferences(modelId: string, count: number): string {
+  const m = modelFor(modelId)
+  return count === 0 || (m && m.kind === "image" && m.refs >= count) ? modelId : REFERENCE_MODEL
+}
 export type MediaKind = "image" | "video"
 export type AssetKind = MediaKind | "audio"
 export type JobStatus =
@@ -220,7 +244,7 @@ export interface Job {
   assets: Asset[]
 }
 /** What to send to DashScope for a job. Images go to the synchronous multimodal endpoint, video to the asynchronous video-synthesis endpoint. */
-export function mapInput(v: GenerationInput, sourceUrl?: string, audioUrl?: string) {
+export function mapInput(v: GenerationInput, sourceUrl?: string, audioUrl?: string, refUrls: string[] = []) {
   const m = modelFor(v.model)!
   if (m.kind === "image")
     return {
@@ -230,7 +254,7 @@ export function mapInput(v: GenerationInput, sourceUrl?: string, audioUrl?: stri
       size: m.sizes?.[v.aspectRatio],
       promptExtend: v.enhancePrompt,
       ...(v.negativePrompt ? { negativePrompt: v.negativePrompt } : {}),
-      ...(sourceUrl ? { sourceImage: sourceUrl } : {}),
+      images: [...(sourceUrl ? [sourceUrl] : []), ...refUrls],
     }
   const wan = m.id === "wan2.7"
   return {
