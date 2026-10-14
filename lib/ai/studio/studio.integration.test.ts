@@ -26,6 +26,7 @@ vi.mock("@/lib/assistant/principal", () => ({
 vi.mock("@/lib/entitlements", () => ({
   assertAllowed: vi.fn(async () => {}),
   assertWithinLimit: vi.fn(async () => {}),
+  getEffective: vi.fn(async () => ({ limits: { ai_studio_daily_credits: null } })),
 }))
 vi.mock("server-only", () => ({}))
 vi.mock("@/lib/ai/runtime-config", () => ({
@@ -95,15 +96,17 @@ beforeAll(async () => {
   await db.exec(
     "CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text)",
   )
+  await db.exec("CREATE TABLE plan_catalog (plan text PRIMARY KEY, limits jsonb)")
   for (const f of [
     "2026-10-07b-ai-media-studio",
     "2026-10-09-ai-media-studio-v2",
     "2026-10-10-ai-media-studio-comfy",
+    "2026-10-14-ai-studio-credits",
   ])
     await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
 }, 30000)
 beforeEach(async () => {
-  await db.exec("TRUNCATE ai_studio_jobs,ai_studio_assets,ai_studio_scope_locks CASCADE")
+  await db.exec("TRUNCATE ai_studio_jobs,ai_studio_assets,ai_studio_scope_locks,ai_studio_credit_ledger CASCADE")
   vi.clearAllMocks()
   vi.stubEnv("DASHSCOPE_API_KEY", "sk-test")
   vi.stubEnv("MEDIA_BLOB_READ_WRITE_TOKEN", "test")
@@ -172,20 +175,6 @@ it("caps active requests in the database under concurrent reservations", async (
   expect(r.filter((v) => v.status === "fulfilled")).toHaveLength(3)
   expect(r.filter((v) => v.status === "rejected")).toHaveLength(2)
   expect(submitGeneration).toHaveBeenCalledTimes(3)
-})
-it("counts failed requests toward quota but permits replays", async () => {
-  const first = input()
-  await createJob(principal(), first)
-  await db.exec("UPDATE ai_studio_jobs SET status='failed'")
-  for (let i = 0; i < 19; i++) {
-    await createJob(principal(), input())
-    await db.exec("UPDATE ai_studio_jobs SET status='failed'")
-  }
-  await expect(createJob(principal(), input())).rejects.toMatchObject({
-    status: 429,
-  })
-  expect((await createJob(principal(), first)).status).toBe("failed")
-  expect(submitGeneration).toHaveBeenCalledTimes(20)
 })
 it("fails closed when configuration is missing", async () => {
   vi.stubEnv("DASHSCOPE_API_KEY", "")

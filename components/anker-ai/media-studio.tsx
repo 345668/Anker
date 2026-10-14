@@ -12,6 +12,8 @@ import {
   type Asset,
   type GenerationInput,
 } from "@/lib/ai/studio/catalog"
+import { costOf, DEFAULT_RATES, type Rate } from "@/lib/ai/studio/credit-cost"
+import type { CreditsView } from "@/lib/ai/studio/credits"
 interface Data {
   scopeKey: string
   ready: boolean
@@ -19,6 +21,9 @@ interface Data {
   jobs: Job[]
   comfyRecipes?: string[]
   nextCursor: string | null
+  /** The workspace's credits and the price list (docs/architecture/52). */
+  credits?: CreditsView
+  rates?: Record<string, Rate>
 }
 const field =
   "w-full rounded-lg border border-border bg-background p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
@@ -78,6 +83,49 @@ function Preview({ asset, large = false }: { asset: Asset; large?: boolean }) {
     />
   )
 }
+const nf = new Intl.NumberFormat("en")
+function hoursUntil(iso: string) {
+  const h = Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 3_600_000))
+  return h <= 1 ? "under an hour" : `${h} hours`
+}
+function CreditsLine({ c }: { c: CreditsView }) {
+  if (c.unlimited)
+    return (
+      <p role="status" className="mb-5 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
+        <span className="font-medium">Credits:</span> unlimited for this workspace · used today{" "}
+        {nf.format(c.usedToday)}
+      </p>
+    )
+  const total = c.allowance ?? 0
+  const low = c.remaining !== null && c.remaining <= Math.max(1, Math.round(total * 0.2)) && c.bonus === 0
+  const left = Math.max(0, total - c.usedToday)
+  return (
+    <div
+      role="status"
+      aria-label={`Credits: ${nf.format(left)} of ${nf.format(total)} left today`}
+      className={`mb-5 rounded-lg border px-4 py-3 text-sm ${low ? "border-amber-500/50 bg-amber-500/5" : "bg-muted/40"}`}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p>
+          <span className="font-medium">Credits today:</span> {nf.format(left)} of {nf.format(total)}
+          {c.bonus > 0 && <> · bonus {nf.format(c.bonus)}</>}
+        </p>
+        <p className="text-xs text-muted-foreground">Resets in {hoursUntil(c.resetsAt)} (00:00 UTC)</p>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+        <div
+          className={`h-full rounded-full ${low ? "bg-amber-500" : "bg-primary"}`}
+          style={{ width: `${total ? Math.min(100, Math.round((left / total) * 100)) : 0}%` }}
+        />
+      </div>
+      {low && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Running low. A smaller image costs fewer credits; your administrator can add more.
+        </p>
+      )}
+    </div>
+  )
+}
 export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: "founder" | "vc" | "lp" }) {
   const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState(""),
@@ -112,6 +160,25 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
     audioUploadRef = useRef<HTMLInputElement>(null)
   const m = modelFor(modelId)!,
     query = `scopeKey=${encodeURIComponent(scopeKey)}`
+  /** The price of the request as it is set up now, from the price list the server sent (the same numbers it will charge). */
+  const cost = (() => {
+    try {
+      return costOf(
+        { model: modelId, resolution, duration: m.kind === "video" ? duration : undefined },
+        data?.rates ?? DEFAULT_RATES,
+      )
+    } catch {
+      return null
+    }
+  })()
+  const credits = data?.credits
+  const short = !!credits && credits.remaining !== null && cost !== null && cost > credits.remaining
+  const refreshCredits = useCallback(async () => {
+    try {
+      const d = await api<Data>(`/api/anker/studio?${query}`)
+      setData((p) => (p ? { ...p, credits: d.credits, rates: d.rates } : p))
+    } catch {}
+  }, [query])
   const load = useCallback(
     async (signal?: AbortSignal) => {
       setLoading(true)
@@ -152,6 +219,14 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
       .filter((j) => isActive(j.status))
       .map((j) => j.id)
       .join(",") || ""
+  const firstActive = useRef(true)
+  useEffect(() => {
+    if (firstActive.current) {
+      firstActive.current = false
+      return
+    }
+    void refreshCredits()
+  }, [active, refreshCredits])
   useEffect(() => {
     if (!active) return
     const c = new AbortController()
@@ -333,6 +408,7 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
     } finally {
       lock.current = false
       setBusy(false)
+      void refreshCredits()
     }
   }
   async function upload(file: File | undefined) {
@@ -446,6 +522,7 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                 Your role can view saved media. Ask an owner for generation access.
               </p>
             )}
+            {data.credits && <CreditsLine c={data.credits} />}
             <div className="grid gap-8 lg:grid-cols-[350px_minmax(0,1fr)]">
               <section aria-label="Generation settings" className="self-start rounded-xl border bg-card p-5">
                 <div className="mb-6 flex gap-2">
@@ -800,6 +877,7 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                       !data.ready ||
                       !data.canGenerate ||
                       !prompt.trim() ||
+                      short ||
                       (m.needsSource && !source)
                     }
                   >
@@ -808,8 +886,17 @@ export function MediaStudio({ scopeKey, persona }: { scopeKey: string; persona: 
                     ) : (
                       <Sparkles className="size-4" />
                     )}
-                    {busy ? "Submitting…" : `Generate ${m.kind}`}
+                    {busy
+                      ? "Submitting…"
+                      : `Generate ${m.kind}${cost !== null ? ` · ${nf.format(cost)} credits` : ""}`}
                   </Button>
+                  {short && credits && cost !== null && (
+                    <p role="alert" className="text-xs text-destructive">
+                      This needs {nf.format(cost)} credits and {nf.format(credits.remaining ?? 0)} are left
+                      today. Choose a smaller option, or ask your administrator for more. Credits reset at
+                      00:00 UTC.
+                    </p>
+                  )}
                 </form>
               </section>
               <section aria-label="Your creations" className="min-w-0">

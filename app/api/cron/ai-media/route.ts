@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db"
 import { advanceJob, reconcileComfy } from "@/lib/ai/studio/service"
+import { refundFailed } from "@/lib/ai/studio/credits"
 import { isCronAuthorised, trackCron } from "@/lib/cron/track"
 import { json } from "@/lib/ai/studio/http"
 export const runtime = "nodejs"
@@ -16,5 +17,7 @@ export const GET = trackCron("ai-media", async (req: Request) => {
     await sql`SELECT id FROM ai_studio_jobs WHERE status IN ('queued','running','saving') AND next_poll_at<=now() AND (lease_until IS NULL OR lease_until<now()) ORDER BY next_poll_at LIMIT 6`
   const r = await Promise.allSettled(jobs.map((j) => advanceJob(j.id)))
   const errors = r.filter((v) => v.status === "rejected").length
-  return json({ processed: r.length - errors, errors }, errors ? 500 : 200)
+  // Credits come back for any job that ended without output and was not refunded in the request that ended it (an uncertain job that later failed).
+  const refunded = await refundFailed().catch(() => 0)
+  return json({ processed: r.length - errors, errors, refunded }, errors ? 500 : 200)
 })

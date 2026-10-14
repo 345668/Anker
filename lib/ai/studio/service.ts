@@ -13,6 +13,7 @@ import {
   submitGeneration,
 } from "./provider"
 import { comfyConfig, comfyJob } from "./comfy/client"
+import { allowanceFor, loadRates, priceOf, refundFailed, shortMessage } from "./credits"
 import { MAX_BYTES, assetBytes, ownedAsset, publicAsset, storeAsset, hash, type AssetRow } from "./assets"
 type Row = {
   id: string
@@ -120,20 +121,25 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
     audioToken = randomBytes(32).toString("hex")
     audioUrl = `${sourceOrigin()}/api/anker/studio/source?token=${audioToken}&kind=audio`
   }
+  const cost = priceOf(input, await loadRates())
+  const allowance = await allowanceFor(p.orgId)
   let reserved
   try {
     ;[reserved] =
-      await sql`SELECT * FROM reserve_ai_studio_job(${randomUUID()},${p.userId},${p.scopeKey},${p.orgId},${input.requestKey},${digest},${input.model},${modelFor(input.model)!.kind},${input.prompt},${JSON.stringify(input)}::jsonb,${input.sourceAssetId ?? null},${sourceUrl ? hash(token) : null})`
+      await sql`SELECT * FROM reserve_ai_studio_job_v2(${randomUUID()},${p.userId},${p.scopeKey},${p.orgId},${input.requestKey},${digest},${input.model},${modelFor(input.model)!.kind},${input.prompt},${JSON.stringify(input)}::jsonb,${input.sourceAssetId ?? null},${sourceUrl ? hash(token) : null},${cost},${allowance})`
   } catch (e) {
-    const c = (e as { code?: string }).code
-    if (c === "54000")
-      throw new WorkspaceError(
-        "Generation allowance reached: 3 active jobs, 20 requests per person daily and 30 per workspace.",
-        429,
-      )
-    if (c === "22023") throw new WorkspaceError("Request key already used for different input.", 409)
+    if ((e as { code?: string }).code === "22023")
+      throw new WorkspaceError("Request key already used for different input.", 409)
     throw e
   }
+  if (reserved.outcome === "credits") throw new WorkspaceError(shortMessage(cost, Number(reserved.have)), 402)
+  if (reserved.outcome === "active")
+    throw new WorkspaceError("You already have 3 generations running. Wait for one to finish.", 429)
+  if (reserved.outcome === "backstop")
+    throw new WorkspaceError(
+      "This workspace reached today's safety limit of 300 generations. Contact support if you need more.",
+      429,
+    )
   if (reserved.created) {
     try {
       if (recipe)
@@ -149,6 +155,7 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
       const code = e instanceof ProviderError ? e.status : 0
       const certain = code >= 400 && code < 500
       await sql`UPDATE ai_studio_jobs SET status=${certain ? (code === 422 ? "blocked" : "failed") : "uncertain"},error=${certain ? (e as Error).message : recipe ? "Submission could not be confirmed. Anker will check the worker and settle it." : "Submission could not be confirmed and may have been charged. Contact support before generating again."},updated_at=now() WHERE id=${reserved.job_id} AND status='submitting'`
+      if (certain) await refundFailed(reserved.job_id).catch(() => {})
     }
   }
   return view(await ownedJob(p, reserved.job_id))
@@ -162,6 +169,7 @@ export async function advanceJob(id: string) {
   const j = row as Row
   const finish = async (s: JobStatus, error: string | null = null) => {
     await sql`UPDATE ai_studio_jobs SET status=${s},error=${error},lease_until=NULL,lease_token=NULL,next_poll_at=now()+interval '8 seconds',updated_at=now() WHERE id=${id} AND lease_token=${lease}`
+    if (s === "failed" || s === "blocked" || s === "canceled") await refundFailed(id).catch(() => {})
   }
   try {
     const [saved] = await sql`SELECT id FROM ai_studio_assets WHERE job_id=${id}`
@@ -231,6 +239,8 @@ export async function reconcileComfy(id: string) {
   const j = await comfyJob(cfg, id, r.output.node, r.output.key)
   if (j.state !== "missing")
     await sql`UPDATE ai_studio_jobs SET provider_id=${`comfy:${id}`},status='queued',error=NULL,next_poll_at=now(),updated_at=now() WHERE id=${id} AND provider_id IS NULL`
-  else if (Date.now() - new Date(row.created_at).getTime() > 300000)
+  else if (Date.now() - new Date(row.created_at).getTime() > 300000) {
     await sql`UPDATE ai_studio_jobs SET status='failed',error='The worker never received this job, so nothing ran and nothing is owed. Try again.',updated_at=now() WHERE id=${id} AND provider_id IS NULL`
+    await refundFailed(id).catch(() => {})
+  }
 }

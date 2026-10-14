@@ -4,6 +4,7 @@ import { comfyBlocker, configuration } from "@/lib/ai/studio/provider"
 import { offeredRecipes } from "@/lib/ai/studio/comfy/recipes"
 import { assertScope, createJob, listJobs } from "@/lib/ai/studio/service"
 import { readJson, errorResponse, json } from "@/lib/ai/studio/http"
+import { allowanceFor, creditsView, loadRates } from "@/lib/ai/studio/credits"
 import { WorkspaceError } from "@/lib/auth/workspace-context"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -25,6 +26,9 @@ export async function GET(req: Request) {
         await Promise.all(offeredRecipes().map(async (r) => ((await comfyBlocker(r)) ? null : r.id)))
       ).filter(Boolean),
       canGenerate: !p.readonly && (p.persona === "lp" || p.canWrite),
+      // The balance and the price list (public to the person): the screen shows the cost before a request is sent.
+      credits: await creditsView(p.scopeKey, await allowanceFor(p.orgId)),
+      rates: await loadRates(),
       jobs,
       nextCursor: jobs.length === 30 ? jobs[jobs.length - 1].createdAt : null,
     })

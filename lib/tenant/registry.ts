@@ -34,6 +34,8 @@ export const RULES: Rule[] = [
   // Pipelines (doc 51): deleting a pipeline cascades to its stages, artifacts and reviews; the consents are deleted after it (pipelines reference them).
   { scope: O, table: "ai_studio_pipelines", where: MEDIA_WORKSPACE_WHERE },
   { scope: O, table: "ai_studio_consents", where: MEDIA_WORKSPACE_WHERE },
+  // Credits (doc 52): the ledger is the workspace's own usage record and goes with it.
+  { scope: O, table: "ai_studio_credit_ledger", where: MEDIA_WORKSPACE_WHERE },
   // ── fund: children whose parent would otherwise refuse the delete ──
   { scope: F, table: "deal_room_documents", where: "room_id::text IN (SELECT id::text FROM deal_rooms WHERE deal_id::text IN (SELECT id::text FROM deal_opportunities WHERE fund_id::text = $2))" },
   { scope: F, table: "deal_room_access_grants", where: "room_id::text IN (SELECT id::text FROM deal_rooms WHERE deal_id::text IN (SELECT id::text FROM deal_opportunities WHERE fund_id::text = $2))" },
