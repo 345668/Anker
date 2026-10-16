@@ -82,6 +82,10 @@
       "schedule": "*/30 * * * *"
     },
     {
+      "path": "/api/cron/directory-identity",
+      "schedule": "30 2 * * *"
+    },
+    {
       "path": "/api/cron/fit-ranker",
       "schedule": "0 4 1 * *"
     },

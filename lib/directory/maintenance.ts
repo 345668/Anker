@@ -70,6 +70,8 @@ export async function deleteDerived(ids: string[]): Promise<number> {
     const del = (await sql.unsafe(`DELETE FROM ${r.table} WHERE ${r.column}::text = ANY($1::text[]) RETURNING 1`, [ids])) as any[]
     n += del.length
   }
+  // Candidate duplicate pairs name people by id only; they go with the person (docs/architecture/55).
+  n += ((await sql`DELETE FROM directory_candidates WHERE kind = 'person' AND (a_id = ANY(${ids}::text[]) OR b_id = ANY(${ids}::text[])) RETURNING 1`) as any[]).length
   return n
 }
 

@@ -32,6 +32,7 @@ beforeAll(async () => {
   for (const r of PERSON_REFS) await db.exec(`CREATE TABLE IF NOT EXISTS ${r.table} (${r.column} text${r.orgColumn ? ", org_id text" : ""})`)
   await db.exec(readFileSync("scripts/migrations/2026-10-16-directory-sources.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16b-directory-tombstones.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-16f-directory-candidates.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16c-dsar-requests.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16d-directory-erasure.sql", "utf8"))
 }, 30000)

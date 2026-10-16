@@ -30,11 +30,12 @@ beforeAll(async () => {
   for (const [t, c] of INVESTOR_REFS) await db.exec(`CREATE TABLE IF NOT EXISTS ${t} (${c} text)`)
   await db.exec(readFileSync("scripts/migrations/2026-10-16-directory-sources.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16b-directory-tombstones.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-16f-directory-candidates.sql", "utf8"))
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => {
   process.env.DIRECTORY_HASH_KEY = K
-  await db.exec("DELETE FROM investors; DELETE FROM directory_tombstones; DELETE FROM directory_hash_meta; UPDATE directory_sources SET purged_at = NULL")
+  await db.exec("DELETE FROM investors; DELETE FROM directory_candidates; DELETE FROM directory_tombstones; DELETE FROM directory_hash_meta; UPDATE directory_sources SET purged_at = NULL")
   for (const [t] of INVESTOR_REFS) await db.exec(`DELETE FROM ${t}`)
 })
 
@@ -128,6 +129,12 @@ describe("eraseRows", () => {
       else { expect(out, `${r.table}.${r.column}`).toEqual({ deleted: 1, anonymised: 0 }); expect(await rows(`SELECT 1 FROM ${r.table}`), `${r.table} cleared`).toHaveLength(0) }
       await db.query(`DELETE FROM ${r.table}`)
     }
+  })
+  it("a candidate pair that names an erased person goes with them, and one that does not stays", async () => {
+    await ins("x", "x@x.com", null, "s3"); await ins("y", "y@x.com", null, "s3", "Yan"); await ins("z", "z@x.com", null, "s3", "Zed")
+    await db.exec("INSERT INTO directory_candidates (kind, a_id, b_id, tier) VALUES ('person', 'x', 'y', 'certain'), ('person', 'y', 'z', 'probable'), ('firm', 'x', 'z', 'probable')")
+    await eraseRows(["x"])
+    expect((await rows("SELECT a_id, b_id, kind FROM directory_candidates ORDER BY a_id")).map((r) => `${r.kind}:${r.a_id}-${r.b_id}`)).toEqual(["firm:x-z", "person:y-z"])
   })
   it("anonymises rather than deletes when the reference check cannot run (a missing table)", async () => {
     await ins("x", "x@x.com", null, "s3")
