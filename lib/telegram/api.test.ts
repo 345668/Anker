@@ -51,3 +51,26 @@ describe("the client", () => {
     expect(e2.message).toContain("unreachable"); expect(e2.message).not.toContain(TOKEN)
   })
 })
+
+import { downloadFile, BOT_DOWNLOAD_MAX } from "./api"
+describe("downloadFile", () => {
+  const b = productBot(env)!
+  const fetchFor = (info: any, file: { status?: number; bytes?: number } = {}) => (async (url: string) => {
+    if (url.includes("/getFile")) return new Response(JSON.stringify({ ok: true, result: info }), { status: 200 })
+    return new Response(new Uint8Array(file.bytes ?? 10), { status: file.status ?? 200 })
+  }) as any
+  it("downloads a small file through the file endpoint", async () => {
+    const buf = await downloadFile(b, "f1", BOT_DOWNLOAD_MAX, fetchFor({ file_id: "f1", file_size: 10, file_path: "voice/file_1.oga" }, { bytes: 10 }))
+    expect(buf.length).toBe(10)
+  })
+  it("refuses a file Telegram says is too large before downloading, and one that turns out larger than it said", async () => {
+    await expect(downloadFile(b, "f1", 1000, fetchFor({ file_id: "f1", file_size: 5000, file_path: "x" }))).rejects.toThrow("file too large")
+    await expect(downloadFile(b, "f1", 1000, fetchFor({ file_id: "f1", file_size: 10, file_path: "x" }, { bytes: 5000 }))).rejects.toThrow("file too large")
+  })
+  it("fails clearly when there is no path or the download is refused, and never shows the token", async () => {
+    await expect(downloadFile(b, "f1", 1000, fetchFor({ file_id: "f1" }))).rejects.toThrow("no file path")
+    await expect(downloadFile(b, "f1", 1000, fetchFor({ file_id: "f1", file_path: "x" }, { status: 404 }))).rejects.toThrow("refused (404)")
+    const e = await downloadFile(b, "f1", 1000, (async (url: string) => { if (url.includes("/getFile")) return new Response(JSON.stringify({ ok: true, result: { file_path: "x" } })); throw new Error(`failed ${url}`) }) as any).then(() => null, (x) => x)
+    expect(e.message).not.toContain(TOKEN)
+  })
+})

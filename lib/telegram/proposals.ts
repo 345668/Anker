@@ -38,3 +38,13 @@ export const parseCallback = (data: string | undefined): { decision: "approve" |
   const m = /^([aru]):([0-9a-f-]{36})$/i.exec(data ?? "")
   return m ? { decision: m[1] === "a" ? "approve" : m[1] === "r" ? "reject" : "undo", id: m[2] } : null
 }
+
+/** The buttons under a held voice note or document: save it as a call note, ask Anker about it, or throw it away. */
+export const parseNoteCallback = (data: string | undefined): { action: "save" | "ask" | "drop"; id: string } | null => {
+  const m = /^([nqx]):([0-9a-f-]{36})$/i.exec(data ?? "")
+  return m ? { action: m[1] === "n" ? "save" : m[1] === "q" ? "ask" : "drop", id: m[2] } : null
+}
+export function noteButtons(id: string, canSave: boolean, withAsk: boolean, appUrl: string): Markup {
+  const row = [...(canSave ? [{ text: "Save as note", callback_data: `n:${id}` }] : []), ...(withAsk ? [{ text: "Ask Anker", callback_data: `q:${id}` }] : []), { text: "Discard", callback_data: `x:${id}` }]
+  return { inline_keyboard: [row, ...(canSave ? [] : [[{ text: "Allow changes in Anker", url: `${appUrl}/dashboard/channels` }]])] }
+}

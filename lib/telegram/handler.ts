@@ -3,14 +3,15 @@ import { sql } from "@/lib/db"
 import { answerToParts, esc } from "./format"
 import { consumeLinkCode, linkByTelegramUser, revokeByTelegramUser, touchLink, type LinkRow } from "./links"
 import type { Markup } from "./api"
-import { renderProposal, renderDecision, chatDecidable, parseCallback, UNDO_WINDOW_MIN, type PView } from "./proposals"
+import { renderProposal, renderDecision, chatDecidable, parseCallback, parseNoteCallback, noteButtons, UNDO_WINDOW_MIN, type PView } from "./proposals"
 
 /**
  * What the bot does with one update (docs/architecture/57, T1: link, and ask in read-only mode). Dependencies are injected, so the rules below are tested without Telegram or a model.
  * Rules that matter: only a Telegram user id with an ACTIVE link is served; everyone else gets one fixed message; groups are refused; nothing is stored here but the answer.
  */
 export interface TgUser { id: number; username?: string; first_name?: string }
-export interface TgMessage { message_id: number; from?: TgUser; chat: { id: number; type: string }; text?: string; voice?: unknown; audio?: unknown; document?: unknown; photo?: unknown; video?: unknown; video_note?: unknown; contact?: unknown; location?: unknown; sticker?: unknown }
+export interface TgFile { file_id: string; file_size?: number; file_name?: string; mime_type?: string; duration?: number }
+export interface TgMessage { message_id: number; from?: TgUser; chat: { id: number; type: string }; text?: string; caption?: string; voice?: TgFile; audio?: TgFile; document?: TgFile; photo?: TgFile[]; video?: unknown; video_note?: unknown; contact?: unknown; location?: unknown; sticker?: unknown }
 export interface TgCallback { id: string; from: TgUser; data?: string; message?: { message_id: number; chat: { id: number; type: string } } }
 export interface TgUpdate { update_id: number; message?: TgMessage; edited_message?: TgMessage; callback_query?: TgCallback; my_chat_member?: { chat: { id: number; type: string } } }
 
@@ -21,13 +22,20 @@ export interface Api {
   sendChatAction(chatId: number): Promise<unknown>
   leaveChat(chatId: number): Promise<unknown>
 }
+export interface Attachments { text: string; refs: Array<{ id: string; name: string; base64: string }>; names: string[] }
+export interface Media {
+  /** Downloads and transcribes a voice note or audio file. Throws a plain-words Error when it cannot. */
+  voice(link: LinkRow, f: { fileId: string; name: string }): Promise<string>
+  /** Downloads and reads a document, spreadsheet or image. */
+  file(link: LinkRow, f: { fileId: string; name: string; mime: string }): Promise<Attachments>
+}
 export interface TodayView { pending: number; tasksToday: number; overdue: number; replies24h: number }
 export interface Deps {
   api: Api
   /** Why this workspace cannot use the channel right now, or null. */
   gate(link: LinkRow): Promise<string | null>
   /** Runs the assistant for the linked person and returns the answer text. Throws a plain-words Error for a refusal. */
-  ask(link: LinkRow, text: string, history: Array<{ role: "user" | "assistant"; content: string }>): Promise<{ answer: string; runId?: string | null }>
+  ask(link: LinkRow, text: string, history: Array<{ role: "user" | "assistant"; content: string }>, attachments?: Attachments): Promise<{ answer: string; runId?: string | null }>
   /** Proposals the run just made (still waiting), newest last. */
   newProposals(link: LinkRow, runId: string): Promise<PView[]>
   /** Proposals waiting in the workspace. */
@@ -35,6 +43,13 @@ export interface Deps {
   /** Approve, reject or undo one proposal for the linked person, with every guard. Throws a plain-words Error when it must not happen. */
   decide(link: LinkRow, proposalId: string, decision: "approve" | "reject" | "undo"): Promise<{ proposal: PView; message: string; undoable: boolean }>
   today(link: LinkRow): Promise<TodayView>
+  media: Media
+  /** Daily limits per device for voice notes and files; a refusal in words, or null. */
+  allow(link: LinkRow, kind: "voice" | "file"): Promise<string | null>
+  stash(link: LinkRow, kind: "voice" | "file", title: string, text: string): Promise<string>
+  readPending(link: LinkRow, id: string): Promise<{ id: string; kind: "voice" | "file"; title: string; text: string } | null>
+  dropPending(link: LinkRow, id: string): Promise<void>
+  saveNote(link: LinkRow, id: string): Promise<{ title: string; duplicate: boolean }>
   /** Remembers that a proposal was shown in the chat, so a notification does not repeat it. */
   shown(link: LinkRow, proposalIds: string[]): Promise<void>
   appUrl: string
@@ -46,7 +61,12 @@ export const MSG = {
   pending: "Almost there. Open Anker, go to Connected channels and approve this device. Then message me again.",
   suspended: "This device has been idle for a long time, so I paused it. Open Anker, Connected channels, and approve it again.",
   group: "I only work in a private chat with me. Please message me directly.",
-  notYet: "Voice notes, photos and files are coming in the next release. For now, send me text.",
+  voiceTooLong: "That recording is longer than I can listen to in one go (about five minutes). Send it in shorter parts.",
+  noSpeech: "I couldn't hear any speech in that. Try recording again closer to the microphone.",
+  fileTooBig: "Telegram only lets me download files up to 20 MB. Upload larger files in Anker.",
+  fileType: "I can read PDF, Word and Excel files, text files and pictures. I can't open that kind of file.",
+  expired: "That has expired. Send it again.",
+  discarded: "Discarded. Nothing was saved.",
   slow: "One moment, I'm still working on your earlier messages.",
   codeBad: "That link has expired or was already used. In Anker, open Connected channels and press Connect Telegram for a new one.",
   alreadyLinked: "This Telegram account is already connected to a workspace. Send /unlink first if you want to connect it somewhere else.",
@@ -106,7 +126,7 @@ export async function handleUpdate(update: TgUpdate, deps: Deps): Promise<void> 
     const bits = [`${t.pending} waiting for your approval`, `${t.tasksToday} task${t.tasksToday === 1 ? "" : "s"} due today`, ...(t.overdue ? [`${t.overdue} overdue`] : []), `${t.replies24h} new repl${t.replies24h === 1 ? "y" : "ies"} to your outreach in the last day`]
     await reply(deps, chatId, `Today: ${bits.join(", ")}.`); return
   }
-  if (!text && (m.voice || m.audio || m.document || m.photo || m.video || m.video_note || m.contact || m.location || m.sticker)) { await reply(deps, chatId, MSG.notYet); return }
+  if (!text && (m.voice || m.audio || m.document || m.photo)) { await handleMedia(m, link, deps); return }
   if (!text || text.startsWith("/")) { await reply(deps, chatId, MSG.help); return }
 
   const refusal = await deps.gate(link)
@@ -114,16 +134,87 @@ export async function handleUpdate(update: TgUpdate, deps: Deps): Promise<void> 
   const now = (deps.now ?? Date.now)()
   const [busy] = (await sql`SELECT count(*)::int AS n FROM telegram_updates WHERE chat_id = ${chatId} AND received_at > ${new Date(now - 60_000).toISOString()}::timestamptz AND status IN ('queued', 'running', 'done')`) as any[]
   if (Number(busy?.n ?? 0) > MAX_PER_MINUTE) { await reply(deps, chatId, MSG.slow); return }
+  await answerQuestion(link, chatId, text, deps)
+}
 
+const failureText = (e: unknown) => ((e as Error)?.name === "TimeoutError" ? MSG.tooLong : (e as Error)?.message && (e as any).plain ? (e as Error).message : MSG.failed)
+
+/** Runs the assistant on one question (typed, or heard, or about a file), sends the answer, keeps the exchange in the workspace's chat, and shows any change it proposed. */
+async function answerQuestion(link: LinkRow, chatId: number, text: string, deps: Deps, attachments?: Attachments, label?: string): Promise<void> {
   await deps.api.sendChatAction(chatId)
   const history = await recentHistory(link)
   let answer: string, runId: string | null = null
-  try { const r = await deps.ask(link, text, history); answer = r.answer; runId = r.runId ?? null }
-  catch (e) { await reply(deps, chatId, (e as Error)?.name === "TimeoutError" ? MSG.tooLong : (e as Error)?.message && (e as any).plain ? (e as Error).message : MSG.failed); return }
+  try { const r = await deps.ask(link, text, history, attachments); answer = r.answer; runId = r.runId ?? null }
+  catch (e) { await reply(deps, chatId, failureText(e)); return }
   for (const part of answerToParts(answer, `${deps.appUrl}/dashboard/anker-ai`)) await deps.api.sendMessage(chatId, part)
-  await appendToChat(link, text, answer)
+  await appendToChat(link, label ? `${label} ${text}` : text, answer)
   // Changes the assistant proposed in this run, each with its own buttons. Nothing has been applied.
   if (runId) { const ps = await deps.newProposals(link, runId); if (ps.length) await sendProposals(deps, link, chatId, ps) }
+}
+
+// ───────────── voice notes and files (T3) ─────────────
+const AUDIO_MAX_SECONDS = 300, AUDIO_MAX_BYTES = 7 * 1024 * 1024, FILE_MAX_BYTES = 20 * 1024 * 1024
+const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|oga|flac|webm)$/i
+const FILE_EXT = /\.(pdf|docx?|xlsx|png|jpe?g|webp|txt|md|csv|json|tsv)$/i
+const DEFAULT_FILE_PROMPT = "Summarise this in a few short lines. Say what kind of document it is, and list any dates, amounts, and the names of people or firms."
+const preview = (t: string, n = 700) => (t.length > n ? `${t.slice(0, n).trimEnd()}…` : t)
+const stamp = (now: number) => new Date(now).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+
+async function handleMedia(m: TgMessage, link: LinkRow, deps: Deps): Promise<void> {
+  const chatId = m.chat.id
+  const audio = m.voice ?? m.audio ?? (m.document && AUDIO_EXT.test(m.document.file_name ?? "") ? m.document : undefined)
+  const doc = audio ? undefined : (m.document ?? (m.photo?.length ? m.photo[m.photo.length - 1] : undefined))
+  if (!audio && !doc) { await reply(deps, chatId, MSG.help); return }
+  const refusal = await deps.gate(link); if (refusal) { await reply(deps, chatId, refusal); return }
+
+  if (audio) {
+    if ((audio.duration ?? 0) > AUDIO_MAX_SECONDS || (audio.file_size ?? 0) > AUDIO_MAX_BYTES) { await reply(deps, chatId, MSG.voiceTooLong); return }
+    const limit = await deps.allow(link, "voice"); if (limit) { await reply(deps, chatId, limit); return }
+    await deps.api.sendChatAction(chatId)
+    let text: string
+    try { text = (await deps.media.voice(link, { fileId: audio.file_id, name: (m.audio?.file_name ?? m.document?.file_name) || (m.voice ? "voice.ogg" : `audio.${(audio.mime_type ?? "audio/mpeg").split("/")[1]?.replace("mpeg", "mp3") || "mp3"}`) })).trim() }
+    catch (e) { await reply(deps, chatId, failureText(e)); return }
+    if (!text) { await reply(deps, chatId, MSG.noSpeech); return }
+    const id = await deps.stash(link, "voice", `Voice note, ${stamp((deps.now ?? Date.now)())}`, text)
+    // The transcript is shown before anything is done with it: speech recognition is wrong exactly where it matters (names, amounts, dates).
+    await deps.api.sendMessage(chatId, `<b>Heard:</b> ${esc(preview(text))}\n\nWhat should I do with it?${link.mode === "write" ? "" : "\n(Saving notes needs \"Allow changes\" on this device.)"}`, noteButtons(id, link.mode === "write", true, deps.appUrl))
+    return
+  }
+
+  const name = m.document?.file_name || `photo-${m.message_id}.jpg`, mime = m.document?.mime_type || "image/jpeg"
+  if ((doc!.file_size ?? 0) > FILE_MAX_BYTES) { await reply(deps, chatId, MSG.fileTooBig); return }
+  if (!FILE_EXT.test(name)) { await reply(deps, chatId, MSG.fileType); return }
+  const limit = await deps.allow(link, "file"); if (limit) { await reply(deps, chatId, limit); return }
+  await deps.api.sendChatAction(chatId)
+  let att: Attachments
+  try { att = await deps.media.file(link, { fileId: doc!.file_id, name, mime }) } catch (e) { await reply(deps, chatId, failureText(e)); return }
+  const question = (m.caption ?? "").trim() || DEFAULT_FILE_PROMPT
+  await answerQuestion(link, chatId, question, deps, att, `[attached: ${name}]`)
+  // Keeping the text of a file is the person's choice, offered once.
+  if (att.text.trim().length >= 20) {
+    const id = await deps.stash(link, "file", name, att.text)
+    await deps.api.sendMessage(chatId, "Keep the text of this file as a call note in Anker?", noteButtons(id, link.mode === "write", false, deps.appUrl))
+  }
+}
+
+/** A tap under a held voice note or file: save it as a note, ask Anker about it, or discard it. */
+async function handleNoteTap(cq: NonNullable<TgUpdate["callback_query"]>, link: LinkRow, note: { action: "save" | "ask" | "drop"; id: string }, deps: Deps): Promise<void> {
+  const chat = cq.message!.chat, mid = cq.message!.message_id
+  const answer = (t: string, alert = true) => deps.api.answerCallback(cq.id, t, alert)
+  try {
+    if (note.action === "drop") { await deps.dropPending(link, note.id); await deps.api.editMessage(chat.id, mid, esc(MSG.discarded), null); await answer("Discarded", false); return }
+    if (note.action === "save") {
+      const r = await deps.saveNote(link, note.id)
+      await deps.api.editMessage(chat.id, mid, `✅ Saved to your call notes: ${esc(r.title)}${r.duplicate ? " (it was already saved)" : ""}.\nReview it, and analyse it if you like, in Anker.`, { inline_keyboard: [[{ text: "Open call notes", url: `${deps.appUrl}/dashboard/calls` }]] })
+      await answer("Saved", false); return
+    }
+    const p = await deps.readPending(link, note.id)
+    if (!p) { await answer(MSG.expired); return }
+    await deps.dropPending(link, note.id)
+    await deps.api.editMessage(chat.id, mid, `<b>Heard:</b> ${esc(preview(p.text))}`, null)
+    await answer("On it", false)
+    await answerQuestion(link, chat.id, p.text, deps, undefined, "(voice note)")
+  } catch (e) { await answer((e as Error)?.message && (e as any).plain ? (e as Error).message : MSG.failed) }
 }
 
 const MAX_SHOWN = 5
@@ -141,6 +232,8 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>, deps:
   if (!chat || chat.type !== "private" || !cq.from) { await answer("This only works in a private chat."); return }
   const link = await linkByTelegramUser(cq.from.id)
   if (!link || link.status !== "active") { await answer("This device is not connected. Connect it again from Anker."); return }
+  const note = parseNoteCallback(cq.data)
+  if (note && cq.message) { const g = await deps.gate(link); if (g) { await answer(g); return } await handleNoteTap(cq, link, note, deps); return }
   if (link.mode !== "write") { await answer(MSG.readOnly); return }
   const refusal = await deps.gate(link); if (refusal) { await answer(refusal); return }
   const parsed = parseCallback(cq.data)

@@ -26,7 +26,7 @@ const sent: Array<{ chat: number; html: string }> = []
 const left: number[] = []
 const deps = (o: Partial<Deps> = {}): Deps => ({
   api: { sendMessage: async (c, h) => { sent.push({ chat: c, html: h }) }, editMessage: async () => {}, answerCallback: async () => {}, sendChatAction: async () => {}, leaveChat: async (c) => { left.push(c) } },
-  gate: async () => null, ask: async () => ({ answer: "Here is your answer." }), newProposals: async () => [], pending: async () => [], decide: async () => { throw new Error("not used") }, today: async () => ({ pending: 0, tasksToday: 0, overdue: 0, replies24h: 0 }), shown: async () => {}, appUrl: "https://app.test", ...o,
+  gate: async () => null, ask: async () => ({ answer: "Here is your answer." }), newProposals: async () => [], pending: async () => [], decide: async () => { throw new Error("not used") }, today: async () => ({ pending: 0, tasksToday: 0, overdue: 0, replies24h: 0 }), shown: async () => {}, media: { voice: async () => "", file: async () => ({ text: "", refs: [], names: [] }) }, allow: async () => null, stash: async () => "id", readPending: async () => null, dropPending: async () => {}, saveNote: async () => ({ title: "t", duplicate: false }), appUrl: "https://app.test", ...o,
 })
 let uid = 1000
 const msg = (text: string | undefined, o: Record<string, unknown> = {}, from = TG, chat = CHAT, type = "private"): TgUpdate => ({ update_id: ++uid, message: { message_id: uid, from: { id: from, username: "rick" }, chat: { id: chat, type }, text, ...o } })
@@ -47,6 +47,7 @@ beforeAll(async () => {
     CREATE TABLE plan_catalog (plan text PRIMARY KEY, features jsonb DEFAULT '{}');
     INSERT INTO organizations VALUES ('o1', 'Acme Fund');`)
   await db.exec(readFileSync("scripts/migrations/2026-10-16i-telegram-channel.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-16k-telegram-t3.sql", "utf8"))
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => { sent.length = 0; left.length = 0; await db.exec("DELETE FROM telegram_updates; DELETE FROM telegram_links; DELETE FROM telegram_link_codes; DELETE FROM anker_chats") })
@@ -155,12 +156,11 @@ describe("what the bot does with a message", () => {
     expect(sent[0].html).toContain("Disconnected"); expect(await linkByTelegramUser(TG)).toBeNull()
     await handleUpdate(msg("hello again"), deps()); expect(sent[1].html).toContain("I don't know this Telegram account")
   })
-  it("/help and /whoami work for an active account, and voice notes, photos and files are declined for now", async () => {
+  it("/help and /whoami work for an active account; a sticker or a location gets the help text", async () => {
     await activeLink()
     await handleUpdate(msg("/help"), deps()); expect(sent[0].html).toContain("Approve and Reject")
     await handleUpdate(msg("/whoami"), deps()); expect(sent[1].html).toBe("Connected to Acme Fund in read-only mode.")
-    await handleUpdate(msg(undefined, { voice: { file_id: "x" } }), deps()); expect(sent[2].html).toContain("next release")
-    await handleUpdate(msg(undefined, { document: { file_id: "x" } }), deps()); expect(sent[3].html).toContain("next release")
+    await handleUpdate(msg(undefined, { sticker: { file_id: "x" } }), deps()); expect(sent[2].html).toContain("I'm Anker AI")
   })
   it("a workspace whose gate refuses (flag, plan, data policy) gets the reason and nothing is run", async () => {
     await activeLink(); let asked = false
@@ -228,10 +228,10 @@ describe("the update queue", () => {
     const a = msg("one"), b = msg("two"), c = msg("three"); for (const u of [a, b, c]) await enqueue(u)
     await db.query("UPDATE telegram_updates SET status = 'running', started_at = now() - interval '10 minutes' WHERE update_id = $1", [a.update_id])
     const r = await sweep(deps())
-    expect(r).toEqual({ processed: 3, failed: 0 }); expect(sent).toHaveLength(3)
+    expect(r).toMatchObject({ processed: 3, failed: 0 }); expect(sent).toHaveLength(3)
     await enqueue(msg("fresh")); const fresh = uid
     await db.query("UPDATE telegram_updates SET status = 'running', started_at = now() WHERE update_id = $1", [fresh])
-    expect(await sweep(deps())).toEqual({ processed: 0, failed: 0 })
+    expect(await sweep(deps())).toMatchObject({ processed: 0, failed: 0 })
   })
   it("an update from a revoked device is dropped, not answered", async () => {
     const id = await activeLink(); const u = msg("hello"); await enqueue(u)

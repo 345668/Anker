@@ -48,3 +48,21 @@ export const editMessage = (bot: ProductBot, chatId: number, messageId: number, 
   call(bot, "editMessageText", { chat_id: chatId, message_id: messageId, text: html, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: markup ?? { inline_keyboard: [] } }, f)
 export const answerCallback = (bot: ProductBot, callbackId: string, text?: string, alert = false, f?: Fetch) =>
   call(bot, "answerCallbackQuery", { callback_query_id: callbackId, ...(text ? { text: text.slice(0, 190), show_alert: alert } : {}) }, f, 5_000).catch(() => {})
+
+export const getFile = (bot: ProductBot, fileId: string, f?: Fetch) => call<{ file_id: string; file_size?: number; file_path?: string }>(bot, "getFile", { file_id: fileId }, f)
+
+/** Telegram lets a bot download files up to 20 MB. The size is checked before and while downloading, and the token never appears in an error. */
+export const BOT_DOWNLOAD_MAX = 20 * 1024 * 1024
+export async function downloadFile(bot: ProductBot, fileId: string, maxBytes = BOT_DOWNLOAD_MAX, f: Fetch = fetch): Promise<Buffer> {
+  const info = await getFile(bot, fileId, f)
+  if (!info.file_path) throw new TelegramError("telegram gave no file path")
+  if ((info.file_size ?? 0) > maxBytes) throw new TelegramError("file too large")
+  let res: Response
+  try { res = await f(`https://api.telegram.org/file/bot${bot.token}/${info.file_path}`, { signal: AbortSignal.timeout(30_000) }) }
+  catch (e) { throw new TelegramError(`telegram download failed: ${String((e as Error)?.message ?? e).split(bot.token).join("[token]")}`.slice(0, 200)) }
+  if (!res.ok || !res.body) throw new TelegramError(`telegram download refused (${res.status})`, res.status)
+  const reader = res.body.getReader(), chunks: Uint8Array[] = []
+  let n = 0
+  for (;;) { const { value, done } = await reader.read(); if (done) break; n += value.byteLength; if (n > maxBytes) { await reader.cancel(); throw new TelegramError("file too large") } chunks.push(value) }
+  return Buffer.concat(chunks)
+}

@@ -32,7 +32,7 @@ const PID = "11111111-2222-3333-4444-555555555555", PID2 = "11111111-2222-3333-4
 const prop = (o: Record<string, unknown> = {}) => ({ id: PID, capability: "crm_update_stage", summary: "Move Katja Weber to Contacted", diff: [{ label: "Stage", before: "Queued", after: "Contacted" }], evidence: {}, risk_class: "R0", source_trust: "trusted", status: "pending", ...o })
 const deps = (o: Partial<Deps> = {}): Deps => ({
   api: { sendMessage: async (c, h, m) => { sent.push({ chat: c, html: h, markup: m }) }, editMessage: async (c, id, h, m) => { edits.push({ c, id, h, m }) }, answerCallback: async (id, t, a) => { answers.push({ id, t, a }) }, sendChatAction: async () => {}, leaveChat: async () => {} },
-  gate: async () => null, ask: async () => ({ answer: "I can move Katja.", runId: "run-1" }), newProposals: async () => [prop() as any], pending: async () => [], today: async () => ({ pending: 2, tasksToday: 1, overdue: 0, replies24h: 3 }), shown: async () => {}, appUrl: "https://app.test",
+  gate: async () => null, ask: async () => ({ answer: "I can move Katja.", runId: "run-1" }), newProposals: async () => [prop() as any], pending: async () => [], today: async () => ({ pending: 2, tasksToday: 1, overdue: 0, replies24h: 3 }), shown: async () => {}, media: { voice: async () => "", file: async () => ({ text: "", refs: [], names: [] }) }, allow: async () => null, stash: async () => "id", readPending: async () => null, dropPending: async () => {}, saveNote: async () => ({ title: "t", duplicate: false }), appUrl: "https://app.test",
   decide: async (l, id, d) => ({ proposal: prop({ id, status: d === "approve" ? "applied" : "rejected" }) as any, message: "Moved to Contacted.", undoable: d === "approve" }), ...o,
 })
 let uid = 9000

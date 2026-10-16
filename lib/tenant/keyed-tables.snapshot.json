@@ -294,6 +294,7 @@
     "teams",
     "telegram_link_codes",
     "telegram_links",
+    "telegram_pending",
     "telegram_prefs",
     "telegram_shown",
     "telegram_updates",
@@ -610,6 +611,9 @@
       "org_id"
     ],
     "telegram_links": [
+      "org_id"
+    ],
+    "telegram_pending": [
       "org_id"
     ],
     "telegram_prefs": [
