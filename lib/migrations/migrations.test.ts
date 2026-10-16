@@ -1,9 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
-// @ts-expect-error plain .mjs shared with the command-line tools
 import { splitSql, statementsOf, destructiveStatements, hasDestructiveHeader, extractObjects, keyOf } from "../../scripts/lib/migration-sql.mjs"
-// @ts-expect-error plain .mjs shared with the command-line tools
 import { emptyCatalog, verdictFor } from "../../scripts/lib/migration-probe.mjs"
 import manifest from "./manifest.json"
 import { behindOf } from "./schema-state"
