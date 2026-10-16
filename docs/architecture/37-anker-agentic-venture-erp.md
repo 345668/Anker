@@ -945,7 +945,7 @@ So the platform layers exist and are tested, and **no customer or partner has us
 
 ### 19.2 What to build next, in order
 1. **First-run value for the design partners (Phase A, week 3 to 4 of 13.1).** A partner who signs in should reach "a reviewed list of investors, a draft wave waiting for approval, and a brief" without configuration: guided setup from a deck or fund thesis, the first drafts created for them, and the approval screen as the landing page. Measure with `activation_by_workspace` (time from workspace created to first contact, first draft, first approved send).
-2. **The directory privacy work (Phase 3, G12, G14):** `dsar_requests` and erasure for directory persons, a per-batch source and licence record, and the workspace provider switch. These are the compliance blockers named before any wider launch and before the first paid customer.
+2. **The directory privacy work (Phase 3, G12, G14), specified in doc 54 on 2026-10-16:** `dsar_requests` and erasure for directory persons, a per-batch source and licence record, and the workspace provider switch. These are the compliance blockers named before any wider launch and before the first paid customer.
 3. **Credit ledger and the single `can`/`meter`** (G11), once a paying customer is in sight.
 4. **Entity identity service and review queue** (G6, G7), when the partners' data shows duplicate firms hurting a real run.
 Items 2 to 4 are real work with real value, but each one waits behind getting a single partner through item 1.
