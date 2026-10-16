@@ -85,4 +85,11 @@ describe("sendEmail", () => {
     expect(sent[0].headers["List-Unsubscribe"]).toBeUndefined()
     expect(sent[0].text).toBe("Total due")
   })
+  it("tells a directory person where their data came from and how to see, correct or erase it, and leaves everyone else's footer alone", () => {
+    const plain = unsubscribeFooter("a@example.com")
+    expect(plain.text).not.toContain("investor directory"); expect(plain.html).not.toContain("investor directory")
+    const d = unsubscribeFooter("a@example.com", { directory: true })
+    expect(d.text).toContain("/privacy/directory"); expect(d.text).toContain("/privacy/request"); expect(d.html).toContain("/privacy/request")
+    expect(d.text).toContain("Unsubscribe:")
+  })
 })

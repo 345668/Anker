@@ -56,9 +56,11 @@ export function unsubscribeHeaders(email: string): Record<string, string> {
 }
 
 /** The visible footer: who sent it, how to stop it, where the privacy notice is. Address comes from OUTREACH_FOOTER_ADDRESS. */
-export function unsubscribeFooter(email: string): { text: string; html: string } {
+export function unsubscribeFooter(email: string, opts: { directory?: boolean } = {}): { text: string; html: string } {
   const url = unsubscribeUrl(email)
   const privacy = `${baseUrl()}/privacy`
+  // A person whose address is in Anker's investor directory is told where it came from and how to see, correct or erase it (docs/architecture/54 D5; GDPR art. 14).
+  const dirReq = `${baseUrl()}/privacy/request`, dirNotice = `${baseUrl()}/privacy/directory`
   const address = (process.env.OUTREACH_FOOTER_ADDRESS || "").trim()
   const text = [
     "",
@@ -67,12 +69,14 @@ export function unsubscribeFooter(email: string): { text: string; html: string }
     ...(address ? [address] : []),
     `Do not want emails like this? Unsubscribe: ${url}`,
     `Privacy notice: ${privacy}`,
+    ...(opts.directory ? [`Your business contact details are in Anker's investor directory. Why and how: ${dirNotice} . See, correct or erase them: ${dirReq}`] : []),
   ].join("\n")
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   const html =
     `<div style="margin-top:24px;padding-top:12px;border-top:1px solid #ddd;font-size:12px;color:#666">` +
     `Sent through Anker AI (an-ker.de).${address ? `<br/>${esc(address)}` : ""}<br/>` +
-    `Do not want emails like this? <a href="${url}">Unsubscribe</a> · <a href="${privacy}">Privacy notice</a></div>`
+    `Do not want emails like this? <a href="${url}">Unsubscribe</a> · <a href="${privacy}">Privacy notice</a>` +
+    (opts.directory ? `<br/>Your business contact details are in Anker's investor directory. <a href="${dirNotice}">Why and how</a> · <a href="${dirReq}">See, correct or erase them</a>` : "") + `</div>`
   return { text, html }
 }
 

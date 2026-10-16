@@ -27,6 +27,7 @@
  */
 
 import { readRouterConfigSync, readRouterConfig } from "./runtime-config"
+import { filterChainForPolicy } from "./data-policy"
 import { qwenCompatBaseUrl } from "./qwen-endpoint"
 
 const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://127.0.0.1:11434").replace(/\/+$/, "")
@@ -223,6 +224,8 @@ export async function embed(text: string, opts: EmbedOptions = {}): Promise<numb
   const keys = resolveKeys(cfg)
   const provider = selectProvider(keys, cfg, opts.provider)
   if (!provider) return null
+  // The workspace's data policy (docs/architecture/54 D6): a forbidden provider gets nothing, and the caller sees no embedding.
+  if ((await filterChainForPolicy([provider])).refusal) return null
 
   let v: number[] | null = null
   switch (provider) {

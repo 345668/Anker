@@ -109,3 +109,8 @@ export async function enforceEmailUse(email: string, purpose: Purpose = "outreac
   if (d.enforce) throw new DirectoryUseError(`Not sent: ${d.reason}`, d.sources[0] ?? null)
   try { const { logAudit } = await import("@/lib/audit/audit-log"); await logAudit({ action: "directory.use_gate_would_block", targetType: "directory_source", targetLabel: d.sources.join(","), metadata: { purpose, code: d.code, sources: d.sources } }) } catch { /* warn-only logging never blocks */ }
 }
+
+/** Whether this address belongs to a person in the directory (so the footer carries the Article 14 pointer). Never throws. */
+export async function isDirectoryEmail(email: string): Promise<boolean> {
+  try { const [r] = (await sql`SELECT 1 AS x FROM investors WHERE lower(email) = ${email.trim().toLowerCase()} AND COALESCE(metadata->>'anonymised', '') <> 'true' LIMIT 1`) as any[]; return !!r } catch { return false }
+}

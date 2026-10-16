@@ -1,5 +1,5 @@
 {
-  "takenAt": "2026-10-05",
+  "takenAt": "2026-10-16",
   "baseTables": [
     "accelerated_match_jobs",
     "action_proposals",
@@ -12,6 +12,17 @@
     "ai_calls",
     "ai_media_tasks",
     "ai_processing_logs",
+    "ai_studio_artifacts",
+    "ai_studio_assets",
+    "ai_studio_consents",
+    "ai_studio_credit_ledger",
+    "ai_studio_credit_rates",
+    "ai_studio_jobs",
+    "ai_studio_pipelines",
+    "ai_studio_reviews",
+    "ai_studio_scope_locks",
+    "ai_studio_stages",
+    "ai_subprocessors",
     "anker_chat_events",
     "anker_chats",
     "archived_contacts",
@@ -75,6 +86,10 @@
     "deck_templates",
     "decks",
     "dependency_checks",
+    "directory_erasure_notices",
+    "directory_hash_meta",
+    "directory_sources",
+    "directory_tombstones",
     "discovery_exports",
     "discovery_facets",
     "discovery_saved_searches",
@@ -83,6 +98,7 @@
     "document_chunks",
     "document_extractions",
     "documents",
+    "dsar_requests",
     "early_access_requests",
     "email_oauth_accounts",
     "email_suppressions",
@@ -145,6 +161,8 @@
     "kyc_documents",
     "kyc_screening_hits",
     "kyc_watchlist",
+    "legacy_drafts_cancel_backup_20261006",
+    "legacy_owner_migration_backup_20261006",
     "legal_documents",
     "legal_entities",
     "li_action_queue",
@@ -288,12 +306,16 @@
     "waterfall_runs",
     "workspace_access_events",
     "workspace_autonomy",
+    "workspace_data_policy",
     "workspace_decks",
     "workspace_invitations",
     "workspace_ownership_transfers"
   ],
   "tables": {
     "action_proposals": [
+      "org_id"
+    ],
+    "activation_by_workspace": [
       "org_id"
     ],
     "agent_events": [
@@ -307,6 +329,18 @@
     ],
     "ai_calls": [
       "workspace_id"
+    ],
+    "ai_studio_consents": [
+      "org_id"
+    ],
+    "ai_studio_credit_ledger": [
+      "org_id"
+    ],
+    "ai_studio_jobs": [
+      "org_id"
+    ],
+    "ai_studio_pipelines": [
+      "org_id"
     ],
     "billing_credit_ledger": [
       "org_id"
@@ -376,6 +410,9 @@
     ],
     "decks": [
       "fund_id"
+    ],
+    "directory_erasure_notices": [
+      "org_id"
     ],
     "discovery_exports": [
       "org_id"
@@ -584,6 +621,9 @@
       "org_id"
     ],
     "workspace_autonomy": [
+      "org_id"
+    ],
+    "workspace_data_policy": [
       "org_id"
     ],
     "workspace_decks": [

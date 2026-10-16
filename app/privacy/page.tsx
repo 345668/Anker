@@ -240,6 +240,9 @@ export default function PrivacyPage() {
         <p>
           If you are in our investor directory you can <Link href="/privacy/request">ask what we hold, or have it corrected, restricted or erased</Link>.
         </p>
+        <p>
+          How the investor directory works: <Link href="/privacy/directory">information for the people in it</Link>. The current list of service providers that process data for us, with their regions, is generated from our records at <Link href="/privacy/subprocessors">the sub-processor page</Link>; where it differs from the general description in this policy, the page is the more recent.
+        </p>
 
 </section>
         <a href="#policy-top" className={s.backToTop}>Back to top ↑</a>

@@ -99,6 +99,8 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
     return view(old as Row)
   }
   await assertCreation(p)
+  // Generation is sent to Alibaba Cloud: a workspace policy that forbids it stops the job before anything is uploaded (docs/architecture/54 D6).
+  { const { filterChainForPolicy } = await import("@/lib/ai/data-policy"); const pol = await filterChainForPolicy(["qwen"], p.orgId); if (pol.refusal) throw new WorkspaceError(pol.refusal, 403) }
   const recipe = modelFor(input.model)?.recipe
   if (recipe) {
     const why = await comfyBlocker(recipe)

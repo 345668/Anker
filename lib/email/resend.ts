@@ -181,7 +181,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
   let text = input.text ?? stripTags(html)
   if (isOutreach) {
-    const footer = unsubscribeFooter(input.to)
+    const footer = unsubscribeFooter(input.to, { directory: await (await import("@/lib/directory/sources")).isDirectoryEmail(input.to) })
     html = html ? html + footer.html : textToHtml(footer.text)
     text = text + footer.text
   }

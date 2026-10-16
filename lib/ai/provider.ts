@@ -1,3 +1,4 @@
+import { filterChainForPolicy } from "@/lib/ai/data-policy"
 import { checkAiBudget, currentAiContext, chargeAiBudget, runBatch } from "@/lib/assistant/context"
 import { costOf } from "./model-catalog"
 /**
@@ -469,6 +470,8 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
   let chain = surfaceProviderChain(cfg, (surfaceEntry?.provider ?? null) as AiProvider | null)
   if (opts.noFailover && chain.length > 1) chain = [chain[0]]
   if (opts.provider && opts.provider !== "none") chain = [opts.provider]
+  // The workspace's data policy (docs/architecture/54 D6): providers it forbids are removed, and a policy that leaves none fails closed with nothing sent.
+  { const pol = await filterChainForPolicy(chain); if (pol.refusal) return withFailure({ text: "", error: pol.refusal, provider: "none" as AiProvider, model: null }); chain = pol.chain }
 
   // A pinned provider (Settings → API Keys) with no saved key would otherwise
   // fail with a vague "no text". Say exactly what's wrong and where to fix it.
@@ -1318,6 +1321,7 @@ export async function aiReadiness(
   }
   let chain = surfaceProviderChain(cfg, (surfaceEntry?.provider ?? null) as AiProvider | null)
   if (opts.provider && opts.provider !== "none") chain = [opts.provider as AiProvider]
+  { const pol = await filterChainForPolicy(chain); if (pol.refusal) return { ok: false, failure: buildFailure({ error: pol.refusal }) }; chain = pol.chain }
   const usable = chain.filter((p) => p !== "none" && hasCredential(p, cfg))
   if (!usable.length) return { ok: false, failure: buildFailure({ error: "no AI provider configured" }) }
   return { ok: true, provider: usable[0], chain: usable }
@@ -1366,6 +1370,7 @@ export async function generateWithTools(
   let chain = surfaceProviderChain(cfg, (surfaceEntry?.provider ?? null) as AiProvider | null)
   if (opts.noFailover && chain.length > 1) chain = [chain[0]]
   if (opts.provider && opts.provider !== "none") chain = [opts.provider]
+  { const pol = await filterChainForPolicy(chain); if (pol.refusal) return withFailure({ text: "", error: pol.refusal, provider: "none" as AiProvider, model: null, toolCalls: [] }); chain = pol.chain }
 
   const resolution = resolveProvenance(opts, cfg)
   // Described, not executed: no `execute` key, so the SDK returns the call for
@@ -1458,6 +1463,7 @@ export async function* generateStream(
   const provider = opts.provider
     ?? (await resolveProviderForSurface(opts.surface).catch(() => "none" as AiProvider))
 
+  { const pol = await filterChainForPolicy([provider]); if (pol.refusal) { yield pol.refusal; return } }
   if (!STREAMABLE.has(provider)) {
     const text = await generate(prompt, opts)
     if (text) yield text

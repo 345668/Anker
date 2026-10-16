@@ -272,7 +272,7 @@ export async function sendGmail(input: SendGmailInput): Promise<{ ok: true; resu
     const f = await (await import("@/lib/email/send-gate")).filterSecondaryRecipients({ cc: input.cc, bcc: input.bcc, senderUserId: input.account.user_id })
     input = { ...input, cc: f.cc, bcc: f.bcc }; droppedRecipients = f.dropped
   }
-  const footer = unsubscribeFooter(input.to)
+  const footer = unsubscribeFooter(input.to, { directory: await (await import("@/lib/directory/sources")).isDirectoryEmail(input.to) })
   input = { ...input, text: input.text ? input.text + footer.text : input.html ? undefined : footer.text, html: input.html ? input.html + footer.html : undefined }
   const tok = await ensureAccessToken(input.account)
   if (!tok.ok) return { ok: false, error: tok.error }

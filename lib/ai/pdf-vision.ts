@@ -165,6 +165,13 @@ export async function analyzePdfDocuments(
   if (!chain.length) {
     return { text: "", provider: "none", model: null, error: "no usable provider key" }
   }
+  // The workspace's data policy (docs/architecture/54 D6): documents are sent only to providers it allows; none left means nothing is sent.
+  {
+    const { filterChainForPolicy } = await import("./data-policy")
+    const pol = await filterChainForPolicy(chain)
+    if (pol.refusal) return { text: "", provider: "none", model: null, error: pol.refusal }
+    chain.splice(0, chain.length, ...pol.chain)
+  }
 
   // ─── Pre-extract PDF text for ALL inputs that don't already carry it.
   // Anthropic-only could lean on its native PDF document API, but every
