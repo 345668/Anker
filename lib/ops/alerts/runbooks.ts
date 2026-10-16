@@ -63,6 +63,11 @@ export const RUNBOOKS: Record<RuleKey, Runbook> = {
     check: "The file names in this alert. `pnpm migrate:verify` lists every migration against the database, so you can see whether the file is really missing or only unrecorded.",
     fix: "Apply the named file: `node scripts/oneshot/run-migration.mjs scripts/migrations/<file> --yes-production`. If `migrate:verify` says the objects already exist, run `pnpm migrate:verify --record`. The incident clears by itself once the ledger has the file.",
   },
+  smoke_failed: {
+    means: "The automatic check that runs after each deploy found a problem: a public page did not load, the database or the migrations were not as the code expects, or a deep check failed. The deploy is live, so customers may be affected.",
+    check: "The failures named in this alert. The GitHub Actions run called Post-deploy smoke has the full log. `/api/health` shows the database and migration state; Vercel's function logs show the failing route.",
+    fix: "If a migration is missing, apply it (the schema alert will also be open). If a page or route fails, roll back the deploy in Vercel (Deployments, the previous one, Promote) and fix forward. The incident clears by itself after the next passing run, or after a day.",
+  },
   alerter_stale: {
     means: "The alert evaluator itself has stopped. Until it runs again nothing is being watched, so any other fault would go unreported.",
     check: "Vercel, Cron Jobs: is alerts-evaluate scheduled and recent? Function logs for /api/cron/alerts-evaluate: an error, a timeout, a missing CRON_SECRET. SAIL, Alerts, the heartbeat line.",

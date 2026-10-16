@@ -83,3 +83,12 @@ Built and tested (2,000+ tests green). Run against production the same day.
 - **Deviation:** `schema_behind` is **severity 2, not 1**. The alert engine opens severity 1 on the first sighting, and a deploy that precedes its migration by a few minutes is normal; severity 2 opens after two sightings, which is the "two checks in a row" the spec wanted.
 - **Adding a migration now means:** write the file, run `pnpm migrate:manifest`, apply it with `--yes-production` (or `pnpm migrate:apply`), then push.
 - Not yet: R2 (baseline and from-scratch build), R4 (restore drill), R5 (scale budget), R6 (post-deploy smoke, which will read `/api/health`).
+
+## 15. Build status, R6 (2026-10-17)
+Built and tested (2,010 tests green); migration `2026-10-17-smoke-runs.sql` applied.
+- **Workflow** `.github/workflows/post-deploy-smoke.yml`: runs when Vercel reports a successful **Production** deployment (and by hand from the Actions tab), and runs `scripts/smoke.mjs https://www.an-ker.de`.
+- **Checks.** `/api/health` (database reachable, no migration missing; retried for about a minute while a new deployment's address switches over), six public pages (`/`, `/login`, `/privacy`, `/privacy/subprocessors`, `/terms`, `/security`; a redirect counts as alive), and the deep read-only checks behind `GET /api/smoke`: database, migrations, entitlements, AI configuration, cron ledger. The deep route returns only pass or fail per check.
+- **Reporting.** The script posts the result to `POST /api/smoke`; a failed run becomes the alert `smoke_failed` (severity 2, email and Telegram through the alert engine) naming the failing checks and the commit, and clears after the next passing run or a day. If the whole site is down, the report cannot be sent but the workflow run itself goes red and GitHub notifies the repository owner.
+- **Default chosen:** the "smoke service token" is a shared secret `SMOKE_TOKEN` (compared in constant time; unset means the route answers 503, never "allowed"), not a user session. It opens only these two read-only routes.
+- **Founder step, not done:** `openssl rand -hex 32`, then set the value as `SMOKE_TOKEN` in Vercel (Production, then redeploy) and as a GitHub Actions secret of the same name. Until both exist the workflow runs the public checks and says the deep checks were skipped.
+- Not included: browser journeys.

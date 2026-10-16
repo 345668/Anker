@@ -76,6 +76,10 @@ export async function gatherMore(snap: Snapshot, thresholds: Thresholds): Promis
     const [t] = (await sql`SELECT count(*) FILTER (WHERE status IN ('queued', 'running') AND received_at < now() - interval '10 minutes')::int AS stuck, count(*) FILTER (WHERE status = 'failed' AND finished_at > now() - interval '1 hour')::int AS failed FROM telegram_updates`) as any[]
     snap.telegram = { stuck: Number(t?.stuck ?? 0), failed1h: Number(t?.failed ?? 0) }
   } catch { /* the channel's tables are not there yet */ }
+  try {
+    const [m] = (await sql`SELECT ok, sha, failures FROM smoke_runs WHERE created_at > now() - interval '24 hours' ORDER BY id DESC LIMIT 1`) as any[]
+    if (m && !m.ok) snap.smoke = { sha: m.sha ?? null, failures: (Array.isArray(m.failures) ? m.failures : []).map((f: any) => `${f.name}: ${f.error ?? 'failed'}`) }
+  } catch { /* the smoke table is not there yet */ }
   try { snap.schemaBehind = (await schemaBehind(true)).slice(0, 50) } catch { /* the ledger could not be read: no finding either way */ }
   try {
     const [c] = (await sql`SELECT count(*) FILTER (WHERE cost_state IN ('exact', 'estimated'))::int AS costed, count(*) FILTER (WHERE cost_state = 'unpriced')::int AS unpriced FROM ai_calls WHERE created_at > now() - interval '24 hours'`) as any[]

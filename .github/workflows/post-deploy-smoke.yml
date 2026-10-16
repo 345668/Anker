@@ -1,0 +1,40 @@
+name: Post-deploy smoke
+
+# After Vercel reports a successful PRODUCTION deployment, check that the live site answers: /api/health (database reachable, no migration missing),
+# the public pages, and the deep read-only checks behind /api/smoke. Result is reported to the app, which raises an incident (email and Telegram)
+# when it fails. See docs/architecture/59 R6.
+#
+# One-time set-up by the founder (nothing here can do it for you):
+#   1. Make a long random value:   openssl rand -hex 32
+#   2. Put it in Vercel (Production) as SMOKE_TOKEN and redeploy.
+#   3. Put the same value in GitHub, Settings, Secrets and variables, Actions, as SMOKE_TOKEN.
+# Without the GitHub secret the public checks still run; the deep checks and the report are skipped and the log says so.
+
+on:
+  deployment_status:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-deploy-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Smoke the live site
+    if: github.event_name == 'workflow_dispatch' || (github.event.deployment_status.state == 'success' && github.event.deployment_status.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SMOKE_BASE_URL: https://www.an-ker.de
+      SMOKE_TOKEN: ${{ secrets.SMOKE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # The new deployment's address can take a moment to switch over; the script retries the health check.
+      - name: Smoke
+        run: node scripts/smoke.mjs "$SMOKE_BASE_URL"

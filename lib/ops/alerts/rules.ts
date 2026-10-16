@@ -6,8 +6,8 @@ import { CRON_MAX_AGE_MIN, type DepCheck } from "@/lib/ops/dependencies"
 
 export type Severity = 1 | 2 | 3
 export interface Finding { rule: RuleKey; subject: string; severity: Severity; summary: string; evidence: Record<string, unknown> }
-export type RuleKey = "cron_stale" | "cron_stuck" | "cron_failing" | "dependency_down" | "dependency_degraded" | "ai_failure_rate" | "privacy_request_due" | "telegram_queue" | "cost_coverage" | "unpriced_model" | "workspace_at_limit" | "schema_behind" | "alerter_stale"
-export const RULE_KEYS: RuleKey[] = ["cron_stale", "cron_stuck", "cron_failing", "dependency_down", "dependency_degraded", "ai_failure_rate", "privacy_request_due", "telegram_queue", "cost_coverage", "unpriced_model", "workspace_at_limit", "schema_behind", "alerter_stale"]
+export type RuleKey = "cron_stale" | "cron_stuck" | "cron_failing" | "dependency_down" | "dependency_degraded" | "ai_failure_rate" | "privacy_request_due" | "telegram_queue" | "cost_coverage" | "unpriced_model" | "workspace_at_limit" | "schema_behind" | "smoke_failed" | "alerter_stale"
+export const RULE_KEYS: RuleKey[] = ["cron_stale", "cron_stuck", "cron_failing", "dependency_down", "dependency_degraded", "ai_failure_rate", "privacy_request_due", "telegram_queue", "cost_coverage", "unpriced_model", "workspace_at_limit", "schema_behind", "smoke_failed", "alerter_stale"]
 /** What each rule is for, shown on the SAIL rules page. */
 export const RULE_INFO: Record<RuleKey, { label: string; text: string; defaultSeverity: Severity }> = {
   cron_stale: { label: "A scheduled job has stopped", text: "A job has not completed successfully for twice its interval.", defaultSeverity: 2 },
@@ -22,6 +22,7 @@ export const RULE_INFO: Record<RuleKey, { label: string; text: string; defaultSe
   unpriced_model: { label: "An AI model has no price", text: "Calls to a model with no price were recorded in the last day. Add the price in SAIL, Model prices.", defaultSeverity: 2 },
   workspace_at_limit: { label: "A workspace has used its AI allowance", text: "A workspace passed 100% of its monthly AI allowance in the last day. Its AI features are paused until the month resets or you raise the limit. Digest only.", defaultSeverity: 3 },
   schema_behind: { label: "The database is behind the deployed code", text: "The running version expects database migrations that have not been applied. Features that use them are broken until they are.", defaultSeverity: 2 },
+  smoke_failed: { label: "The post-deploy check failed", text: "After the last deploy, a page or a deep check failed. The newest check in the last day did not pass; a later passing run clears this.", defaultSeverity: 2 },
   alerter_stale: { label: "The alert evaluator has stopped", text: "No successful evaluation for 30 minutes. Raised by the watchdog.", defaultSeverity: 1 },
 }
 export interface Thresholds { ai_failure_rate?: { rate?: number; minCalls?: number; windowMin?: number } }
@@ -54,6 +55,8 @@ export interface Snapshot {
   metering?: { costed: number; unpriced: number; unpricedModels: Array<{ model: string; calls: number }>; atLimit?: string[] }
   /** Migration files the deployed code expects that the ledger lacks (docs/architecture/59 R3). Absent when the ledger could not be read. */
   schemaBehind?: string[]
+  /** The newest post-deploy smoke run from the last day, if it failed (docs/architecture/59 R6). */
+  smoke?: { sha: string | null; failures: string[] }
 }
 
 const min = (ms: number) => Math.round(ms / 60000)
@@ -159,7 +162,13 @@ export function schemaBehind(s: Snapshot): Finding[] {
   return [{ rule: "schema_behind", subject: "database-schema", severity: 2, summary: `The database is missing ${b.length} migration(s) the deployed code expects: ${b.slice(0, 3).join(", ")}${b.length > 3 ? ", …" : ""}.`, evidence: { missing: b.slice(0, 10), count: b.length } }]
 }
 
+export function smokeFailed(s: Snapshot): Finding[] {
+  const m = s.smoke
+  if (!m) return []
+  return [{ rule: "smoke_failed", subject: "post-deploy-smoke", severity: 2, summary: `The check after the last deploy${m.sha ? ` (${m.sha.slice(0, 7)})` : ""} failed: ${m.failures.slice(0, 3).join("; ")}${m.failures.length > 3 ? "; …" : ""}.`, evidence: { commit: m.sha, failures: m.failures.slice(0, 10) } }]
+}
+
 export function evaluate(s: Snapshot, t: Thresholds = {}): Finding[] {
   const stuck = cronStuck(s)
-  return [...stuck, ...cronStale(s, new Set(stuck.map((f) => f.subject))), ...cronFailing(s), ...dependencyDown(s), ...dependencyDegraded(s), ...aiFailureRate(s, t), ...privacyRequestDue(s), ...telegramQueue(s), ...costCoverage(s), ...unpricedModel(s), ...workspaceAtLimit(s), ...schemaBehind(s)]
+  return [...stuck, ...cronStale(s, new Set(stuck.map((f) => f.subject))), ...cronFailing(s), ...dependencyDown(s), ...dependencyDegraded(s), ...aiFailureRate(s, t), ...privacyRequestDue(s), ...telegramQueue(s), ...costCoverage(s), ...unpricedModel(s), ...workspaceAtLimit(s), ...schemaBehind(s), ...smokeFailed(s)]
 }
