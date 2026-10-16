@@ -76,6 +76,11 @@ export async function gatherMore(snap: Snapshot, thresholds: Thresholds): Promis
     snap.telegram = { stuck: Number(t?.stuck ?? 0), failed1h: Number(t?.failed ?? 0) }
   } catch { /* the channel's tables are not there yet */ }
   try {
+    const [c] = (await sql`SELECT count(*) FILTER (WHERE cost_state IN ('exact', 'estimated'))::int AS costed, count(*) FILTER (WHERE cost_state = 'unpriced')::int AS unpriced FROM ai_calls WHERE created_at > now() - interval '24 hours'`) as any[]
+    const models = (await sql`SELECT COALESCE(model, '(unknown model)') AS model, count(*)::int AS n FROM ai_calls WHERE created_at > now() - interval '24 hours' AND cost_state = 'unpriced' AND model IS NOT NULL GROUP BY 1 ORDER BY n DESC LIMIT 10`) as any[]
+    snap.metering = { costed: Number(c?.costed ?? 0), unpriced: Number(c?.unpriced ?? 0), unpricedModels: models.map((m) => ({ model: String(m.model), calls: Number(m.n) })) }
+  } catch { /* cost columns not there yet */ }
+  try {
     const rows = (await sql`SELECT results FROM dependency_checks ORDER BY id DESC LIMIT 3`) as any[]
     const hist: Record<string, string[]> = {}
     for (const r of rows) for (const c of (typeof r.results === "string" ? JSON.parse(r.results) : r.results) ?? []) (hist[c.name] ??= []).push(String(c.status))

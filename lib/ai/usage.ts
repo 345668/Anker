@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db"
 import { TASKS, type TaskTag } from "./model-router"
 import { costOf } from "./model-catalog"
+import { costCenterOf, priceCall, warmPrices } from "./pricing"
 import { currentRunId } from "@/lib/assistant/context"
 import { logEvent } from "@/lib/observability/log"
 
@@ -66,8 +67,11 @@ export interface AiCallRecord {
   streamed?: boolean | null
   /** The run this call belongs to. Taken from the ambient run when not given. */
   runId?: string | null
-  /** Cost at the time of the call. Computed from tokens and the catalogue price when not given; null when unpriced. */
+  /** Cost at the time of the call. Computed from tokens and the price table when not given; null when unpriced. */
   costUsd?: number | null
+  /** Text lengths, used only to estimate the cost when the provider returned no usage. */
+  promptChars?: number | null
+  outputChars?: number | null
 }
 
 /**
@@ -104,14 +108,18 @@ const int = (n: number | null | undefined) =>
  */
 export async function recordAiCall(record: AiCallRecord): Promise<void> {
   const runId = record.runId ?? currentRunId()
-  const costUsd = record.costUsd !== undefined ? record.costUsd : costOf(record.model, { promptTokens: record.promptTokens ?? undefined, outputTokens: record.outputTokens ?? undefined })
+  await warmPrices()
+  const priced = record.costUsd !== undefined
+    ? { costUsd: record.costUsd, state: (record.costUsd === null ? "unpriced" : "exact") as "exact" | "unpriced" }
+    : priceCall({ model: record.model, provider: record.provider, ok: record.ok, promptTokens: record.promptTokens, outputTokens: record.outputTokens, promptChars: record.promptChars, outputChars: record.outputChars })
+  const costUsd = priced.costUsd
   logEvent("ai_call", { provider: record.provider, model: record.model ?? null, task: record.task ? String(record.task) : null, ok: record.ok, ms: int(record.durationMs), in_tok: int(record.promptTokens), out_tok: int(record.outputTokens), cost_usd: costUsd === null ? null : Number(costUsd.toFixed(6)), status: int(record.httpStatus), attempt: int(record.attempt) ?? 0 }, runId)
   try {
     await sql`
       INSERT INTO ai_calls (
         task, provider, model, attempt, ok, error, http_status,
         duration_ms, prompt_tokens, output_tokens, workspace_id, actor_id,
-        actor_email, persona, resolution, requested_model, streamed, run_id, cost_usd
+        actor_email, persona, resolution, requested_model, streamed, run_id, cost_usd, cost_state, cost_center
       ) VALUES (
         ${record.task ? String(record.task).slice(0, 64) : null},
         ${String(record.provider).slice(0, 64)},
@@ -131,7 +139,9 @@ export async function recordAiCall(record: AiCallRecord): Promise<void> {
         ${record.requestedModel ? String(record.requestedModel).slice(0, 128) : null},
         ${record.streamed ?? false},
         ${runId},
-        ${costUsd === null ? null : Number(costUsd.toFixed(6))}
+        ${costUsd === null ? null : Number(costUsd.toFixed(6))},
+        ${priced.state},
+        ${costCenterOf(record.workspaceId, record.task ? String(record.task) : null)}
       )
     `
   } catch {

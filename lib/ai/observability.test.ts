@@ -32,7 +32,7 @@ beforeAll(async () => {
   for (const f of ["scripts/migrations/2026-09-21-ai-call-log.sql",
                    "scripts/migrations/2026-09-21b-ai-call-attribution.sql",
                    "scripts/migrations/2026-09-28-ai-call-provenance.sql",
-                   "scripts/migrations/2026-10-03-ops-telemetry.sql"]) {
+                   "scripts/migrations/2026-10-03-ops-telemetry.sql", "scripts/migrations/2026-10-16m-metering-m1.sql"]) {
     const migration = readFileSync(f, "utf8")
     await db.exec(migration); await db.exec(migration)
   }

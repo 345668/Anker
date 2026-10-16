@@ -70,3 +70,12 @@ Pricing: known model exact, unknown model unpriced, missing tokens estimated, fr
 
 ## 12. Not in scope
 Publishing usage-based prices (needs M3 numbers first, doc 37 7.3); invoicing from usage; per-seat cost allocation; metering of the Halyard desktop app's local models; changing any plan limit.
+
+## 13. Build status, M1 (2026-10-16)
+Built and tested; migration `2026-10-16m-metering-m1.sql` applied to Neon.
+- `model_prices` table (SAIL page **Model prices**, `admin/model-prices`), read before the catalogue; seeded with two **unverified placeholders** (`mistral-small-latest`, `gpt-4o-mini`) that the founder must check.
+- Every AI call now records `cost_state` (`exact`, `estimated`, `unpriced`, `none`) and `cost_center` (`workspace:<id>`, `platform:<task>` or `unknown`). When the provider returns no token counts, the cost is estimated from text length (4 characters a token) on the main, streamed and tool paths. The run's money ceiling uses the same pricing.
+- Alert rules `cost_coverage` (under 95% of the last day's calls costed, digest) and `unpriced_model` (any priced-nowhere model, one finding per model), with runbooks.
+- **Found while testing:** the tool-call path would have thrown `prompt is not defined` (the browser's global `prompt` hid it from the type checker); the native-tools tests caught it and it is fixed before deploy.
+- **Backfill limit:** historic rows without token counts cannot be priced, so the last 30 days read 175 exact, 1,931 unpriced (mostly `qwen-flash` calls that returned no usage), 1,184 none (failed calls). New calls are counted properly; the coverage alert measures the last 24 hours only.
+- Next: M2 (`usage_events`, speech/vision/embeddings), M3 (gate, warnings, unit economics).

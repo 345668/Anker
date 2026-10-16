@@ -6,8 +6,8 @@ import { CRON_MAX_AGE_MIN, type DepCheck } from "@/lib/ops/dependencies"
 
 export type Severity = 1 | 2 | 3
 export interface Finding { rule: RuleKey; subject: string; severity: Severity; summary: string; evidence: Record<string, unknown> }
-export type RuleKey = "cron_stale" | "cron_stuck" | "cron_failing" | "dependency_down" | "dependency_degraded" | "ai_failure_rate" | "privacy_request_due" | "telegram_queue" | "alerter_stale"
-export const RULE_KEYS: RuleKey[] = ["cron_stale", "cron_stuck", "cron_failing", "dependency_down", "dependency_degraded", "ai_failure_rate", "privacy_request_due", "telegram_queue", "alerter_stale"]
+export type RuleKey = "cron_stale" | "cron_stuck" | "cron_failing" | "dependency_down" | "dependency_degraded" | "ai_failure_rate" | "privacy_request_due" | "telegram_queue" | "cost_coverage" | "unpriced_model" | "alerter_stale"
+export const RULE_KEYS: RuleKey[] = ["cron_stale", "cron_stuck", "cron_failing", "dependency_down", "dependency_degraded", "ai_failure_rate", "privacy_request_due", "telegram_queue", "cost_coverage", "unpriced_model", "alerter_stale"]
 /** What each rule is for, shown on the SAIL rules page. */
 export const RULE_INFO: Record<RuleKey, { label: string; text: string; defaultSeverity: Severity }> = {
   cron_stale: { label: "A scheduled job has stopped", text: "A job has not completed successfully for twice its interval.", defaultSeverity: 2 },
@@ -18,6 +18,8 @@ export const RULE_INFO: Record<RuleKey, { label: string; text: string; defaultSe
   ai_failure_rate: { label: "AI calls are failing", text: "A provider's share of failed calls in the window is above the threshold.", defaultSeverity: 2 },
   privacy_request_due: { label: "A privacy request is due", text: "A confirmed request is due within 7 days or overdue.", defaultSeverity: 2 },
   telegram_queue: { label: "The Telegram channel is backing up", text: "Messages to the Anker bot have waited over ten minutes, or several have failed in the last hour.", defaultSeverity: 2 },
+  cost_coverage: { label: "AI cost records are incomplete", text: "Under 95% of the last day's AI calls have a cost, so a plan's monthly AI allowance is not seeing the real spend.", defaultSeverity: 3 },
+  unpriced_model: { label: "An AI model has no price", text: "Calls to a model with no price were recorded in the last day. Add the price in SAIL, Model prices.", defaultSeverity: 2 },
   alerter_stale: { label: "The alert evaluator has stopped", text: "No successful evaluation for 30 minutes. Raised by the watchdog.", defaultSeverity: 1 },
 }
 export interface Thresholds { ai_failure_rate?: { rate?: number; minCalls?: number; windowMin?: number } }
@@ -46,6 +48,8 @@ export interface Snapshot {
   depHistory?: Record<string, string[]>
   /** Customer Telegram updates waiting over ten minutes, and failures in the last hour. */
   telegram?: { stuck: number; failed1h: number }
+  /** The last day's AI calls by cost state (docs/architecture/58), and the models that had no price. */
+  metering?: { costed: number; unpriced: number; unpricedModels: Array<{ model: string; calls: number }> }
 }
 
 const min = (ms: number) => Math.round(ms / 60000)
@@ -125,7 +129,23 @@ export function telegramQueue(s: Snapshot): Finding[] {
   return [{ rule: "telegram_queue", subject: "telegram-queue", severity: 2, summary: `Telegram: ${t.stuck} message(s) have waited over ten minutes and ${t.failed1h} failed in the last hour.`, evidence: { waitingOverTenMinutes: t.stuck, failedLastHour: t.failed1h } }]
 }
 
+export const COST_COVERAGE_MIN = 0.95
+export const COST_COVERAGE_MIN_CALLS = 20
+
+export function costCoverage(s: Snapshot): Finding[] {
+  const m = s.metering
+  if (!m) return []
+  const total = m.costed + m.unpriced
+  if (total < COST_COVERAGE_MIN_CALLS || m.costed / total >= COST_COVERAGE_MIN) return []
+  const pct = Math.round((m.costed / total) * 100)
+  return [{ rule: "cost_coverage", subject: "ai-cost-coverage", severity: 3, summary: `Only ${pct}% of the last day's ${total} AI calls have a cost.`, evidence: { calls: total, withCost: m.costed, unpriced: m.unpriced, coveragePct: pct } }]
+}
+
+export function unpricedModel(s: Snapshot): Finding[] {
+  return (s.metering?.unpricedModels ?? []).map((u) => ({ rule: "unpriced_model" as const, subject: u.model, severity: 2 as const, summary: `${u.model} has no price: ${u.calls} call(s) in the last day were not counted.`, evidence: { model: u.model, calls: u.calls } }))
+}
+
 export function evaluate(s: Snapshot, t: Thresholds = {}): Finding[] {
   const stuck = cronStuck(s)
-  return [...stuck, ...cronStale(s, new Set(stuck.map((f) => f.subject))), ...cronFailing(s), ...dependencyDown(s), ...dependencyDegraded(s), ...aiFailureRate(s, t), ...privacyRequestDue(s), ...telegramQueue(s)]
+  return [...stuck, ...cronStale(s, new Set(stuck.map((f) => f.subject))), ...cronFailing(s), ...dependencyDown(s), ...dependencyDegraded(s), ...aiFailureRate(s, t), ...privacyRequestDue(s), ...telegramQueue(s), ...costCoverage(s), ...unpricedModel(s)]
 }

@@ -19,6 +19,7 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
 import { modelForTask, dashscopeModelChain, type TaskTag } from "./model-router"
 import { recordAiCall, type AiResolution } from "./usage"
+import { priceCall } from "./pricing"
 import { generateText, tool, jsonSchema, type ModelMessage } from "ai"
 import { applyRoleSkill } from "./skills-loader"
 import { buildFailure, type AiFailure } from "./failure"
@@ -523,11 +524,13 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
       // input to every cost figure downstream.
       promptTokens: last.usage?.promptTokens ?? null,
       outputTokens: last.usage?.outputTokens ?? null,
+      promptChars: prompt.length,
+      outputChars: last.text?.length ?? 0,
     })
     // Charge the run for what this call actually used, before deciding whether to
     // continue. Failed and empty calls count: they consumed the prompt, and a
     // ceiling that ignored them would let a retry loop run free.
-    chargeAiBudget(costOf(last.model, last.usage))
+    chargeAiBudget(priceCall({ model: last.model, provider: p, ok: Boolean(last.text), promptTokens: last.usage?.promptTokens, outputTokens: last.usage?.outputTokens, promptChars: prompt.length, outputChars: last.text?.length ?? 0 }).costUsd)
     if (last.text) return last       // success (possibly after failover)
     attempts.push(`${p}: ${last.error ?? "no text"}`)
     failures.push(buildFailure({ status: last.status, error: last.error }))
@@ -1417,7 +1420,7 @@ export async function generateWithTools(
         resolution, requestedModel: opts.requestedModel ?? null,
         promptTokens: usage?.promptTokens ?? null, outputTokens: usage?.outputTokens ?? null,
       })
-      chargeAiBudget(costOf(model, usage))
+      chargeAiBudget(priceCall({ model, provider: p, ok: true, promptTokens: usage?.promptTokens, outputTokens: usage?.outputTokens, promptChars: JSON.stringify(messages).length, outputChars: text.length }).costUsd)
       if (text || toolCalls.length) {
         return { text, error: null, provider: p, model, usage, toolCalls,
                  finishReason: res.finishReason ?? null }
@@ -1497,6 +1500,7 @@ export async function* generateStream(
   const temp = opts.temperature ?? 0.4
 
   let recorded = false
+  let outChars = 0
   const record = (ok: boolean, model: string | null, error?: string, status?: number) => {
     if (recorded) return          // a fallback path must not double-count
     recorded = true
@@ -1511,6 +1515,7 @@ export async function* generateStream(
       persona: who?.persona ?? null,
       resolution: resolveProvenance(opts, cfg),
       requestedModel: opts.requestedModel ?? null,
+      promptChars: prompt.length, outputChars: outChars,
     })
   }
 
@@ -1571,7 +1576,7 @@ export async function* generateStream(
         if (!data || data === "[DONE]") continue
         try {
           const delta = JSON.parse(data)?.choices?.[0]?.delta?.content
-          if (typeof delta === "string" && delta) { produced = true; yield delta }
+          if (typeof delta === "string" && delta) { produced = true; outChars += delta.length; yield delta }
         } catch { /* a partial or non-JSON frame is skipped, not fatal */ }
       }
     }

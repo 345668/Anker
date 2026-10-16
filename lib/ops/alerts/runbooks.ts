@@ -43,6 +43,16 @@ export const RUNBOOKS: Record<RuleKey, Runbook> = {
     check: "SAIL, Telegram channel: the queue, the webhook status and its last error. Vercel function logs for /api/telegram/webhook and the telegram-sweep cron. Telegram's own status.",
     fix: "If the webhook is not registered or shows an error, register it again in SAIL. If the AI provider is failing, fix that first (the AI failure rule will also be open). The sweep retries waiting messages every minute, up to three times each.",
   },
+  cost_coverage: {
+    means: "Many recent AI calls have no cost on record. A workspace's monthly AI allowance adds up those costs, so it would not stop a workspace that is using far more than its plan.",
+    check: "SAIL, Model prices: which models are unpriced. SAIL, AI usage: calls by provider and model for the last day.",
+    fix: "Add the missing prices in SAIL, Model prices. If the provider returns no token counts, calls are estimated from text length and still count; if most calls are unpriced, a new model was switched on without a price.",
+  },
+  unpriced_model: {
+    means: "Calls to a model with no price were made in the last day, so their cost is not counted in anyone's allowance.",
+    check: "The model name in this alert; SAIL, Model prices.",
+    fix: "Enter the model's list price per million input and output tokens in SAIL, Model prices. The incident clears when no unpriced call is recorded for a day.",
+  },
   alerter_stale: {
     means: "The alert evaluator itself has stopped. Until it runs again nothing is being watched, so any other fault would go unreported.",
     check: "Vercel, Cron Jobs: is alerts-evaluate scheduled and recent? Function logs for /api/cron/alerts-evaluate: an error, a timeout, a missing CRON_SECRET. SAIL, Alerts, the heartbeat line.",

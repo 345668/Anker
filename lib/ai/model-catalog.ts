@@ -279,15 +279,22 @@ export function costOf(
   usage: { promptTokens?: number; outputTokens?: number } | null | undefined,
 ): number | null {
   if (!modelId || !usage) return null
-  const m = getModel(modelId)
-  if (!m) return null
+  const r = catalogRates(modelId)
+  if (!r) return null
   const inTok = usage.promptTokens
   const outTok = usage.outputTokens
   if (inTok === undefined && outTok === undefined) return null
+  return ((inTok ?? 0) * (r.in ?? 0) + (outTok ?? 0) * (r.out ?? 0)) / 1_000_000
+}
+
+/** The catalogue's list price per million tokens (high end of a range), or null when the model is unknown or has no price. */
+export function catalogRates(modelId: string): { in: number | null; out: number | null } | null {
+  const m = getModel(modelId)
+  if (!m) return null
   const inRate = highRate(m.priceIn)
   const outRate = highRate(m.priceOut)
   if (inRate === null && outRate === null) return null
-  return ((inTok ?? 0) * (inRate ?? 0) + (outTok ?? 0) * (outRate ?? 0)) / 1_000_000
+  return { in: inRate, out: outRate }
 }
 
 /** High end of a "0.4-1.2" range, or a plain "1.25". Null when absent/unparseable. */
