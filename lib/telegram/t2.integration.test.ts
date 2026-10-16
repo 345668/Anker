@@ -31,8 +31,8 @@ const sent: Array<{ chat: number; html: string; markup?: any }> = [], edits: any
 const PID = "11111111-2222-3333-4444-555555555555", PID2 = "11111111-2222-3333-4444-666666666666"
 const prop = (o: Record<string, unknown> = {}) => ({ id: PID, capability: "crm_update_stage", summary: "Move Katja Weber to Contacted", diff: [{ label: "Stage", before: "Queued", after: "Contacted" }], evidence: {}, risk_class: "R0", source_trust: "trusted", status: "pending", ...o })
 const deps = (o: Partial<Deps> = {}): Deps => ({
-  api: { sendMessage: async (c, h, m) => { sent.push({ chat: c, html: h, markup: m }) }, editMessage: async (c, id, h, m) => { edits.push({ c, id, h, m }) }, answerCallback: async (id, t, a) => { answers.push({ id, t, a }) }, sendChatAction: async () => {}, leaveChat: async () => {} },
-  gate: async () => null, ask: async () => ({ answer: "I can move Katja.", runId: "run-1" }), newProposals: async () => [prop() as any], pending: async () => [], today: async () => ({ pending: 2, tasksToday: 1, overdue: 0, replies24h: 3 }), shown: async () => {}, media: { voice: async () => "", file: async () => ({ text: "", refs: [], names: [] }) }, allow: async () => null, stash: async () => "id", readPending: async () => null, dropPending: async () => {}, saveNote: async () => ({ title: "t", duplicate: false }), appUrl: "https://app.test",
+  api: { sendMessage: async (c, h, m) => { sent.push({ chat: c, html: h, markup: m }) }, editMessage: async (c, id, h, m) => { edits.push({ c, id, h, m }) }, answerCallback: async (id, t, a) => { answers.push({ id, t, a }) }, sendChatAction: async () => {}, sendVoice: async () => {}, leaveChat: async () => {} },
+  gate: async () => null, ask: async () => ({ answer: "I can move Katja.", runId: "run-1" }), newProposals: async () => [prop() as any], pending: async () => [], today: async () => ({ pending: 2, tasksToday: 1, overdue: 0, replies24h: 3 }), shown: async () => {}, media: { voice: async () => "", file: async () => ({ text: "", refs: [], names: [] }) }, voiceReply: async () => null, sendFile: async () => false, forget: async () => 0, remember: async () => {}, allow: async () => null, stash: async () => "id", readPending: async () => null, dropPending: async () => {}, saveNote: async () => ({ title: "t", duplicate: false }), appUrl: "https://app.test",
   decide: async (l, id, d) => ({ proposal: prop({ id, status: d === "approve" ? "applied" : "rejected" }) as any, message: "Moved to Contacted.", undoable: d === "approve" }), ...o,
 })
 let uid = 9000
@@ -50,7 +50,7 @@ beforeAll(async () => {
     CREATE TABLE action_proposals (id text PRIMARY KEY, org_id text, capability text, summary text, diff jsonb DEFAULT '[]', evidence jsonb DEFAULT '{}', risk_class text, source_trust text DEFAULT 'trusted', status text DEFAULT 'pending', applied_at timestamptz, undo jsonb, run_id text, created_at timestamptz DEFAULT now(), expires_at timestamptz DEFAULT now() + interval '14 days');
     CREATE TABLE crm_tasks (id serial PRIMARY KEY, org_id text, user_id text, title text, due_at timestamptz, done_at timestamptz);
     CREATE TABLE outreach_replies (id serial PRIMARY KEY, user_id text, received_at timestamptz DEFAULT now());`)
-  await db.exec(readFileSync("scripts/migrations/2026-10-16i-telegram-channel.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-16j-telegram-t2.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-16i-telegram-channel.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-16j-telegram-t2.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-16k-telegram-t3.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-16l-telegram-t4.sql", "utf8"))
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => { sent.length = 0; edits.length = 0; answers.length = 0; st.canWrite = true; st.decideCalls.length = 0; st.decideFail = null; st.applied = true
@@ -65,9 +65,9 @@ describe("devices: mode and preferences", () => {
   it("notifications are off until switched on, are per device, and switching one on starts its watermark now so old items are not announced", async () => {
     const id = await link("write")
     expect(await getPrefs([id])).toEqual({})
-    expect(await setPrefs(id, "u1", "o1", { approvals: true, replies: false, deadlines: true })).toBe(true)
-    expect((await getPrefs([id]))[id]).toEqual({ approvals: true, replies: false, deadlines: true })
-    expect(await setPrefs(id, "stranger", "o1", { approvals: true, replies: true, deadlines: true })).toBe(false); expect(await setPrefs(id, "u1", "other-org", { approvals: true, replies: true, deadlines: true })).toBe(false)
+    expect(await setPrefs(id, "u1", "o1", { approvals: true, replies: false, deadlines: true, voiceReplies: false, dailyBrief: false })).toBe(true)
+    expect((await getPrefs([id]))[id]).toEqual({ approvals: true, replies: false, deadlines: true, voiceReplies: false, dailyBrief: false })
+    expect(await setPrefs(id, "stranger", "o1", { approvals: true, replies: true, deadlines: true, voiceReplies: false, dailyBrief: false })).toBe(false); expect(await setPrefs(id, "u1", "other-org", { approvals: true, replies: true, deadlines: true, voiceReplies: false, dailyBrief: false })).toBe(false)
     const r = (await rows("SELECT last_approvals_at, last_replies_at FROM telegram_prefs"))[0]; expect(Date.now() - new Date(r.last_approvals_at).getTime()).toBeLessThan(10_000)
   })
 })
@@ -197,9 +197,9 @@ describe("/inbox, /today, /mode", () => {
 describe("notifications", () => {
   const T = Date.UTC(2026, 9, 17, 10, 0, 0)         // 12:00 Berlin
   const NIGHT = Date.UTC(2026, 9, 17, 21, 0, 0)     // 23:00 Berlin
-  const out: any[] = []; const api = { sendMessage: async (c: number, h: string, m: any) => { out.push({ c, h, m }) }, editMessage: async () => {}, answerCallback: async () => {}, sendChatAction: async () => {}, leaveChat: async () => {} }
+  const out: any[] = []; const api = { sendMessage: async (c: number, h: string, m: any) => { out.push({ c, h, m }) }, editMessage: async () => {}, answerCallback: async () => {}, sendChatAction: async () => {}, sendVoice: async () => {}, leaveChat: async () => {} }
   beforeEach(() => { out.length = 0 })
-  const on = async (p: Partial<{ approvals: boolean; replies: boolean; deadlines: boolean }>) => { const id = await link("write"); await setPrefs(id, "u1", "o1", { approvals: false, replies: false, deadlines: false, ...p }); await db.query("UPDATE telegram_prefs SET last_approvals_at = $2, last_replies_at = $2 WHERE link_id = $1", [id, new Date(T - 3600_000).toISOString()]); return id }
+  const on = async (p: Partial<{ approvals: boolean; replies: boolean; deadlines: boolean; dailyBrief: boolean; voiceReplies: boolean }>) => { const id = await link("write"); await setPrefs(id, "u1", "o1", { approvals: false, replies: false, deadlines: false, voiceReplies: false, dailyBrief: false, ...p }); await db.query("UPDATE telegram_prefs SET last_approvals_at = $2, last_replies_at = $2 WHERE link_id = $1", [id, new Date(T - 3600_000).toISOString()]); return id }
 
   it("nothing is sent to someone who has not opted in", async () => {
     await link("write"); await db.query("INSERT INTO action_proposals (id, org_id, capability, summary, risk_class) VALUES ($1,'o1','x','x','R0')", [PID])
@@ -224,12 +224,21 @@ describe("notifications", () => {
     await notifyAll(api, "https://app.test", Date.UTC(2026, 9, 18, 6, 0, 0)); expect(out).toHaveLength(1)    // 08:00 Berlin
   })
   it("replies: a count only, since the last time; tasks: once each morning, a count only", async () => {
-    await on({ replies: true, deadlines: true })
+    await on({ replies: true, deadlines: true, voiceReplies: false, dailyBrief: false })
     await db.query("INSERT INTO outreach_replies (user_id, received_at) VALUES ('u1',$1), ('u1',$1), ('u2',$1)", [new Date(T - 600_000).toISOString()])
     await db.query("INSERT INTO crm_tasks (org_id, user_id, title, due_at) VALUES ('o1','u1','Call Katja', $1), ('o1','u1','Send deck', $1)", [new Date(T - 3600_000).toISOString()])
     await notifyAll(api, "https://app.test", T)
     expect(out.map((o) => o.h).sort()).toEqual(["2 new replies to your outreach.", "2 tasks are due today or overdue."]); expect(JSON.stringify(out)).not.toMatch(/Katja|deck/)
     await notifyAll(api, "https://app.test", T + 3600_000); expect(out).toHaveLength(2)
+  })
+  it("daily brief: opt-in, names the tasks, replaces the plain task count, once a day, and stays quiet when there is nothing", async () => {
+    await on({ dailyBrief: true, deadlines: true })
+    await notifyAll(api, "https://app.test", T); expect(out).toHaveLength(0)
+    await db.query("INSERT INTO crm_tasks (org_id, user_id, title, due_at) VALUES ('o1','u1','Call Katja', $1), ('o1','u1','Send deck', $1)", [new Date(T - 3600_000).toISOString()])
+    await db.query("UPDATE telegram_prefs SET last_brief_on = NULL, last_deadlines_on = NULL")
+    await notifyAll(api, "https://app.test", T)
+    expect(out).toHaveLength(1); expect(out[0].h).toContain("Your day"); expect(out[0].h).toContain("Call Katja"); expect(out[0].h).not.toContain("tasks are due")
+    await notifyAll(api, "https://app.test", T + 3600_000); expect(out).toHaveLength(1)
   })
   it("a workspace the gate refuses, and a revoked device, get nothing; a failing send is counted and retried next time", async () => {
     const id = await on({ approvals: true }); await db.query("INSERT INTO action_proposals (id, org_id, capability, summary, risk_class, created_at) VALUES ($1,'o1','x','x','R0',$2)", [PID, new Date(T - 600_000).toISOString()])

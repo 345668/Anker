@@ -3,7 +3,7 @@
  * The catalogue itself lives in the `plan_catalog` table so SAIL can edit it; the keys below are the universe the code knows.
  */
 export const FEATURE_KEYS = ["assistant", "outreach", "linkedin", "matchmaking", "intake", "tools", "fund_ops", "spvs", "deals", "channel_telegram"] as const
-export const LIMIT_KEYS = ["ai_spend_usd_month", "seats", "outreach_sends_day", "intake_submissions_month", "storage_mb", "ai_studio_daily_credits"] as const
+export const LIMIT_KEYS = ["ai_spend_usd_month", "seats", "outreach_sends_day", "intake_submissions_month", "storage_mb", "ai_studio_daily_credits", "telegram_voice_per_day", "telegram_files_per_day", "telegram_audio_minutes_per_day", "telegram_voice_replies_per_day"] as const
 export type FeatureKey = (typeof FEATURE_KEYS)[number]
 export type LimitKey = (typeof LIMIT_KEYS)[number]
 export type LifecycleState = "trial" | "active" | "paused" | "offboarding"

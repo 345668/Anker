@@ -19,9 +19,11 @@ export interface Api {
   sendMessage(chatId: number, html: string, markup?: Markup | null): Promise<unknown>
   editMessage(chatId: number, messageId: number, html: string, markup?: Markup | null): Promise<unknown>
   answerCallback(callbackId: string, text?: string, alert?: boolean): Promise<unknown>
+  sendVoice(chatId: number, mp3: Buffer): Promise<unknown>
   sendChatAction(chatId: number): Promise<unknown>
   leaveChat(chatId: number): Promise<unknown>
 }
+export interface OutFile { name: string; url: string; kind: string }
 export interface Attachments { text: string; refs: Array<{ id: string; name: string; base64: string }>; names: string[] }
 export interface Media {
   /** Downloads and transcribes a voice note or audio file. Throws a plain-words Error when it cannot. */
@@ -35,7 +37,7 @@ export interface Deps {
   /** Why this workspace cannot use the channel right now, or null. */
   gate(link: LinkRow): Promise<string | null>
   /** Runs the assistant for the linked person and returns the answer text. Throws a plain-words Error for a refusal. */
-  ask(link: LinkRow, text: string, history: Array<{ role: "user" | "assistant"; content: string }>, attachments?: Attachments): Promise<{ answer: string; runId?: string | null }>
+  ask(link: LinkRow, text: string, history: Array<{ role: "user" | "assistant"; content: string }>, attachments?: Attachments): Promise<{ answer: string; runId?: string | null; artifacts?: OutFile[]; sensitive?: boolean }>
   /** Proposals the run just made (still waiting), newest last. */
   newProposals(link: LinkRow, runId: string): Promise<PView[]>
   /** Proposals waiting in the workspace. */
@@ -43,6 +45,14 @@ export interface Deps {
   /** Approve, reject or undo one proposal for the linked person, with every guard. Throws a plain-words Error when it must not happen. */
   decide(link: LinkRow, proposalId: string, decision: "approve" | "reject" | "undo"): Promise<{ proposal: PView; message: string; undoable: boolean }>
   today(link: LinkRow): Promise<TodayView>
+  /** An MP3 of the answer when this device wants spoken replies and is within its allowance; otherwise null. Never throws. */
+  voiceReply(link: LinkRow, answer: string): Promise<Buffer | null>
+  /** Sends a file the assistant generated, if it belongs to this workspace. Returns whether it was sent. */
+  sendFile(link: LinkRow, chatId: number, file: OutFile): Promise<boolean>
+  /** Deletes the chat's messages from the last 48 hours and clears the conversation in Anker. Returns how many messages were removed. */
+  forget(link: LinkRow, chatId: number): Promise<number>
+  /** Remembers the id of a message the person sent, so /forget can delete it. */
+  remember(link: LinkRow, chatId: number, messageId: number): Promise<void>
   media: Media
   /** Daily limits per device for voice notes and files; a refusal in words, or null. */
   allow(link: LinkRow, kind: "voice" | "file"): Promise<string | null>
@@ -61,7 +71,10 @@ export const MSG = {
   pending: "Almost there. Open Anker, go to Connected channels and approve this device. Then message me again.",
   suspended: "This device has been idle for a long time, so I paused it. Open Anker, Connected channels, and approve it again.",
   group: "I only work in a private chat with me. Please message me directly.",
-  voiceTooLong: "That recording is longer than I can listen to in one go (about five minutes). Send it in shorter parts.",
+  voiceTooLong: "That recording is longer than I can listen to. A Telegram voice note can be up to 45 minutes; other audio files up to about five. Send it in shorter parts.",
+  listening: "Listening to a long recording. This takes a minute or two.",
+  sensitive: "This answer uses data room, LP or KYC records, so I'm not sending the detail through Telegram. The full answer is in Anker AI.",
+  forgotten: (n: number) => `Done. I removed ${n} message${n === 1 ? "" : "s"} from the last 48 hours here, and cleared this conversation in Anker. Telegram only lets me delete messages from the last 48 hours; older ones you can delete yourself.`,
   noSpeech: "I couldn't hear any speech in that. Try recording again closer to the microphone.",
   fileTooBig: "Telegram only lets me download files up to 20 MB. Upload larger files in Anker.",
   fileType: "I can read PDF, Word and Excel files, text files and pictures. I can't open that kind of file.",
@@ -73,7 +86,7 @@ export const MSG = {
   unlinked: "Disconnected. I will not respond here until you connect again from Anker.",
   tooLong: "That took too long and I stopped. Please try a shorter or more specific question.",
   failed: "I couldn't answer that just now. Please try again in a moment.",
-  help: "I'm Anker AI. Ask me about your workspace in plain language, for example: \"who did I contact last week?\" or \"move Katja to Contacted\".\n\nWhen I want to change something, I show you the change with Approve and Reject buttons. Nothing is changed until you tap Approve, and I never send email or messages to other people from here.\n\n/today what needs you today\n/inbox changes waiting for your approval\n/mode whether I may propose changes\n/whoami which workspace this is\n/unlink disconnect this device",
+  help: "I'm Anker AI. Ask me about your workspace in plain language, for example: \"who did I contact last week?\" or \"move Katja to Contacted\".\n\nWhen I want to change something, I show you the change with Approve and Reject buttons. Nothing is changed until you tap Approve, and I never send email or messages to other people from here.\n\n/today what needs you today\n/inbox changes waiting for your approval\n/mode whether I may propose changes\n/whoami which workspace this is\n/forget delete this chat's recent messages\n/unlink disconnect this device",
   readOnly: "This device is read-only: I can answer but not propose changes. To allow changes, open Anker, Connected channels, and switch on \"Allow changes\" for this device.",
   noPending: "Nothing is waiting for your approval.",
   stale: "That proposal is no longer waiting.",
@@ -106,6 +119,8 @@ export async function handleUpdate(update: TgUpdate, deps: Deps): Promise<void> 
   if (/^\/unlink(?:@\w+)?$/i.test(text)) { await revokeByTelegramUser(tgId); await reply(deps, chatId, MSG.unlinked); return }
   if (link.status === "pending") { await reply(deps, chatId, MSG.pending); return }
   if (link.status === "suspended") { await reply(deps, chatId, MSG.suspended); return }
+  await deps.remember(link, chatId, m.message_id).catch(() => {})
+  if (/^\/forget(?:@\w+)?$/i.test(text)) { await reply(deps, chatId, MSG.forgotten(await deps.forget(link, chatId))); return }
 
   if ((await touchLink(link)) === "suspended") { await reply(deps, chatId, MSG.suspended); return }
   if (/^\/(help|start)(?:@\w+)?$/i.test(text)) { await reply(deps, chatId, MSG.help); return }
@@ -143,17 +158,30 @@ const failureText = (e: unknown) => ((e as Error)?.name === "TimeoutError" ? MSG
 async function answerQuestion(link: LinkRow, chatId: number, text: string, deps: Deps, attachments?: Attachments, label?: string): Promise<void> {
   await deps.api.sendChatAction(chatId)
   const history = await recentHistory(link)
-  let answer: string, runId: string | null = null
-  try { const r = await deps.ask(link, text, history, attachments); answer = r.answer; runId = r.runId ?? null }
+  let r: Awaited<ReturnType<Deps["ask"]>>
+  try { r = await deps.ask(link, text, history, attachments) }
   catch (e) { await reply(deps, chatId, failureText(e)); return }
-  for (const part of answerToParts(answer, `${deps.appUrl}/dashboard/anker-ai`)) await deps.api.sendMessage(chatId, part)
+  const answer = r.answer, runId = r.runId ?? null
+  // The full answer always goes into the workspace's own chat in Anker. What goes through Telegram depends on what it was made from.
   await appendToChat(link, label ? `${label} ${text}` : text, answer)
+  if (r.sensitive) {
+    await deps.api.sendMessage(chatId, esc(MSG.sensitive), { inline_keyboard: [[{ text: "Open Anker AI", url: `${deps.appUrl}/dashboard/anker-ai` }]] })
+    if (runId) { const ps = await deps.newProposals(link, runId); if (ps.length) await deps.api.sendMessage(chatId, esc(`${ps.length} change${ps.length === 1 ? " is" : "s are"} waiting for your approval in Anker.`), { inline_keyboard: [[{ text: "Open in Anker", url: `${deps.appUrl}/dashboard/actions` }]] }) }
+    return
+  }
+  for (const part of answerToParts(answer, `${deps.appUrl}/dashboard/anker-ai`)) await deps.api.sendMessage(chatId, part)
+  for (const f of (r.artifacts ?? []).slice(0, 3)) await deps.sendFile(link, chatId, f).catch(() => false)
+  const mp3 = await deps.voiceReply(link, answer).catch(() => null)
+  if (mp3) await deps.api.sendVoice(chatId, mp3).catch(() => {})
   // Changes the assistant proposed in this run, each with its own buttons. Nothing has been applied.
   if (runId) { const ps = await deps.newProposals(link, runId); if (ps.length) await sendProposals(deps, link, chatId, ps) }
 }
 
 // ───────────── voice notes and files (T3) ─────────────
 const AUDIO_MAX_SECONDS = 300, AUDIO_MAX_BYTES = 7 * 1024 * 1024, FILE_MAX_BYTES = 20 * 1024 * 1024
+/** A Telegram voice note is Ogg/Opus, which is cut into pieces (docs/architecture/57 T4): up to 45 minutes and the 20 MB the bot can download. Other audio stays at about five minutes. */
+const VOICE_MAX_SECONDS = 45 * 60
+const OGG_NAME = /\.(ogg|oga|opus)$/i
 const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|oga|flac|webm)$/i
 const FILE_EXT = /\.(pdf|docx?|xlsx|png|jpe?g|webp|txt|md|csv|json|tsv)$/i
 const DEFAULT_FILE_PROMPT = "Summarise this in a few short lines. Say what kind of document it is, and list any dates, amounts, and the names of people or firms."
@@ -168,9 +196,12 @@ async function handleMedia(m: TgMessage, link: LinkRow, deps: Deps): Promise<voi
   const refusal = await deps.gate(link); if (refusal) { await reply(deps, chatId, refusal); return }
 
   if (audio) {
-    if ((audio.duration ?? 0) > AUDIO_MAX_SECONDS || (audio.file_size ?? 0) > AUDIO_MAX_BYTES) { await reply(deps, chatId, MSG.voiceTooLong); return }
+    const longOk = !!m.voice || OGG_NAME.test((m.audio?.file_name ?? m.document?.file_name) ?? "")
+    const tooLong = longOk ? (audio.duration ?? 0) > VOICE_MAX_SECONDS || (audio.file_size ?? 0) > FILE_MAX_BYTES : (audio.duration ?? 0) > AUDIO_MAX_SECONDS || (audio.file_size ?? 0) > AUDIO_MAX_BYTES
+    if (tooLong) { await reply(deps, chatId, MSG.voiceTooLong); return }
     const limit = await deps.allow(link, "voice"); if (limit) { await reply(deps, chatId, limit); return }
     await deps.api.sendChatAction(chatId)
+    if ((audio.duration ?? 0) > AUDIO_MAX_SECONDS) await reply(deps, chatId, MSG.listening)
     let text: string
     try { text = (await deps.media.voice(link, { fileId: audio.file_id, name: (m.audio?.file_name ?? m.document?.file_name) || (m.voice ? "voice.ogg" : `audio.${(audio.mime_type ?? "audio/mpeg").split("/")[1]?.replace("mpeg", "mp3") || "mp3"}`) })).trim() }
     catch (e) { await reply(deps, chatId, failureText(e)); return }

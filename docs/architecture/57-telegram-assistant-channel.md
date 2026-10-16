@@ -159,3 +159,18 @@ Telegram groups and channels; payments or invoicing through the bot; the bot mak
 - **Limits:** 40 voice notes and 30 files per device per day; each refusal says so in words.
 - **Not in T3:** saving a file to the data room or to a CRM contact (a proposal, planned for T4), longer recordings, voice replies, and a per-workspace setting for the daily limits (fixed constants for now).
 - 23 more tests (suite 1,910 passing).
+
+## 18. Build status, T4 (2026-10-16)
+Built, tested (1937 Anker tests, 188 SAIL tests, typecheck clean), migration `2026-10-16l-telegram-t4.sql` applied to Neon and recorded.
+- **Configurable limits.** The four daily numbers (voice notes per device, files per device, audio minutes per workspace, spoken replies per workspace) are now entitlement limits (`telegram_voice_per_day`, `telegram_files_per_day`, `telegram_audio_minutes_per_day`, `telegram_voice_replies_per_day`), set per workspace in SAIL. Defaults 40 / 30 / 120 / 20 apply when nothing is set; `unlimited` is stored as -1.
+- **Longer recordings.** A Telegram voice note may now be up to 45 minutes (20 MB, Telegram's download limit): the Ogg/Opus file is split at page boundaries into pieces of about four minutes, transcribed three at a time and joined. Other audio files stay at five minutes / 7 MB. The audio length is stored (`telegram_updates.units`) to meter the workspace's daily minutes.
+- **Voice replies.** Off by default; each device can switch "read my answers aloud" on. The answer is spoken with Qwen TTS, encoded to MP3 (lamejs) and sent as a voice message after the text. A failure never loses the text. Capped per workspace per day.
+- **Files out.** Files the assistant generates (up to three per answer, 20 MB each) are sent as documents, only if they belong to this workspace.
+- **Sensitive answers.** Answers built from data room, LP or KYC records send no detail through Telegram, no voice and no file: only a pointer to Anker AI. The full answer is saved in the workspace's own chat.
+- **/forget.** Deletes the last 48 hours of messages in the chat (both sides, from the ids kept in `telegram_sent`, no text), clears the conversation in Anker and the held transcripts. Telegram does not let a bot delete older messages; the reply says so.
+- **Daily brief.** Opt-in per device; one message each morning (after quiet hours) naming pending approvals, today's and overdue task titles and new replies. It replaces the plain task-count notification and is the one message that names things, because the person asked for it.
+
+Caveats, stated plainly:
+- **Not verified live.** ASR, TTS and Telegram delivery have been tested against mocks and recorded fixtures only; the product bot does not exist yet (founder step: BotFather, `TELEGRAM_PRODUCT_BOT_TOKEN`, webhook, feature, flag).
+- **LGPL.** `lamejs` (MP3 encoding) is LGPL; it is used unmodified as a dependency. Counsel should confirm this is acceptable for the distribution model.
+- Deferred: save-to-data-room and CRM notes as proposals, agent-result messages, T5.

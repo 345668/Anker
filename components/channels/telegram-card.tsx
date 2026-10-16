@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 
-interface Prefs { approvals: boolean; replies: boolean; deadlines: boolean }
+interface Prefs { approvals: boolean; replies: boolean; deadlines: boolean; voiceReplies: boolean; dailyBrief: boolean }
 interface Link { id: string; mine: boolean; username: string | null; mode: string; status: string; linkedAt: string; lastSeenAt: string | null; prefs: Prefs }
 interface State { available: boolean; reason: string | null; bot: string | null; canManageAll: boolean; canWrite: boolean; ttlMinutes: number; links: Link[] }
 const STATUS: Record<string, string> = { pending: "Waiting for your approval", active: "Connected", suspended: "Paused (idle for a long time)" }
@@ -59,9 +59,10 @@ export function TelegramCard() {
                 <div className="mt-3 space-y-2 border-t pt-3">
                   <label className="flex items-start gap-2"><input type="checkbox" className="mt-1" checked={l.mode === "write"} disabled={busy || !s.canWrite} onChange={(e) => act(l.id, "mode", { mode: e.target.checked ? "write" : "read" })} /><span>Allow changes. The bot proposes, you approve each change with a tap.{!s.canWrite ? " (Your role in this workspace cannot make changes.)" : ""}</span></label>
                   <fieldset><legend className="font-medium">Message me when</legend>
-                    {([["approvals", "changes are waiting for my approval"], ["replies", "someone replies to my outreach"], ["deadlines", "tasks are due (once each morning)"]] as const).map(([k, t]) => (
+                    {([["approvals", "changes are waiting for my approval"], ["replies", "someone replies to my outreach"], ["deadlines", "tasks are due (once each morning)"], ["dailyBrief", "send me a short brief each morning (replaces the task message; names the tasks)"]] as const).map(([k, t]) => (
                       <label key={k} className="mt-1 flex items-center gap-2"><input type="checkbox" checked={l.prefs[k]} disabled={busy} onChange={(e) => act(l.id, "prefs", { ...l.prefs, [k]: e.target.checked })} />{t}</label>))}
-                    <p className="mt-1 text-xs text-muted-foreground">Messages say how many, never who or what. Nothing is sent between 22:00 and 07:00 Berlin time; it waits for the morning.</p>
+                    <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={l.prefs.voiceReplies} disabled={busy} onChange={(e) => act(l.id, "prefs", { ...l.prefs, voiceReplies: e.target.checked })} />Also read my answers aloud (a short voice message after the text)</label>
+                    <p className="mt-1 text-xs text-muted-foreground">Notifications say how many, never who or what; the morning brief is the exception and lists task titles. Nothing is sent between 22:00 and 07:00 Berlin time; it waits for the morning.</p>
                   </fieldset>
                 </div>)}
               </li>

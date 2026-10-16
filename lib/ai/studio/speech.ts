@@ -46,7 +46,7 @@ export const speechSchema = z
   })
   .strict()
 export type SpeechInput = z.infer<typeof speechSchema>
-async function speakLine(voice: string, text: string, language: string) {
+export async function speakLine(voice: string, text: string, language: string) {
   const j = await providerCall("services/aigc/multimodal-generation/generation", {
     timeout: 45000,
     body: {

@@ -25,8 +25,8 @@ const TG = 1810594739, CHAT = 1810594739
 const sent: Array<{ chat: number; html: string }> = []
 const left: number[] = []
 const deps = (o: Partial<Deps> = {}): Deps => ({
-  api: { sendMessage: async (c, h) => { sent.push({ chat: c, html: h }) }, editMessage: async () => {}, answerCallback: async () => {}, sendChatAction: async () => {}, leaveChat: async (c) => { left.push(c) } },
-  gate: async () => null, ask: async () => ({ answer: "Here is your answer." }), newProposals: async () => [], pending: async () => [], decide: async () => { throw new Error("not used") }, today: async () => ({ pending: 0, tasksToday: 0, overdue: 0, replies24h: 0 }), shown: async () => {}, media: { voice: async () => "", file: async () => ({ text: "", refs: [], names: [] }) }, allow: async () => null, stash: async () => "id", readPending: async () => null, dropPending: async () => {}, saveNote: async () => ({ title: "t", duplicate: false }), appUrl: "https://app.test", ...o,
+  api: { sendMessage: async (c, h) => { sent.push({ chat: c, html: h }) }, editMessage: async () => {}, answerCallback: async () => {}, sendChatAction: async () => {}, sendVoice: async () => {}, leaveChat: async (c) => { left.push(c) } },
+  gate: async () => null, ask: async () => ({ answer: "Here is your answer." }), newProposals: async () => [], pending: async () => [], decide: async () => { throw new Error("not used") }, today: async () => ({ pending: 0, tasksToday: 0, overdue: 0, replies24h: 0 }), shown: async () => {}, media: { voice: async () => "", file: async () => ({ text: "", refs: [], names: [] }) }, voiceReply: async () => null, sendFile: async () => false, forget: async () => 0, remember: async () => {}, allow: async () => null, stash: async () => "id", readPending: async () => null, dropPending: async () => {}, saveNote: async () => ({ title: "t", duplicate: false }), appUrl: "https://app.test", ...o,
 })
 let uid = 1000
 const msg = (text: string | undefined, o: Record<string, unknown> = {}, from = TG, chat = CHAT, type = "private"): TgUpdate => ({ update_id: ++uid, message: { message_id: uid, from: { id: from, username: "rick" }, chat: { id: chat, type }, text, ...o } })
@@ -47,7 +47,9 @@ beforeAll(async () => {
     CREATE TABLE plan_catalog (plan text PRIMARY KEY, features jsonb DEFAULT '{}');
     INSERT INTO organizations VALUES ('o1', 'Acme Fund');`)
   await db.exec(readFileSync("scripts/migrations/2026-10-16i-telegram-channel.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-16j-telegram-t2.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16k-telegram-t3.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-16l-telegram-t4.sql", "utf8"))
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => { sent.length = 0; left.length = 0; await db.exec("DELETE FROM telegram_updates; DELETE FROM telegram_links; DELETE FROM telegram_link_codes; DELETE FROM anker_chats") })
@@ -217,7 +219,7 @@ describe("the update queue", () => {
   })
   it("a failure is retried up to three times and then given up on, with the content wiped and no content in the error", async () => {
     await activeLink(); const u = msg("hello"); await enqueue(u)
-    const boom = deps({ api: { sendMessage: async () => { throw new Error("telegram down") }, editMessage: async () => {}, answerCallback: async () => {}, sendChatAction: async () => {}, leaveChat: async () => {} } })
+    const boom = deps({ api: { sendMessage: async () => { throw new Error("telegram down") }, editMessage: async () => {}, answerCallback: async () => {}, sendChatAction: async () => {}, sendVoice: async () => {}, leaveChat: async () => {} } })
     for (let i = 1; i < MAX_ATTEMPTS; i++) { expect(await processUpdate(u.update_id, boom)).toBe("failed"); expect((await rows("SELECT status FROM telegram_updates"))[0].status).toBe("queued") }
     expect(await processUpdate(u.update_id, boom)).toBe("failed")
     expect((await rows("SELECT status, payload_enc, error, attempts FROM telegram_updates"))[0]).toEqual({ status: "failed", payload_enc: null, error: "telegram down", attempts: MAX_ATTEMPTS })

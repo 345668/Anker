@@ -79,24 +79,24 @@ export async function reactivateLink(linkId: string, userId: string): Promise<Li
   return r ?? null
 }
 
-export interface Prefs { approvals: boolean; replies: boolean; deadlines: boolean }
+export interface Prefs { approvals: boolean; replies: boolean; deadlines: boolean; voiceReplies: boolean; dailyBrief: boolean }
 /** Switches a device between read-only and "may propose changes". Only the person who owns the device; the person must be able to write in the workspace (checked by the caller). */
 export async function setMode(linkId: string, userId: string, mode: "read" | "write"): Promise<LinkRow | null> {
   const [r] = (await sql`UPDATE telegram_links SET mode = ${mode} WHERE id = ${linkId} AND user_id = ${userId} AND status = 'active' RETURNING *`) as any[]
   return r ?? null
 }
-/** Notification opt-ins for one device. The watermarks start now, so turning a switch on never floods the chat with old items. */
+/** Notification and reply preferences for one device. The watermarks start now, so turning a switch on never floods the chat with old items. */
 export async function setPrefs(linkId: string, userId: string, orgId: string, p: Prefs): Promise<boolean> {
   const [l] = (await sql`SELECT id FROM telegram_links WHERE id = ${linkId} AND user_id = ${userId} AND org_id = ${orgId} AND status = 'active'`) as any[]
   if (!l) return false
-  await sql`INSERT INTO telegram_prefs (link_id, org_id, approvals, replies, deadlines) VALUES (${linkId}, ${orgId}, ${p.approvals}, ${p.replies}, ${p.deadlines})
-    ON CONFLICT (link_id) DO UPDATE SET approvals = EXCLUDED.approvals, replies = EXCLUDED.replies, deadlines = EXCLUDED.deadlines, updated_at = now(),
+  await sql`INSERT INTO telegram_prefs (link_id, org_id, approvals, replies, deadlines, voice_replies, daily_brief) VALUES (${linkId}, ${orgId}, ${p.approvals}, ${p.replies}, ${p.deadlines}, ${!!p.voiceReplies}, ${!!p.dailyBrief})
+    ON CONFLICT (link_id) DO UPDATE SET approvals = EXCLUDED.approvals, replies = EXCLUDED.replies, deadlines = EXCLUDED.deadlines, voice_replies = EXCLUDED.voice_replies, daily_brief = EXCLUDED.daily_brief, updated_at = now(),
       last_approvals_at = CASE WHEN telegram_prefs.approvals THEN telegram_prefs.last_approvals_at ELSE now() END,
       last_replies_at = CASE WHEN telegram_prefs.replies THEN telegram_prefs.last_replies_at ELSE now() END`
   return true
 }
 export async function getPrefs(linkIds: string[]): Promise<Record<string, Prefs>> {
   if (!linkIds.length) return {}
-  const rows = (await sql`SELECT link_id, approvals, replies, deadlines FROM telegram_prefs WHERE link_id = ANY(${linkIds}::text[])`) as any[]
-  return Object.fromEntries(rows.map((r) => [r.link_id, { approvals: !!r.approvals, replies: !!r.replies, deadlines: !!r.deadlines }]))
+  const rows = (await sql`SELECT link_id, approvals, replies, deadlines, voice_replies, daily_brief FROM telegram_prefs WHERE link_id = ANY(${linkIds}::text[])`) as any[]
+  return Object.fromEntries(rows.map((r) => [r.link_id, { approvals: !!r.approvals, replies: !!r.replies, deadlines: !!r.deadlines, voiceReplies: !!r.voice_replies, dailyBrief: !!r.daily_brief }]))
 }

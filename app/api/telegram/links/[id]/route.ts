@@ -37,7 +37,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json({ ok: true })
     }
     if (b?.action === "prefs") {
-      const ok = await setPrefs(id, p.userId, p.orgId ?? "", { approvals: b.approvals === true, replies: b.replies === true, deadlines: b.deadlines === true })
+      const ok = await setPrefs(id, p.userId, p.orgId ?? "", { approvals: b.approvals === true, replies: b.replies === true, deadlines: b.deadlines === true, voiceReplies: b.voiceReplies === true, dailyBrief: b.dailyBrief === true })
       if (!ok) throw new WorkspaceError("Device not found.", 404)
       await logAudit({ actorId: p.userId, action: "telegram.link_prefs", targetType: "workspace", targetId: p.orgId ?? "", metadata: { link: id } })
       return NextResponse.json({ ok: true })

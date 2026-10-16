@@ -29,6 +29,7 @@
     "@ai-sdk/openai-compatible": "^2.0.48",
     "@ai-sdk/react": "^3.0.170",
     "@anthropic-ai/sdk": "^0.90.0",
+    "@breezystack/lamejs": "^1.2.7",
     "@crawlee/cheerio": "^3.13.0",
     "@electric-sql/pglite": "^0.3.10",
     "@hookform/resolvers": "^3.10.0",

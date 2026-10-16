@@ -24,10 +24,12 @@ export function secretOk(presented: string | null | undefined, bot: ProductBot |
 export class TelegramError extends Error { constructor(message: string, readonly status: number | null = null) { super(message); this.name = "TelegramError" } }
 type Fetch = typeof fetch
 
-async function call<T = any>(bot: ProductBot, method: string, body: Record<string, unknown> = {}, f: Fetch = fetch, timeoutMs = 10_000): Promise<T> {
+async function call<T = any>(bot: ProductBot, method: string, body: Record<string, unknown> | FormData = {}, f: Fetch = fetch, timeoutMs = 10_000): Promise<T> {
   let res: Response
   try {
-    res = await f(`https://api.telegram.org/bot${bot.token}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) })
+    res = await f(`https://api.telegram.org/bot${bot.token}/${method}`, body instanceof FormData
+      ? { method: "POST", body, signal: AbortSignal.timeout(timeoutMs) }
+      : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) })
   } catch (e) { throw new TelegramError(`telegram unreachable: ${String((e as Error)?.message ?? e).split(bot.token).join("[token]")}`.slice(0, 200)) }
   const json: any = await res.json().catch(() => ({}))
   if (!res.ok || json?.ok === false) throw new TelegramError(`telegram ${method} refused (${res.status})${json?.description ? `: ${String(json.description).split(bot.token).join("[token]")}` : ""}`.slice(0, 200), res.status)
@@ -66,3 +68,17 @@ export async function downloadFile(bot: ProductBot, fileId: string, maxBytes = B
   for (;;) { const { value, done } = await reader.read(); if (done) break; n += value.byteLength; if (n > maxBytes) { await reader.cancel(); throw new TelegramError("file too large") } chunks.push(value) }
   return Buffer.concat(chunks)
 }
+
+/** Telegram accepts uploads from a bot up to 50 MB; we send at most 20 MB. MP3 plays as a voice message. */
+const upload = (bot: ProductBot, method: string, field: string, chatId: number, bytes: Buffer, filename: string, mime: string, extra: Record<string, string> = {}, f?: Fetch) => {
+  const form = new FormData()
+  form.set("chat_id", String(chatId))
+  for (const [k, v] of Object.entries(extra)) form.set(k, v)
+  form.set(field, new Blob([new Uint8Array(bytes)], { type: mime }), filename)
+  return call<{ message_id: number }>(bot, method, form, f, 60_000)
+}
+export const sendVoice = (bot: ProductBot, chatId: number, mp3: Buffer, f?: Fetch) => upload(bot, "sendVoice", "voice", chatId, mp3, "reply.mp3", "audio/mpeg", {}, f)
+export const sendDocument = (bot: ProductBot, chatId: number, bytes: Buffer, filename: string, mime: string, caption?: string, f?: Fetch) =>
+  upload(bot, "sendDocument", "document", chatId, bytes, filename, mime, caption ? { caption: caption.slice(0, 900) } : {}, f)
+/** Deletes up to 100 messages at once; Telegram allows it for messages younger than 48 hours. */
+export const deleteMessages = (bot: ProductBot, chatId: number, ids: number[], f?: Fetch) => call(bot, "deleteMessages", { chat_id: chatId, message_ids: ids.slice(0, 100) }, f)

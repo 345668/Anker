@@ -296,6 +296,7 @@
     "telegram_links",
     "telegram_pending",
     "telegram_prefs",
+    "telegram_sent",
     "telegram_shown",
     "telegram_updates",
     "tenant_entitlements",
@@ -617,6 +618,9 @@
       "org_id"
     ],
     "telegram_prefs": [
+      "org_id"
+    ],
+    "telegram_sent": [
       "org_id"
     ],
     "telegram_shown": [

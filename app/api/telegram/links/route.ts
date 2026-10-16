@@ -23,7 +23,7 @@ export async function GET() {
     const bot = productBot(), reason = bot ? await gate({ org_id: p.orgId }) : "The Telegram bot has not been set up yet."
     const links = await listLinks(p.userId, p.orgId, mgr(p))
     const prefs = await getPrefs(links.filter((l) => l.user_id === p.userId).map((l) => l.id))
-    return NextResponse.json({ available: !reason, reason, bot: bot ? await botUsername(bot) : null, canManageAll: mgr(p), canWrite: p.canWrite, me: p.userId, ttlMinutes: CODE_TTL_MIN, links: links.map((l) => ({ id: l.id, userId: l.user_id, mine: l.user_id === p.userId, username: l.telegram_username, mode: l.mode, status: l.status, linkedAt: l.linked_at, lastSeenAt: l.last_seen_at, prefs: prefs[l.id] ?? { approvals: false, replies: false, deadlines: false } })) }, { headers: noStore })
+    return NextResponse.json({ available: !reason, reason, bot: bot ? await botUsername(bot) : null, canManageAll: mgr(p), canWrite: p.canWrite, me: p.userId, ttlMinutes: CODE_TTL_MIN, links: links.map((l) => ({ id: l.id, userId: l.user_id, mine: l.user_id === p.userId, username: l.telegram_username, mode: l.mode, status: l.status, linkedAt: l.linked_at, lastSeenAt: l.last_seen_at, prefs: prefs[l.id] ?? { approvals: false, replies: false, deadlines: false, voiceReplies: false, dailyBrief: false } })) }, { headers: noStore })
   } catch (e) { return workspaceError(e) }
 }
 
