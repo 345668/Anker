@@ -196,6 +196,10 @@ describe("channels", () => {
     expect(defaultChannels({}).map((c) => c.name)).toEqual(["email"])
     expect(defaultChannels({ TELEGRAM_BOT_TOKEN: "1234567890:AAH-abcdefghijklmnopqrstuvwxyz012345", TELEGRAM_CHAT_ID: "123456789" }).map((c) => c.name)).toEqual(["email", "telegram"])
   })
+  it("each configured Telegram chat is its own channel, so one failing chat does not hide the others", () => {
+    const names = defaultChannels({ TELEGRAM_BOT_TOKEN: "1234567890:AAH-abcdefghijklmnopqrstuvwxyz012345", TELEGRAM_CHAT_ID: "123456789", TELEGRAM_CHAT_ID_2: "987654321" }).map((c) => c.name)
+    expect(names).toEqual(["email", "telegram", "telegram 2"])
+  })
   it("a test notification reports each channel's result", async () => {
     expect(await sendTestNotification(channels(false, true))).toEqual([{ channel: "email", ok: true }, { channel: "telegram", ok: false, error: "telegram refused (401)" }])
     expect(sent[0].subject).toBe("[Anker test] alert delivery")

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { telegramConfig, telegramText, sendTelegram } from "./telegram"
+import { telegramConfig, telegramConfigs, telegramChats, telegramText, sendTelegram } from "./telegram"
 
 const TOKEN = "1234567890:AAH-abcdefghijklmnopqrstuvwxyz012345"
 describe("telegramConfig", () => {
@@ -8,6 +8,20 @@ describe("telegramConfig", () => {
     expect(telegramConfig({ TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_CHAT_ID: "-1001234567890" })?.chatId).toBe("-1001234567890")
     expect(telegramConfig({ TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_CHAT_ID: "@anker_alerts" })?.chatId).toBe("@anker_alerts")
     for (const env of [{}, { TELEGRAM_BOT_TOKEN: TOKEN }, { TELEGRAM_CHAT_ID: "123456789" }, { TELEGRAM_BOT_TOKEN: "not-a-token", TELEGRAM_CHAT_ID: "123456789" }, { TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_CHAT_ID: "me" }]) expect(telegramConfig(env)).toBeNull()
+  })
+})
+describe("more than one chat", () => {
+  const base = { TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_CHAT_ID: "123456789" }
+  it("reads TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID_2 to _9, ignoring repeats and malformed ids", () => {
+    expect(telegramChats({ ...base, TELEGRAM_CHAT_ID_2: "987654321", TELEGRAM_CHAT_ID_3: "123456789", TELEGRAM_CHAT_ID_4: "nope", TELEGRAM_CHAT_ID_5: " -1001234567890 " })).toEqual(["123456789", "987654321", "-1001234567890"])
+    expect(telegramChats({})).toEqual([])
+  })
+  it("one config per chat with the same bot, none without a valid token, and the single-chat form still works", () => {
+    expect(telegramConfigs({ ...base, TELEGRAM_CHAT_ID_2: "987654321" }).map((c) => c.chatId)).toEqual(["123456789", "987654321"])
+    expect(telegramConfigs({ TELEGRAM_CHAT_ID: "123456789" })).toEqual([])
+    expect(telegramConfigs({ ...base, TELEGRAM_BOT_TOKEN: "bad" })).toEqual([])
+    expect(telegramConfig({ ...base, TELEGRAM_CHAT_ID_2: "987654321" })?.chatId).toBe("123456789")
+    expect(telegramConfig({ TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_CHAT_ID_2: "987654321" })?.chatId).toBe("987654321")
   })
 })
 describe("telegramText", () => {

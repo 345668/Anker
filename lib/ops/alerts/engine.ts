@@ -2,7 +2,7 @@ import "server-only"
 import { sql } from "@/lib/db"
 import { evaluate, alerterStale, RULE_KEYS, type Finding, type RuleKey, type Snapshot } from "./rules"
 import { RUNBOOKS } from "./runbooks"
-import { sendTelegram, telegramConfig, telegramText } from "./telegram"
+import { sendTelegram, telegramConfigs, telegramText } from "./telegram"
 
 /**
  * The alert engine (docs/architecture/56, A1). It turns the facts the platform already collects into incidents and tells a person once.
@@ -31,8 +31,7 @@ export async function defaultDeliver(m: Message): Promise<void> {
 /** The channels that are switched on: email always, Telegram when its two variables are set. */
 export function defaultChannels(env: Record<string, string | undefined> = process.env): Channel[] {
   const out: Channel[] = [{ name: "email", send: defaultDeliver }]
-  const tg = telegramConfig(env)
-  if (tg) out.push({ name: "telegram", send: async (m) => sendTelegram(tg, telegramText(m.subject, m.text)) })
+  telegramConfigs(env).forEach((tg, i) => out.push({ name: i === 0 ? "telegram" : `telegram ${i + 1}`, send: async (m) => sendTelegram(tg, telegramText(m.subject, m.text)) }))
   return out
 }
 

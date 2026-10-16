@@ -4,9 +4,23 @@
  */
 export interface TelegramConfig { token: string; chatId: string }
 
+const CHAT_OK = /^-?\d{3,}$|^@\w{4,}$/
+/** Every configured chat: TELEGRAM_CHAT_ID, then TELEGRAM_CHAT_ID_2 to _9. Malformed or repeated ids are ignored. */
+export function telegramChats(env: Record<string, string | undefined> = process.env): string[] {
+  const ids = [env.TELEGRAM_CHAT_ID, ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => env[`TELEGRAM_CHAT_ID_${n}`])].map((x) => (x ?? "").trim()).filter((x) => CHAT_OK.test(x))
+  return [...new Set(ids)]
+}
+
+/** The first configured chat (the original single-chat form). */
 export function telegramConfig(env: Record<string, string | undefined> = process.env): TelegramConfig | null {
-  const token = (env.TELEGRAM_BOT_TOKEN ?? "").trim(), chatId = (env.TELEGRAM_CHAT_ID ?? "").trim()
-  return /^\d{5,}:[\w-]{20,}$/.test(token) && /^-?\d{3,}$|^@\w{4,}$/.test(chatId) ? { token, chatId } : null
+  const token = (env.TELEGRAM_BOT_TOKEN ?? "").trim(), chats = telegramChats(env)
+  return /^\d{5,}:[\w-]{20,}$/.test(token) && chats.length ? { token, chatId: chats[0] } : null
+}
+
+/** One config per chat, all with the same bot. */
+export function telegramConfigs(env: Record<string, string | undefined> = process.env): TelegramConfig[] {
+  const token = (env.TELEGRAM_BOT_TOKEN ?? "").trim()
+  return /^\d{5,}:[\w-]{20,}$/.test(token) ? telegramChats(env).map((chatId) => ({ token, chatId })) : []
 }
 
 /** A message short enough to read on a lock screen: the subject, the summary, and the first thing to do. */
