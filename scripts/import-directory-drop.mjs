@@ -356,6 +356,14 @@ function diff(existing, incoming) {
 }
 
 async function main() {
+  if (APPLY) {
+    // The source register gate (docs/architecture/54 D1): a batch is applied only when its source has a licence record.
+    const [reg] = await q("SELECT status FROM directory_sources WHERE source = $1", [BATCH]).catch(() => [])
+    if (!reg || reg.status === "withdrawn") {
+      console.error(`Source "${BATCH}" is not in the directory source register${reg ? " (it is withdrawn)" : ""}. Record its licence and permitted use first (SAIL, Directory sources), then re-run.`)
+      process.exit(3)
+    }
+  }
   const dir = await loadDirectory()
   const seenPerson = new Map(), seenFirm = new Map()
   const stats = {

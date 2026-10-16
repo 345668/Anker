@@ -89,6 +89,8 @@ export interface GateInput { to: string; senderUserId?: string | null; recipient
 /** Throws SuppressedRecipientError or CountryGateError; returns normally when the email may be sent. */
 export async function assertOutreachAllowed(i: GateInput): Promise<void> {
   if (await isGloballySuppressed(i.to)) throw new SuppressedRecipientError(i.to)
+  // What the contact's directory source may be used for (docs/architecture/54 D1). Enforced for restricted and withdrawn sources; warn-only for unreviewed ones.
+  await (await import("@/lib/directory/sources")).enforceEmailUse(i.to)
   // The sender's workspace: paused, outreach not in the plan, or today's allowance used up (docs/architecture/41).
   await (await import("@/lib/entitlements")).assertSenderMayContact(i.senderUserId)
   if ((process.env.OUTREACH_COUNTRY_GATE ?? "on").toLowerCase() === "off") return

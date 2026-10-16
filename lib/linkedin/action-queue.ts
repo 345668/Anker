@@ -42,6 +42,8 @@ export async function enqueueAction(userId: string, input: EnqueueActionInput): 
   if (!ACTION_TYPES.includes(input.actionType)) throw new Error(`Invalid action_type: ${input.actionType}`)
   const targetUrl = String(input.targetUrl || "").trim()
   if (!targetUrl) throw new Error("targetUrl is required")
+  // What the contact's directory source may be used for (docs/architecture/54 D1): enforced for restricted and withdrawn sources, warn-only for unreviewed ones.
+  if (input.actionType === "connect_request" || input.actionType === "message" || input.actionType === "follow_up") await (await import("@/lib/directory/sources")).enforceLinkedInUse(targetUrl)
 
   const status: ActionStatus = input.autoApprove ? "queued" : "pending_approval"
   const approvedBy = input.autoApprove ? input.approvedBy ?? userId : null

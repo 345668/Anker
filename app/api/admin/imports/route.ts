@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { importCsv } from "@/lib/admin/csv-importer"
+import { importBlockedReason } from "@/lib/directory/sources"
 
 export const runtime = "nodejs"
 export const maxDuration = 600
@@ -37,6 +38,12 @@ export async function POST(req: NextRequest) {
     if (!source) return NextResponse.json({ error: "source tag required (e.g. csv:partner-list-2026)" }, { status: 400 })
     if (file.size > MAX_BYTES)
       return NextResponse.json({ error: `file too large (max ${MAX_BYTES / 1e6}MB)` }, { status: 400 })
+
+    // A batch is applied only when its source is in the directory source register (docs/architecture/54 D1). A dry run may preview an unregistered source.
+    if (!dryRun) {
+      const blocked = await importBlockedReason(source)
+      if (blocked) return NextResponse.json({ error: blocked, code: "source_not_registered" }, { status: 409 })
+    }
 
     const ab = await file.arrayBuffer()
     const report = await importCsv({

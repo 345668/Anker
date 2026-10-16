@@ -130,3 +130,12 @@ Each slice is tested and deployed alone; the `mayUse` gate and any new refusal s
 
 ## 17. Not in scope
 Customer-side DSAR tooling for a workspace's own contacts (a later product feature); consent management for newsletter signups beyond the existing unsubscribe; cookie banner changes; a full record of processing document (the register and this spec are its inputs); SOC 2 work (doc 37 section 8.5); the open-weights lane itself (doc 53).
+
+## 18. Build status
+**D1, the register (2026-10-16), Anker side built, tested and applied to production** (migration `2026-10-16-directory-sources`).
+- `directory_sources` holds one row per `source`. Backfill: 15 existing sources as `unreviewed` (permitted use internal matching only, no licence invented) and the vendor sample `drop:2026-10-13` as `restricted` (internal matching only). The flag `directory_use_gate` ships **off**.
+- `lib/directory/use-gate.ts` (pure decision) and `sources.ts`. **Restricted, withdrawn and recorded-but-not-permitting sources are enforced at once; unreviewed or unregistered ones only warn** (one audit entry, `directory.use_gate_would_block`, with source and purpose and never the address) until the flag is turned on. A person known through several sources is allowed when any one allows the use. A failure of the check never blocks a send.
+- Hooks: the email send gate (`assertOutreachAllowed`) and the LinkedIn action queue (connect, message, follow-up).
+- Import gate: `POST /api/admin/imports` refuses an unregistered or withdrawn source (409, dry runs excepted) and `scripts/import-directory-drop.mjs --apply` refuses likewise. `registerSource` never loosens a restricted or withdrawn source.
+- 20 new tests (pure decisions; the real migration on PGlite). Suite: 1,642 pass.
+- **Not built in D1:** the SAIL pages (review form, register, withdraw) are in SAIL; withdrawing a batch **blocks all use at once but does not yet delete rows or write tombstones** (that is D2). Known limit: a directory person who is also a workspace's own contact is gated by the directory source in enforcing mode; workspace-owned copies need an owner check before the flag is turned on for unreviewed sources.
