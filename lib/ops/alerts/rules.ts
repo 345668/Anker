@@ -6,8 +6,8 @@ import { CRON_MAX_AGE_MIN, type DepCheck } from "@/lib/ops/dependencies"
 
 export type Severity = 1 | 2 | 3
 export interface Finding { rule: RuleKey; subject: string; severity: Severity; summary: string; evidence: Record<string, unknown> }
-export type RuleKey = "cron_stale" | "cron_stuck" | "cron_failing" | "dependency_down" | "dependency_degraded" | "ai_failure_rate" | "privacy_request_due" | "alerter_stale"
-export const RULE_KEYS: RuleKey[] = ["cron_stale", "cron_stuck", "cron_failing", "dependency_down", "dependency_degraded", "ai_failure_rate", "privacy_request_due", "alerter_stale"]
+export type RuleKey = "cron_stale" | "cron_stuck" | "cron_failing" | "dependency_down" | "dependency_degraded" | "ai_failure_rate" | "privacy_request_due" | "telegram_queue" | "alerter_stale"
+export const RULE_KEYS: RuleKey[] = ["cron_stale", "cron_stuck", "cron_failing", "dependency_down", "dependency_degraded", "ai_failure_rate", "privacy_request_due", "telegram_queue", "alerter_stale"]
 /** What each rule is for, shown on the SAIL rules page. */
 export const RULE_INFO: Record<RuleKey, { label: string; text: string; defaultSeverity: Severity }> = {
   cron_stale: { label: "A scheduled job has stopped", text: "A job has not completed successfully for twice its interval.", defaultSeverity: 2 },
@@ -17,6 +17,7 @@ export const RULE_INFO: Record<RuleKey, { label: string; text: string; defaultSe
   dependency_degraded: { label: "A dependency has been degraded for days", text: "The nightly check has reported the same check as degraded three nights running. Digest only.", defaultSeverity: 3 },
   ai_failure_rate: { label: "AI calls are failing", text: "A provider's share of failed calls in the window is above the threshold.", defaultSeverity: 2 },
   privacy_request_due: { label: "A privacy request is due", text: "A confirmed request is due within 7 days or overdue.", defaultSeverity: 2 },
+  telegram_queue: { label: "The Telegram channel is backing up", text: "Messages to the Anker bot have waited over ten minutes, or several have failed in the last hour.", defaultSeverity: 2 },
   alerter_stale: { label: "The alert evaluator has stopped", text: "No successful evaluation for 30 minutes. Raised by the watchdog.", defaultSeverity: 1 },
 }
 export interface Thresholds { ai_failure_rate?: { rate?: number; minCalls?: number; windowMin?: number } }
@@ -43,6 +44,8 @@ export interface Snapshot {
   privacy?: Array<{ id: string; kind: string; dueAt: number }>
   /** Statuses of each check in the last three nightly runs, newest first. */
   depHistory?: Record<string, string[]>
+  /** Customer Telegram updates waiting over ten minutes, and failures in the last hour. */
+  telegram?: { stuck: number; failed1h: number }
 }
 
 const min = (ms: number) => Math.round(ms / 60000)
@@ -116,7 +119,13 @@ export function privacyRequestDue(s: Snapshot): Finding[] {
   return out
 }
 
+export function telegramQueue(s: Snapshot): Finding[] {
+  const t = s.telegram
+  if (!t || (t.stuck === 0 && t.failed1h < 3)) return []
+  return [{ rule: "telegram_queue", subject: "telegram-queue", severity: 2, summary: `Telegram: ${t.stuck} message(s) have waited over ten minutes and ${t.failed1h} failed in the last hour.`, evidence: { waitingOverTenMinutes: t.stuck, failedLastHour: t.failed1h } }]
+}
+
 export function evaluate(s: Snapshot, t: Thresholds = {}): Finding[] {
   const stuck = cronStuck(s)
-  return [...stuck, ...cronStale(s, new Set(stuck.map((f) => f.subject))), ...cronFailing(s), ...dependencyDown(s), ...dependencyDegraded(s), ...aiFailureRate(s, t), ...privacyRequestDue(s)]
+  return [...stuck, ...cronStale(s, new Set(stuck.map((f) => f.subject))), ...cronFailing(s), ...dependencyDown(s), ...dependencyDegraded(s), ...aiFailureRate(s, t), ...privacyRequestDue(s), ...telegramQueue(s)]
 }

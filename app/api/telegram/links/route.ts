@@ -1,0 +1,42 @@
+/**
+ * GET  /api/telegram/links  -> the signed-in person's Telegram devices in the active workspace (and every device, for an owner or admin), plus whether the channel is available.
+ * POST /api/telegram/links  { action: "code" } -> a single-use link code and the t.me address to open on the phone.
+ * Docs/architecture/57 section 4. The person and the workspace come from the session, never from the request.
+ */
+import { NextResponse } from "next/server"
+import { requireAiPrincipal } from "@/lib/assistant/principal"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
+import { productBot } from "@/lib/telegram/api"
+import { createLinkCode, listLinks, CODE_TTL_MIN } from "@/lib/telegram/links"
+import { botUsername, gate } from "@/lib/telegram/runtime"
+import { logAudit } from "@/lib/audit/audit-log"
+
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+const noStore = { "Cache-Control": "private, no-store" }
+const mgr = (p: Awaited<ReturnType<typeof requireAiPrincipal>>) => ["workspace_owner", "admin"].includes(p.membership?.orgRole ?? "")
+
+export async function GET() {
+  try {
+    const p = await requireAiPrincipal()
+    if (!p.orgId) return NextResponse.json({ available: false, reason: "Telegram connects to a company or fund workspace.", links: [] }, { headers: noStore })
+    const bot = productBot(), reason = bot ? await gate({ org_id: p.orgId }) : "The Telegram bot has not been set up yet."
+    const links = await listLinks(p.userId, p.orgId, mgr(p))
+    return NextResponse.json({ available: !reason, reason, bot: bot ? await botUsername(bot) : null, canManageAll: mgr(p), me: p.userId, ttlMinutes: CODE_TTL_MIN, links: links.map((l) => ({ id: l.id, userId: l.user_id, mine: l.user_id === p.userId, username: l.telegram_username, mode: l.mode, status: l.status, linkedAt: l.linked_at, lastSeenAt: l.last_seen_at })) }, { headers: noStore })
+  } catch (e) { return workspaceError(e) }
+}
+
+export async function POST(req: Request) {
+  try {
+    const p = await requireAiPrincipal()
+    const b = await req.json().catch(() => ({}))
+    if (b?.action !== "code") throw new WorkspaceError("Unknown action.", 400)
+    if (!p.orgId) throw new WorkspaceError("Telegram connects to a company or fund workspace.", 400)
+    const bot = productBot(); if (!bot) throw new WorkspaceError("The Telegram bot has not been set up yet.", 503)
+    const refusal = await gate({ org_id: p.orgId }); if (refusal) throw new WorkspaceError(refusal, 403)
+    const username = await botUsername(bot); if (!username) throw new WorkspaceError("Telegram could not be reached. Try again in a moment.", 503)
+    const { code, expiresAt } = await createLinkCode(p.userId, p.orgId)
+    await logAudit({ actorId: p.userId, action: "telegram.link_code_created", targetType: "workspace", targetId: p.orgId, metadata: {} })
+    return NextResponse.json({ url: `https://t.me/${username}?start=${code}`, expiresAt, ttlMinutes: CODE_TTL_MIN }, { headers: noStore })
+  } catch (e) { return workspaceError(e) }
+}

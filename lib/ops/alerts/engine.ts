@@ -72,6 +72,10 @@ export async function gatherMore(snap: Snapshot, thresholds: Thresholds): Promis
     snap.privacy = rows.map((r) => ({ id: String(r.id), kind: String(r.kind), dueAt: new Date(r.due).getTime() }))
   } catch { /* no privacy requests table */ }
   try {
+    const [t] = (await sql`SELECT count(*) FILTER (WHERE status IN ('queued', 'running') AND received_at < now() - interval '10 minutes')::int AS stuck, count(*) FILTER (WHERE status = 'failed' AND finished_at > now() - interval '1 hour')::int AS failed FROM telegram_updates`) as any[]
+    snap.telegram = { stuck: Number(t?.stuck ?? 0), failed1h: Number(t?.failed ?? 0) }
+  } catch { /* the channel's tables are not there yet */ }
+  try {
     const rows = (await sql`SELECT results FROM dependency_checks ORDER BY id DESC LIMIT 3`) as any[]
     const hist: Record<string, string[]> = {}
     for (const r of rows) for (const c of (typeof r.results === "string" ? JSON.parse(r.results) : r.results) ?? []) (hist[c.name] ??= []).push(String(c.status))

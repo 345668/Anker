@@ -1,0 +1,20 @@
+/**
+ * GET /api/cron/telegram-sweep — every minute. Processes Telegram updates the webhook could not start, or that a killed function left half done (docs/architecture/57).
+ * Auth: Vercel Cron `Authorization: Bearer $CRON_SECRET`; fails closed when unset. Does nothing when the product bot is not configured.
+ */
+import { NextRequest, NextResponse } from "next/server"
+import { productBot } from "@/lib/telegram/api"
+import { sweep, realDeps } from "@/lib/telegram/runtime"
+import { trackCron, isCronAuthorised } from "@/lib/cron/track"
+
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+export const maxDuration = 300
+
+async function handle(req: NextRequest) {
+  if (!isCronAuthorised(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const bot = productBot()
+  if (!bot) return NextResponse.json({ ok: true, configured: false })
+  try { return NextResponse.json({ ok: true, configured: true, ...(await sweep(realDeps(bot))) }) } catch (e: any) { console.error("[telegram-sweep]", e?.message ?? e); return NextResponse.json({ error: "Sweep failed" }, { status: 500 }) }
+}
+export const GET = trackCron("telegram-sweep", handle)

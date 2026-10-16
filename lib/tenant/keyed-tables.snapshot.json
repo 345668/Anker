@@ -23,6 +23,10 @@
     "ai_studio_scope_locks",
     "ai_studio_stages",
     "ai_subprocessors",
+    "alert_events",
+    "alert_heartbeat",
+    "alert_incidents",
+    "alert_rule_settings",
     "anker_chat_events",
     "anker_chats",
     "archived_contacts",
@@ -86,6 +90,7 @@
     "deck_templates",
     "decks",
     "dependency_checks",
+    "directory_candidates",
     "directory_erasure_notices",
     "directory_hash_meta",
     "directory_sources",
@@ -287,6 +292,9 @@
     "team_invitations",
     "team_members",
     "teams",
+    "telegram_link_codes",
+    "telegram_links",
+    "telegram_updates",
     "tenant_entitlements",
     "tenant_lifecycle",
     "tenant_lifecycle_events",
@@ -594,6 +602,15 @@
       "fund_id"
     ],
     "tasks": [
+      "org_id"
+    ],
+    "telegram_link_codes": [
+      "org_id"
+    ],
+    "telegram_links": [
+      "org_id"
+    ],
+    "telegram_updates": [
       "org_id"
     ],
     "tenant_entitlements": [

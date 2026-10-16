@@ -38,6 +38,11 @@ export const RUNBOOKS: Record<RuleKey, Runbook> = {
     check: "SAIL, Privacy requests: the request, the records found and its due date.",
     fix: "Act on the request (access, correct, restrict, erase) or, if it is complex, extend it once with a reason. Closing the request clears this incident.",
   },
+  telegram_queue: {
+    means: "Messages sent to the Anker bot by customers are waiting or failing: people are not getting answers on Telegram.",
+    check: "SAIL, Telegram channel: the queue, the webhook status and its last error. Vercel function logs for /api/telegram/webhook and the telegram-sweep cron. Telegram's own status.",
+    fix: "If the webhook is not registered or shows an error, register it again in SAIL. If the AI provider is failing, fix that first (the AI failure rule will also be open). The sweep retries waiting messages every minute, up to three times each.",
+  },
   alerter_stale: {
     means: "The alert evaluator itself has stopped. Until it runs again nothing is being watched, so any other fault would go unreported.",
     check: "Vercel, Cron Jobs: is alerts-evaluate scheduled and recent? Function logs for /api/cron/alerts-evaluate: an error, a timeout, a missing CRON_SECRET. SAIL, Alerts, the heartbeat line.",

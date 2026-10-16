@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { evaluate, cronStale, cronStuck, cronFailing, dependencyDown, dependencyDegraded, aiFailureRate, privacyRequestDue, alerterStale, SEV1_JOBS, RULE_KEYS, RULE_INFO, type Snapshot } from "./rules"
+import { telegramQueue, evaluate, cronStale, cronStuck, cronFailing, dependencyDown, dependencyDegraded, aiFailureRate, privacyRequestDue, alerterStale, SEV1_JOBS, RULE_KEYS, RULE_INFO, type Snapshot } from "./rules"
 import { RUNBOOKS } from "./runbooks"
 import { CRON_MAX_AGE_MIN } from "@/lib/ops/dependencies"
 
@@ -101,5 +101,15 @@ describe("the rule set", () => {
   it("every rule is described for the settings page and has a default severity", () => {
     for (const k of RULE_KEYS) { expect(RULE_INFO[k].label.length, k).toBeGreaterThan(5); expect([1, 2, 3]).toContain(RULE_INFO[k].defaultSeverity) }
     expect(RULE_INFO.dependency_degraded.defaultSeverity).toBe(3)
+  })
+})
+
+describe("telegram_queue", () => {
+  it("fires for messages waiting over ten minutes or three failures in the hour, with counts only", () => {
+    expect(telegramQueue(snap({ telegram: { stuck: 0, failed1h: 2 } }))).toHaveLength(0)
+    expect(telegramQueue(snap())).toHaveLength(0)
+    const f = telegramQueue(snap({ telegram: { stuck: 2, failed1h: 0 } }))
+    expect(f[0]).toMatchObject({ rule: "telegram_queue", severity: 2, evidence: { waitingOverTenMinutes: 2, failedLastHour: 0 } })
+    expect(telegramQueue(snap({ telegram: { stuck: 0, failed1h: 3 } }))).toHaveLength(1)
   })
 })
