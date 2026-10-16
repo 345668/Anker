@@ -86,7 +86,8 @@ export async function findFirmActivity(
   const corpus = pages.map((p) => `--- ${p.url} ---\n${p.text}`).join("\n\n").slice(0, MAX_CHARS)
   if (corpus.trim().length < 200) return empty("no readable text on the site")
 
-  const answer = await ask(`Below are pages from the website of the investor "${firm.name}".
+  const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> => Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error("the model took too long")), ms))])
+  const answer = await withTimeout(ask(`Below are pages from the website of the investor "${firm.name}".
 
 Find the MOST RECENT investment this investor made that the pages give a DATE for.
 
@@ -98,7 +99,7 @@ Rules:
 Return only JSON:
 {"lastInvestmentAt": "YYYY-MM-DD or null (use the 1st when only a month is given)", "note": "<company and round, max 120 chars>", "evidence": "<exact quote>"}
 
-${corpus}`).catch((e: any) => `{"error":${JSON.stringify(String(e?.message ?? e))}}`)
+${corpus}`), 60_000).catch((e: any) => `{"error":${JSON.stringify(String(e?.message ?? e))}}`)
 
   const parsed = extractJsonObject(answer, "investor-activity")
   if (!parsed || parsed.error) return empty("no answer from the model")
@@ -126,9 +127,9 @@ export async function checksToday(): Promise<number> {
  * Check the firms founders are actually being shown: the top results of runs
  * from the last 30 days whose activity is unknown or older than 90 days.
  */
-export async function runActivitySweep(opts: { limit?: number; ids?: string[]; deps?: ActivityDeps } = {}) {
+export async function runActivitySweep(opts: { limit?: number; ids?: string[]; deps?: ActivityDeps; timeBudgetMs?: number; concurrency?: number; now?: () => number } = {}) {
   const budget = Math.max(0, Math.min(opts.limit ?? dailyLimit(), dailyLimit() - (await checksToday())))
-  if (budget === 0) return { checked: 0, withDate: 0, errors: 0, budgetLeft: 0 }
+  if (budget === 0) return { checked: 0, withDate: 0, errors: 0, deferred: 0, budgetLeft: 0 }
 
   const rows = opts.ids?.length
     ? await sql`SELECT id::text AS id, name, website FROM investment_firms WHERE id::text = ANY(${opts.ids}) LIMIT ${budget}`
@@ -143,23 +144,36 @@ export async function runActivitySweep(opts: { limit?: number; ids?: string[]; d
          ORDER BY f.activity_checked_at NULLS FIRST
          LIMIT ${budget}`
 
-  let withDate = 0, errors = 0
-  for (const firm of rows as any[]) {
-    try {
-      const found = await findFirmActivity(firm, opts.deps)
-      await sql`UPDATE investment_firms
-                   SET last_investment_at = ${found.lastInvestmentAt}::date,
-                       last_investment_note = ${found.note},
-                       activity_source_url = ${found.sourceUrl},
-                       activity_checked_at = now()
-                 WHERE id::text = ${firm.id}`
-      if (found.lastInvestmentAt) withDate++
-    } catch (e: any) {
-      errors++
-      console.warn(`[investor-activity] ${firm.name}: ${e?.message ?? e}`)
+  // The function is killed at 300 seconds. Each firm can take minutes (three page fetches and a model call), so the sweep used to run 60 of them one after another and never
+  // finish: every run since at least 2026-10-11 stayed "running". Now a few run at once and no new firm is started after the time budget; the rest wait for tomorrow.
+  const now = opts.now ?? Date.now
+  const until = now() + (opts.timeBudgetMs ?? 230_000)
+  let withDate = 0, errors = 0, done = 0, cursor = 0
+  const list = rows as any[]
+  async function worker() {
+    for (;;) {
+      if (now() >= until) return
+      const i = cursor++
+      if (i >= list.length) return
+      const firm = list[i]
+      try {
+        const found = await findFirmActivity(firm, opts.deps)
+        await sql`UPDATE investment_firms
+                     SET last_investment_at = ${found.lastInvestmentAt}::date,
+                         last_investment_note = ${found.note},
+                         activity_source_url = ${found.sourceUrl},
+                         activity_checked_at = now()
+                   WHERE id::text = ${firm.id}`
+        if (found.lastInvestmentAt) withDate++
+        done++
+      } catch (e: any) {
+        errors++
+        console.warn(`[investor-activity] ${firm.name}: ${e?.message ?? e}`)
+      }
     }
   }
-  return { checked: rows.length, withDate, errors, budgetLeft: Math.max(0, dailyLimit() - (await checksToday())) }
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, Math.min(8, opts.concurrency ?? 4)), list.length) }, worker))
+  return { checked: done + errors, withDate, errors, deferred: Math.max(0, list.length - Math.min(cursor, list.length)), budgetLeft: Math.max(0, dailyLimit() - (await checksToday())) }
 }
 
 /** Re-exported so callers have one import for activity (definition: normalize/recency.ts). */
