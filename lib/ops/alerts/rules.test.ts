@@ -113,3 +113,13 @@ describe("telegram_queue", () => {
     expect(telegramQueue(snap({ telegram: { stuck: 0, failed1h: 3 } }))).toHaveLength(1)
   })
 })
+
+import { schemaBehind as schemaBehindRule } from "./rules"
+describe("schema_behind (docs/architecture/59)", () => {
+  const base = { now: 0, latest: {}, lastOk: {}, recent: {}, deps: [] } as any
+  it("one finding naming the missing files, none when complete or unknown", () => {
+    const f = schemaBehindRule({ ...base, schemaBehind: ["2026-10-17-a.sql", "b.sql"] })
+    expect(f).toHaveLength(1); expect(f[0]).toMatchObject({ rule: "schema_behind", severity: 2, evidence: { count: 2 } }); expect(f[0].summary).toContain("2026-10-17-a.sql")
+    expect(schemaBehindRule({ ...base, schemaBehind: [] })).toEqual([]); expect(schemaBehindRule(base)).toEqual([])
+  })
+})

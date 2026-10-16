@@ -9,13 +9,16 @@
  *
  * Usage (reads NEON_DATABASE_URL / DATABASE_URL — auto-loaded from .env.local
  * if not already exported; real env vars take precedence):
- *   node scripts/oneshot/run-migration.mjs --status            # list applied / pending
- *   node scripts/oneshot/run-migration.mjs --all               # apply every pending file
- *   node scripts/oneshot/run-migration.mjs <path/to/file.sql>  # apply one file
- *   node scripts/oneshot/run-migration.mjs --backfill          # mark ALL files applied
- *                                                              #   WITHOUT running them
- *                                                              #   (seed the ledger on a
- *                                                              #   DB already at head)
+ *   node scripts/oneshot/run-migration.mjs --status            # list applied / pending (read-only)
+ *   node scripts/oneshot/run-migration.mjs --all               # DRY RUN: shows the host and what would be applied
+ *   node scripts/oneshot/run-migration.mjs <path/to/file.sql>  # DRY RUN of one file
+ *   ... add --yes-production to a command above to really apply it
+ *   node scripts/oneshot/run-migration.mjs --backfill --yes-production
+ *                                                              # mark ALL files applied WITHOUT running them
+ *                                                              #   (prefer `pnpm migrate:verify --record`, which checks first)
+ *
+ * (docs/architecture/59) The database is production. A command that would change it only describes the change unless --yes-production is given, and a file that
+ * drops or empties anything is refused unless its first line is `-- destructive: <restore point or reason>`.
  *
  * The ledger table is created on first run (ensureLedger).
  */
@@ -25,38 +28,11 @@ import { createHash } from "node:crypto"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { neon } from "@neondatabase/serverless"
+import { loadEnvFiles, hostOf } from "../lib/load-env.mjs"
+import { statementsOf, destructiveStatements, hasDestructiveHeader } from "../lib/migration-sql.mjs"
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const MIGRATIONS_DIR = path.join(HERE, "..", "migrations")
-const REPO_ROOT = path.join(HERE, "..", "..")
-
-/**
- * Load env from .env.local (then .env) so `pnpm migrate` works without the
- * caller pre-exporting NEON_DATABASE_URL. Dependency-free. Real environment
- * variables always win — a value already in process.env is never overwritten,
- * so CI / one-off `NEON_DATABASE_URL=… pnpm migrate` still takes precedence.
- */
-function loadEnvFiles() {
-  for (const name of [".env.local", ".env"]) {
-    let text
-    try { text = readFileSync(path.join(REPO_ROOT, name), "utf8") } catch { continue }
-    for (let line of text.split("\n")) {
-      line = line.trim()
-      if (!line || line.startsWith("#")) continue
-      if (line.startsWith("export ")) line = line.slice(7).trim()
-      const eq = line.indexOf("=")
-      if (eq === -1) continue
-      const key = line.slice(0, eq).trim()
-      if (!key || key in process.env) continue // don't clobber real env
-      let val = line.slice(eq + 1).trim()
-      // Strip matching surrounding quotes (keeps inner characters verbatim).
-      if (val.length >= 2 && ((val[0] === '"' && val.at(-1) === '"') || (val[0] === "'" && val.at(-1) === "'"))) {
-        val = val.slice(1, -1)
-      }
-      process.env[key] = val
-    }
-  }
-}
 
 loadEnvFiles()
 
@@ -64,11 +40,14 @@ const url = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL
 if (!url) { console.error("NEON_DATABASE_URL missing (set it, or add it to .env.local)"); process.exit(1) }
 const sql = neon(url)
 
-const arg = process.argv[2]
+const args = process.argv.slice(2)
+const YES = args.includes("--yes-production")
+const arg = args.find((a) => a !== "--yes-production")
 if (!arg) {
-  console.error("Usage: run-migration.mjs <file.sql> | --all | --status | --backfill")
+  console.error("Usage: run-migration.mjs <file.sql> | --all | --status | --backfill   [--yes-production]")
   process.exit(1)
 }
+console.log(`Database: ${hostOf(url)}${YES || arg === "--status" ? "" : "   (dry run: add --yes-production to apply)"}\n`)
 
 await ensureLedger()
 
@@ -112,8 +91,13 @@ async function applyOne(file) {
   if (applied.has(name)) { console.log(`↷ ${name} already applied — skipping.`); return }
 
   const raw = await readFile(abs, "utf8")
-  const clean = raw.split("\n").filter((l) => !/^\s*--/.test(l)).join("\n")
-  const stmts = splitSql(clean).map((s) => s.trim()).filter(Boolean)
+  const stmts = statementsOf(raw)
+  const risky = destructiveStatements(raw)
+  if (risky.length && !hasDestructiveHeader(raw)) {
+    console.error(`✗ ${name} removes data or structure and has no \`-- destructive: <restore point or reason>\` first line:\n${risky.map((r) => `    ${r}`).join("\n")}`)
+    process.exit(1)
+  }
+  if (!YES) { console.log(`Would apply ${stmts.length} statement(s) from ${name}${risky.length ? " (destructive, header present)" : ""}. Nothing was changed.\n`); return }
 
   console.log(`Applying ${stmts.length} statement(s) from ${name}…`)
   let n = 0
@@ -136,6 +120,7 @@ async function applyOne(file) {
 /** Mark every migration file as applied WITHOUT running it. Use once, on a DB
  *  already at head, to seed the ledger. Idempotent. */
 async function backfill() {
+  if (!YES) { console.log("Dry run. --backfill records every file as applied without running it; use `pnpm migrate:verify --record` to record only what the database really has, or add --yes-production."); return }
   const files = await migrationFiles()
   const applied = await appliedSet()
   let added = 0
@@ -178,50 +163,4 @@ async function record(filename, contents) {
 async function migrationFiles() {
   const all = await readdir(MIGRATIONS_DIR)
   return all.filter((f) => f.endsWith(".sql")).sort()
-}
-
-// ─── SQL splitter (respects $$…$$ dollar-quotes and '…' string literals) ─────
-
-function splitSql(src) {
-  const out = []
-  let buf = ""
-  let inSingle = false
-  let dollarTag = null
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i]
-    if (dollarTag) {
-      buf += c
-      if (c === "$" && src.slice(i).startsWith(dollarTag)) {
-        buf += dollarTag.slice(1)
-        i += dollarTag.length - 1
-        dollarTag = null
-      }
-      continue
-    }
-    if (inSingle) {
-      buf += c
-      if (c === "'" && src[i - 1] !== "\\") inSingle = false
-      continue
-    }
-    // Line comment (outside strings/dollar-quotes): skip to end of line. This
-    // matters even after the caller strips full-line comments, because an
-    // INLINE comment can contain an apostrophe ("-- extension's report") that
-    // would otherwise open a bogus string literal and swallow later semicolons.
-    if (c === "-" && src[i + 1] === "-") {
-      const nl = src.indexOf("\n", i)
-      if (nl === -1) break
-      buf += "\n"
-      i = nl
-      continue
-    }
-    if (c === "'") { inSingle = true; buf += c; continue }
-    if (c === "$") {
-      const m = src.slice(i).match(/^\$([A-Za-z_][A-Za-z0-9_]*)?\$/)
-      if (m) { dollarTag = m[0]; buf += m[0]; i += m[0].length - 1; continue }
-    }
-    if (c === ";") { out.push(buf); buf = ""; continue }
-    buf += c
-  }
-  if (buf.trim()) out.push(buf)
-  return out
 }

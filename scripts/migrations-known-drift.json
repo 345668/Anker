@@ -1,0 +1,11 @@
+{
+  "note": "Migration files recorded as applied whose objects differ from production today. Found by `pnpm migrate:verify` on 2026-10-16. Each is old schema that evolved by other means (renamed or replaced columns, tables that existed before the file). No current code failure was found for them. The schema baseline (docs/architecture/59 R2) retires this list. A NEW partial file is not on this list and fails the check.",
+  "files": {
+    "2026-04-27-platform-tables.sql": "deals table pre-dates the file and has a different shape (owner_id/title/deal_size instead of user_id/name/amount)",
+    "2026-05-08-firm-defensive-cols.sql": "investment_firms columns were named differently in production (foundation_year, typical_check_size); two source indexes were never created",
+    "2026-05-08-news-articles.sql": "news_articles has no subheadline column (the code aliases executive_summary); three indexes were never created",
+    "2026-05-15-agent-runs.sql": "the agent_runs_latest view does not exist; no code reads it",
+    "2026-09-11-matching-profile-contract.sql": "eight fund_profiles columns were never created (structure, legal_structure, waterfall_type, gp_track_record, university_partners, corporate_partners, placement_agent, return_scenarios); no query reads them",
+    "2026-09-23-lp-matching-repair.sql": "lp_match_audit uses prev_stage/new_stage/notes instead of from_stage/to_stage/actor/note"
+  }
+}

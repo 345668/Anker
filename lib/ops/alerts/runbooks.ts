@@ -58,6 +58,11 @@ export const RUNBOOKS: Record<RuleKey, Runbook> = {
     check: "SAIL, Unit economics: the workspace's spend against its limit and where it went. SAIL, Tenants: its plan and limits.",
     fix: "If the use is legitimate, raise the workspace's AI limit in SAIL, Tenants, or move it to a larger plan. If it looks wrong (a loop, a very large upload), look at the usage breakdown first. The owners have already been told in the app.",
   },
+  schema_behind: {
+    means: "The version of Anker that is running expects database changes that have not been made yet. Anything that uses them (a new column, a new table) fails until they are applied. This usually means a deploy went out before its migration.",
+    check: "The file names in this alert. `pnpm migrate:verify` lists every migration against the database, so you can see whether the file is really missing or only unrecorded.",
+    fix: "Apply the named file: `node scripts/oneshot/run-migration.mjs scripts/migrations/<file> --yes-production`. If `migrate:verify` says the objects already exist, run `pnpm migrate:verify --record`. The incident clears by itself once the ledger has the file.",
+  },
   alerter_stale: {
     means: "The alert evaluator itself has stopped. Until it runs again nothing is being watched, so any other fault would go unreported.",
     check: "Vercel, Cron Jobs: is alerts-evaluate scheduled and recent? Function logs for /api/cron/alerts-evaluate: an error, a timeout, a missing CRON_SECRET. SAIL, Alerts, the heartbeat line.",

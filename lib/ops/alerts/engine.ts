@@ -1,3 +1,4 @@
+import { schemaBehind } from "@/lib/migrations/schema-state"
 import "server-only"
 import { sql } from "@/lib/db"
 import { evaluate, alerterStale, RULE_KEYS, AI_DEFAULTS, type Finding, type RuleKey, type Snapshot, type Thresholds } from "./rules"
@@ -75,6 +76,7 @@ export async function gatherMore(snap: Snapshot, thresholds: Thresholds): Promis
     const [t] = (await sql`SELECT count(*) FILTER (WHERE status IN ('queued', 'running') AND received_at < now() - interval '10 minutes')::int AS stuck, count(*) FILTER (WHERE status = 'failed' AND finished_at > now() - interval '1 hour')::int AS failed FROM telegram_updates`) as any[]
     snap.telegram = { stuck: Number(t?.stuck ?? 0), failed1h: Number(t?.failed ?? 0) }
   } catch { /* the channel's tables are not there yet */ }
+  try { snap.schemaBehind = (await schemaBehind(true)).slice(0, 50) } catch { /* the ledger could not be read: no finding either way */ }
   try {
     const [c] = (await sql`SELECT count(*) FILTER (WHERE cost_state IN ('exact', 'estimated'))::int AS costed, count(*) FILTER (WHERE cost_state = 'unpriced')::int AS unpriced FROM ai_calls WHERE created_at > now() - interval '24 hours'`) as any[]
     const models = (await sql`SELECT COALESCE(model, '(unknown model)') AS model, count(*)::int AS n FROM ai_calls WHERE created_at > now() - interval '24 hours' AND cost_state = 'unpriced' AND model IS NOT NULL GROUP BY 1 ORDER BY n DESC LIMIT 10`) as any[]
