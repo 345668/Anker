@@ -1,4 +1,5 @@
 import { meter } from "@/lib/metering"
+import { isMember, purgeFormerMembers } from "./membership"
 import "server-only"
 import { sql } from "@/lib/db"
 import { decryptSecret, encryptSecret } from "@/lib/db/secrets"
@@ -49,7 +50,8 @@ export function realApi(b: bot.ProductBot): Api {
 }
 
 /** Whether this workspace may use the channel, in words. Null means yes. The data policy comes first: Telegram is an external processor. */
-export async function gate(link: Pick<LinkRow, "org_id">): Promise<string | null> {
+export async function gate(link: Pick<LinkRow, "org_id"> & { user_id?: string }): Promise<string | null> {
+  if (link.user_id && !(await isMember(link.org_id, link.user_id))) return "You are no longer a member of this workspace, so I can't answer here."
   if (!(await isFlagOn("telegram_channel", link.org_id))) return "Telegram access is not switched on for your workspace yet."
   const eff = await getEffective(link.org_id)
   if (!eff.features.channel_telegram) return "Your plan does not include the Telegram channel."
@@ -259,6 +261,7 @@ export async function processUpdate(updateId: number, deps: Deps, botId = deps.b
 /** Every update that is waiting: new ones the webhook could not start, or ones left behind by a killed function. Oldest first, one chat at a time (the claim enforces the order). */
 export async function sweep(deps: Deps | null, limit = 10, depsFor?: (botId: string) => Promise<Deps | null>): Promise<{ processed: number; failed: number; expired?: number }> {
   const expired = await sweepPending().catch(() => 0)
+  await purgeFormerMembers().catch((e) => console.error("[telegram] member check failed:", (e as Error)?.message))
   const rows = (await sql`SELECT bot_id, update_id FROM telegram_updates WHERE attempts < ${MAX_ATTEMPTS} AND (status = 'queued' OR (status = 'running' AND started_at < now() - make_interval(secs => ${STALE_RUNNING_MS / 1000}))) ORDER BY received_at, update_id LIMIT ${limit}`) as any[]
   let processed = 0, failed = 0
   for (const r of rows) { const bid = String(r.bot_id), d = deps && (deps.botId ?? "platform") === bid ? deps : depsFor ? await depsFor(bid) : null; if (!d) continue; const o = await processUpdate(Number(r.update_id), d, bid); if (o === "done") processed++; else if (o === "failed") failed++ }
@@ -291,7 +294,7 @@ export async function notifyAll(api: Api, app: string, now = Date.now(), botId =
     st.links++
     const q = { start: Number(r.quiet_start), end: Number(r.quiet_end), tz: String(r.tz || DEFAULT_QUIET.tz) }
     if (inQuietHours(now, q)) { st.held++; continue }
-    if (await gate({ org_id: r.org_id })) continue
+    if (await gate({ org_id: r.org_id, user_id: r.user_id })) continue
     const send = async (html: string, url: string, label: string) => {
       try { await api.sendMessage(Number(r.chat_id), html, { inline_keyboard: [[{ text: label, url }]] }); st.sent++; return true } catch { st.failed++; return false }
     }

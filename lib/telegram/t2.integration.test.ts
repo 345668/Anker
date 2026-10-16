@@ -49,7 +49,8 @@ beforeAll(async () => {
     CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text); CREATE TABLE plan_catalog (plan text PRIMARY KEY, features jsonb DEFAULT '{}');
     CREATE TABLE action_proposals (id text PRIMARY KEY, org_id text, capability text, summary text, diff jsonb DEFAULT '[]', evidence jsonb DEFAULT '{}', risk_class text, source_trust text DEFAULT 'trusted', status text DEFAULT 'pending', applied_at timestamptz, undo jsonb, run_id text, created_at timestamptz DEFAULT now(), expires_at timestamptz DEFAULT now() + interval '14 days');
     CREATE TABLE crm_tasks (id serial PRIMARY KEY, org_id text, user_id text, title text, due_at timestamptz, done_at timestamptz);
-    CREATE TABLE outreach_replies (id serial PRIMARY KEY, user_id text, received_at timestamptz DEFAULT now());`)
+    CREATE TABLE outreach_replies (id serial PRIMARY KEY, user_id text, received_at timestamptz DEFAULT now());
+    CREATE TABLE memberships (id serial PRIMARY KEY, user_id text, org_id text, org_role text); INSERT INTO memberships (user_id, org_id, org_role) VALUES ('u1','o1','member'), ('u2','o1','member');`)
   await db.exec(readFileSync("scripts/migrations/2026-10-16i-telegram-channel.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-16j-telegram-t2.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-16k-telegram-t3.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-16l-telegram-t4.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-16n-telegram-own-bot.sql", "utf8"))
 }, 30000)
 afterAll(async () => db.close())

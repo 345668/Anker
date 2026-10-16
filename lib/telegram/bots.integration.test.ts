@@ -168,3 +168,30 @@ describe("a member's own bot (docs/architecture/57 section 20)", () => {
     expect(await disconnectBot("o1", "boss", { botId: anna.id }, fake())).toBe(true); expect(await disconnectBot("o2", "boss", { botId: ws.id }, fake())).toBe(false)      // not another workspace's bot
   })
 })
+
+describe("a member who leaves (docs/architecture/57 section 20)", () => {
+  beforeAll(async () => { await db.exec("CREATE TABLE IF NOT EXISTS memberships (id serial PRIMARY KEY, user_id text, org_id text, org_role text)") })
+  beforeEach(() => { vi.stubGlobal("fetch", fake()) })      // no real network: the webhook removal goes through the fake Telegram
+  afterAll(() => { vi.unstubAllGlobals() })
+  beforeEach(async () => { await db.exec("DELETE FROM memberships; INSERT INTO memberships (user_id, org_id, org_role) VALUES ('boss','o1','workspace_owner'), ('rick','o1','member'), ('anna','o1','member')") })
+  const link = async (user: string, bot: string, tgId: number) => { const r = await consumeLinkCode((await createLinkCode(user, "o1", bot)).code, { userId: tgId, chatId: tgId }, "read", bot); expect(r.ok).toBe(true) }
+  it("their phones are disconnected and their personal bot is removed; colleagues and the workspace bot are untouched", async () => {
+    const ws = await connectBot("o1", "boss", TOKEN_A, fake()); const mine = await connectBot("o1", "rick", TOKEN_B, fake(), "personal")
+    await link("rick", mine.id, 11); await link("rick", ws.id, 12); await link("anna", ws.id, 22)
+    await enqueue({ update_id: 9, message: { message_id: 1, chat: { id: 12, type: "private" }, from: { id: 12 }, text: "x" } } as any, ws.id)
+    await db.exec("DELETE FROM memberships WHERE user_id = 'rick'")
+    const { purgeFormerMembers } = await import("./membership")
+    calls.length = 0
+    const r = await purgeFormerMembers(); expect(r).toMatchObject({ members: 1, links: 2, bots: 1 })
+    expect((await rows("SELECT user_id, status FROM telegram_links ORDER BY user_id")).map((l) => `${l.user_id}:${l.status}`)).toEqual(["anna:pending", "rick:revoked", "rick:revoked"])
+    expect(await personalBotOf("o1", "rick")).toBeNull(); expect(await ownBotOf("o1")).not.toBeNull()
+    expect((await rows("SELECT status, payload_enc FROM telegram_updates"))[0]).toMatchObject({ status: "dropped", payload_enc: null })
+    expect(calls.filter((c) => c.method === "deleteWebhook").map((c) => c.token)).toEqual([TOKEN_B])      // only the leaver's own bot loses its webhook
+  })
+  it("a member who is still in the workspace is left alone, and a second pass finds nothing", async () => {
+    const mine = await connectBot("o1", "rick", TOKEN_B, fake(), "personal"); await link("rick", mine.id, 11)
+    const { purgeFormerMembers, forgetMember, isMember } = await import("./membership")
+    expect(await purgeFormerMembers()).toMatchObject({ members: 0 }); expect(await isMember("o1", "rick")).toBe(true); expect(await isMember("o2", "rick")).toBe(false)
+    expect(await forgetMember("o1", "rick")).toEqual({ links: 1, bot: true }); expect(await purgeFormerMembers()).toMatchObject({ members: 0 })
+  })
+})
