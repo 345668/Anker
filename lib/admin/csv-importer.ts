@@ -12,6 +12,7 @@
  * later filter / undo a specific import.
  */
 
+import { isTombstoned } from "@/lib/directory/maintenance"
 import * as XLSX from "xlsx"
 import crypto from "node:crypto"
 import { sql } from "@/lib/db"
@@ -90,6 +91,8 @@ export interface ImportReport {
   firmsAlreadyPresent: number
   investorsInserted: number
   investorsAlreadyPresent: number
+  /** People left out because they were erased, objected, or came from a withdrawn batch. */
+  investorsTombstoned: number
   /** Auto-detected mapping from canonical → header. */
   detectedColumns: Partial<Record<CanonicalColumn, string>>
   /** First N parse / insert errors for the UI to show. */
@@ -113,7 +116,7 @@ export async function importCsv(input: ImportInput): Promise<ImportReport> {
 
   let rowsParsed = 0, rowsSkipped = 0
   let firmsInserted = 0, firmsAlreadyPresent = 0
-  let investorsInserted = 0, investorsAlreadyPresent = 0
+  let investorsInserted = 0, investorsAlreadyPresent = 0, investorsTombstoned = 0
 
   for (let i = 0; i < Math.min(rows.length, cap); i++) {
     const r = rows[i]
@@ -136,6 +139,7 @@ export async function importCsv(input: ImportInput): Promise<ImportReport> {
             const invId = stableId("inv", `${slug(fullName)}@${id}`)
             const r2 = await upsertInvestor(invId, inv, id, input.source)
             if (r2 === "inserted") investorsInserted++
+            else if (r2 === "tombstoned") investorsTombstoned++
             else investorsAlreadyPresent++
           }
         }
@@ -147,6 +151,7 @@ export async function importCsv(input: ImportInput): Promise<ImportReport> {
         const invId = stableId("inv", out.dedupKey)
         const result = await upsertInvestor(invId, out, null, input.source)
         if (result === "inserted") investorsInserted++
+        else if (result === "tombstoned") investorsTombstoned++
         else investorsAlreadyPresent++
       }
     } catch (e: any) {
@@ -165,6 +170,7 @@ export async function importCsv(input: ImportInput): Promise<ImportReport> {
     firmsAlreadyPresent,
     investorsInserted,
     investorsAlreadyPresent,
+    investorsTombstoned,
     detectedColumns: detected,
     errors: errors.slice(0, 30),
     durationMs: Date.now() - t0,
@@ -311,9 +317,11 @@ async function upsertFirm(id: string, p: ParsedFirm, source: string): Promise<"i
   return "inserted"
 }
 
-async function upsertInvestor(invId: string, p: ParsedInvestor, firmId: string | null, source: string): Promise<"inserted" | "exists"> {
+async function upsertInvestor(invId: string, p: ParsedInvestor, firmId: string | null, source: string): Promise<"inserted" | "exists" | "tombstoned"> {
   const exists = await sql`SELECT 1 FROM investors WHERE id = ${invId} LIMIT 1`
   if ((exists as any[]).length) return "exists"
+  // An erased or objecting person (or one from a withdrawn batch) is not re-imported (docs/architecture/54 D2). Fails closed when the hash key differs from production.
+  if (await isTombstoned({ email: p.email, linkedinUrl: p.linkedin, personLinkedinUrl: p.linkedin, source })) return "tombstoned"
   await sql`
     INSERT INTO investors (
       id, first_name, last_name, title, email, linkedin_url, person_linkedin_url,

@@ -78,6 +78,10 @@
       "schedule": "30 * * * *"
     },
     {
+      "path": "/api/cron/directory-maintenance",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/cron/fit-ranker",
       "schedule": "0 4 1 * *"
     },

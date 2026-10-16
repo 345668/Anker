@@ -22,7 +22,7 @@ export const CRON_MAX_AGE_MIN: Record<string, number> = {
   "outreach-reengage": 2880, "market-signals": 2880, "compliance-digest": 20160, "campaign-assessment": 40, "intake-assessment": 40, "tenant-requests": 70, "agents": 40, "outreach-send": 15, "evals": 2880,
   "ai-media": 10,
   "campaign-send": 70, "deadline-reminders": 2880, "verify-emails": 2880, "directory-normalize": 2880,
-  "investor-activity": 2880, "assistant-uploads-sweep": 150, "fit-ranker": 90000, "dependency-check": 2880,
+  "investor-activity": 2880, "assistant-uploads-sweep": 150, "directory-maintenance": 120, "fit-ranker": 90000, "dependency-check": 2880,
 }
 
 type Env = Record<string, string | undefined>

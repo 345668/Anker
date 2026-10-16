@@ -26,6 +26,7 @@ const { neon } = require("@neondatabase/serverless")
 import { pathToFileURL } from "node:url"
 // The platform's own firm-name rules (accent spellings, acronyms beside a name, initials): the same ones the
 // scorer and the assistant use, so the importer and the app agree on what "the same firm" means.
+import { identityHashes, canaryHash } from "../lib/directory/identity.ts"
 import { firmDedupKeys, acronymKey, initialsKey, repairMojibake } from "../lib/matching/v2/dedup.ts"
 
 const args = process.argv.slice(2)
@@ -43,6 +44,34 @@ const q = (text, values = []) => {
     sql = neon(DB)
   }
   return sql.query(text, values)
+}
+
+// Tombstones (docs/architecture/54 D2): an erased or objecting person, or one from a withdrawn batch, is not imported again. Needs the production hash key; refuses to guess.
+let tombstoneGuard = null   // null = not checked yet, false = unavailable, object = ready
+async function guardReady() {
+  if (tombstoneGuard !== null) return tombstoneGuard
+  try {
+    const key = process.env.DIRECTORY_HASH_KEY || process.env.SECRET_KEY
+    if (!key) throw new Error("no DIRECTORY_HASH_KEY or SECRET_KEY in the environment")
+    const [m] = await q("SELECT v FROM directory_hash_meta WHERE k = 'canary'")
+    if (!m) throw new Error("the directory has not been hashed yet (the maintenance job writes the canary)")
+    if (m.v !== canaryHash(key)) throw new Error("this key differs from the production hash key")
+    tombstoneGuard = { key }
+  } catch (e) {
+    tombstoneGuard = false
+    if (APPLY) { console.error(`Cannot check tombstones: ${e.message}. Refusing to apply.`); process.exit(4) }
+    console.error(`Warning: tombstones not checked (${e.message}). A real run would refuse.`)
+  }
+  return tombstoneGuard
+}
+async function isTombstoned(email, linkedin) {
+  const g = await guardReady()
+  if (!g) return false
+  const h = identityHashes({ email, linkedinUrl: linkedin, personLinkedinUrl: linkedin }, g.key)
+  if (!h.emailHash && !h.linkedinHashes.length) return false
+  const rows = await q(`SELECT 1 FROM directory_tombstones t WHERE (t.expires_at IS NULL OR t.expires_at > now()) AND (t.source IS NULL OR t.source = $1)
+    AND (($2::text IS NOT NULL AND t.email_hash = $2) OR (t.linkedin_hash IS NOT NULL AND t.linkedin_hash = ANY($3::text[]))) LIMIT 1`, [BATCH, h.emailHash, h.linkedinHashes])
+  return rows.length > 0
 }
 
 // ─── Normalisation — the same notion of "same" the scorer uses ──────────────
@@ -490,6 +519,7 @@ async function main() {
           await q(`UPDATE investors SET ${sets}, updated_at = now() WHERE id = $1`, [hit.id, ...Object.values(fills)])
         }
       } else {
+        if (await isTombstoned(email, row.linkedin)) { stats.personTombstoned = (stats.personTombstoned ?? 0) + 1; continue }
         stats.personNew++; f.newPeople++
         const [first, ...rest] = row.name.split(/\s+/)
         const id = crypto.randomUUID()
@@ -516,7 +546,7 @@ async function main() {
     console.log(`${f.file.slice(0, 47).padEnd(49)}${String(f.rows).padStart(5)}${String(f.people).padStart(8)}${String(f.firms).padStart(7)}${String(f.newPeople).padStart(9)}${String(f.newFirms).padStart(8)}${String(f.filled).padStart(8)}${String(f.dup).padStart(6)}${String(f.conflicts).padStart(10)}`)
   }
   console.log(`
-people   matched ${stats.personMatched}   new ${stats.personNew}   filled ${stats.personFilled}   duplicate-in-batch ${stats.personDupInBatch}   conflicts ${stats.personConflicts}
+${stats.personTombstoned ? `left out: ${stats.personTombstoned} person row(s) erased or withdrawn earlier (tombstone)\n` : ""}people   matched ${stats.personMatched}   new ${stats.personNew}   filled ${stats.personFilled}   duplicate-in-batch ${stats.personDupInBatch}   conflicts ${stats.personConflicts}
 firms    matched ${stats.firmMatched}   new ${stats.firmNew}   filled ${stats.firmFilled}   duplicate-in-batch ${stats.firmDupInBatch}   conflicts ${stats.firmConflicts}
 rows read ${stats.rows} from ${stats.files} files` + `${stats.firmNameCollision ? `\nname collisions kept apart: ${stats.firmNameCollision} (same name, different site and country)` : ""}` + `${stats.notes ? `\nleft out: ${stats.notes} banner/footer row(s)` : ""}${stats.unidentifiable ? `\nleft out: ${stats.unidentifiable} person row(s) with nothing to recognise them by (no email, LinkedIn, firm, or name with place)` : ""}`)
 
