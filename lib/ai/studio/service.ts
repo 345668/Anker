@@ -1,3 +1,4 @@
+import { meter } from "@/lib/metering"
 import { randomBytes, randomUUID } from "node:crypto"
 import { sql } from "@/lib/db"
 import type { AiPrincipal } from "@/lib/assistant/context"
@@ -168,6 +169,7 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
         referenceUrls,
       })
       await sql`UPDATE ai_studio_jobs SET provider_id=${id},status='queued',updated_at=now() WHERE id=${reserved.job_id} AND status IN ('submitting','uncertain')`
+      { const video = modelFor(input.model)!.kind === "video"; void meter({ unit: video ? "video_second" : "image", qty: video ? Number((input as any).duration ?? 5) : 1, estimated: video, source: "studio", owner: p.orgId ?? null, ref: String(reserved.job_id) }) }
     } catch (e) {
       const code = e instanceof ProviderError ? e.status : 0
       const certain = code >= 400 && code < 500

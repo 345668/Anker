@@ -76,10 +76,12 @@ export async function assertAllowed(orgId: string, action: Action, feature?: Fea
 export async function usageThisMonth(orgId: string): Promise<{ aiSpendUsd: number; intakeSubmissions: number }> {
   const ai = ((await sql`SELECT COALESCE(sum(cost_usd), 0)::float AS s FROM ai_calls WHERE workspace_id = ${orgId} AND created_at >= date_trunc('month', now())`) as any[])[0]
   let intake = 0
+  let events = 0
+  try { events = Number(((await sql`SELECT COALESCE(sum(cost_usd), 0)::float AS s FROM usage_events WHERE org_id = ${orgId} AND created_at >= date_trunc('month', now())`) as any[])[0]?.s ?? 0) } catch { /* table not there yet */ }
   try {
     intake = Number(((await sql`SELECT count(*)::int AS n FROM intake_submissions s JOIN organizations o ON o.fund_id = s.fund_id WHERE o.id = ${orgId} AND s.created_at >= date_trunc('month', now())`) as any[])[0].n)
   } catch { /* table absent */ }
-  return { aiSpendUsd: Number(ai?.s ?? 0), intakeSubmissions: intake }
+  return { aiSpendUsd: Number(ai?.s ?? 0) + events, intakeSubmissions: intake }
 }
 
 /** Refuse when a measured monthly limit is already used up. A null limit is unlimited. */

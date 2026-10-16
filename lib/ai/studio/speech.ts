@@ -8,6 +8,7 @@ import { providerCall, requireConfiguration, ProviderError } from "./provider"
 import { assertCreation, assertScope } from "./service"
 import { publicAsset, storeAsset } from "./assets"
 import { durationMs, joinWavs, parseWav, wavBytes } from "./wav"
+import { meter } from "@/lib/metering"
 /** Qwen3-TTS voices offered in the studio. docs/architecture/48. */
 export const VOICES = [
   { id: "Ethan", label: "Ethan", gender: "male" },
@@ -96,6 +97,7 @@ export async function createSpeech(p: AiPrincipal, input: SpeechInput) {
     if (e instanceof WorkspaceError) throw e
     throw new WorkspaceError("A spoken line could not be read back. Try again; nothing was kept.", 502)
   }
+  void meter({ unit: "tts_char", qty: input.lines.reduce((a, l) => a + l.text.length, 0), source: "studio-speech", owner: p.orgId ?? null })
   const track = joinWavs(
     clips,
     input.lines.map((l) => l.pauseMs),

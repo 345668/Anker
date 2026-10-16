@@ -29,6 +29,7 @@
 import { readRouterConfigSync, readRouterConfig } from "./runtime-config"
 import { filterChainForPolicy } from "./data-policy"
 import { qwenCompatBaseUrl } from "./qwen-endpoint"
+import { guessTokens, meter } from "@/lib/metering"
 
 const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://127.0.0.1:11434").replace(/\/+$/, "")
 const EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL ?? "nomic-embed-text"
@@ -150,6 +151,8 @@ async function withTimeout<T>(ms: number, fn: (signal: AbortSignal) => Promise<T
 }
 
 export interface EmbedOptions {
+  /** Set by embedBatch, which meters the whole batch once. */
+  noMeter?: boolean
   model?: string
   provider?: EmbedProvider
   /** Per-request timeout (ms). Default 20s. */
@@ -236,6 +239,7 @@ export async function embed(text: string, opts: EmbedOptions = {}): Promise<numb
     case "voyage":  v = keys.voyage ? await embedVoyage(text, keys.voyage, opts.timeoutMs) : null; break
     case "ollama":  v = keys.localOn ? await embedOllama(text, opts.model ?? EMBED_MODEL, opts.timeoutMs) : null; break
   }
+  if (v && !opts.noMeter) void meter({ unit: "embed_token", qty: guessTokens(text.length), estimated: true, source: "embeddings" })
   return fitDim(v, opts.dim)
 }
 
@@ -286,10 +290,12 @@ export async function embedBatch(
     while (true) {
       const i = cursor++
       if (i >= texts.length) return
-      out[i] = await embed(texts[i], opts)
+      out[i] = await embed(texts[i], { ...opts, noMeter: true })
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, texts.length) }, worker))
+  const chars = texts.reduce((a, t, i) => a + (out[i] ? t.length : 0), 0)
+  if (chars > 0 && !opts.noMeter) void meter({ unit: "embed_token", qty: guessTokens(chars), estimated: true, source: "embeddings" })
   return out
 }
 

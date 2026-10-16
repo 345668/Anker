@@ -307,9 +307,11 @@
     "tenant_requests",
     "tenant_tombstones",
     "term_grids",
+    "unit_prices",
     "url_health_checks",
     "url_health_jobs",
     "url_repair_candidates",
+    "usage_events",
     "user_email_settings",
     "user_roles",
     "user_settings",
@@ -647,6 +649,9 @@
       "org_id"
     ],
     "tenant_tombstones": [
+      "org_id"
+    ],
+    "usage_events": [
       "org_id"
     ],
     "valuation_snapshots": [

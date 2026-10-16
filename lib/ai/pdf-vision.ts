@@ -25,6 +25,7 @@
  * responsible for parsing JSON (each call-site has its own schema).
  */
 
+import { meter } from "@/lib/metering"
 import Anthropic from "@anthropic-ai/sdk"
 import { readRouterConfig, type AiRouterConfig } from "./runtime-config"
 import { qwenLanes } from "./qwen-lanes"
@@ -204,22 +205,27 @@ export async function analyzePdfDocuments(
       const docsWithText = await docsFor(p)
       if (p === "anthropic") {
         const text = await callAnthropic(docsWithText, prompt, k.anthropicKey, k.anthropicModel, maxTokens, temperature)
+        void meter({ unit: "vision_doc", qty: docs.length, source: tag })
         return { text, provider: "anthropic", model: k.anthropicModel, error: null }
       }
       if (p === "openai") {
         const text = await callOpenAI(docsWithText, prompt, k.openaiKey, k.openaiModel, maxTokens, temperature)
+        void meter({ unit: "vision_doc", qty: docs.length, source: tag })
         return { text, provider: "openai", model: k.openaiModel, error: null }
       }
       if (p === "gemini") {
         const text = await callGemini(docsWithText, prompt, k.geminiKey, k.geminiModel, maxTokens, temperature)
+        void meter({ unit: "vision_doc", qty: docs.length, source: tag })
         return { text, provider: "gemini", model: k.geminiModel, error: null }
       }
       if (p === "mistral") {
         const text = await callMistral(docsWithText, prompt, k.mistralKey, k.mistralModel, maxTokens, temperature, tag)
+        void meter({ unit: "vision_doc", qty: docs.length, source: tag })
         return { text, provider: "mistral", model: k.mistralModel, error: null }
       }
       if (p === "qwen") {
         const text = await callQwen(docsWithText, prompt, k.qwenKey, k.qwenBaseUrl, k.qwenModel, maxTokens, temperature, opts.json)
+        void meter({ unit: "vision_doc", qty: docs.length, source: tag })
         return { text, provider: "qwen", model: k.qwenModel, error: null }
       }
     } catch (e: any) {

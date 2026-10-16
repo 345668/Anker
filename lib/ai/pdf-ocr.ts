@@ -14,6 +14,7 @@
  * BEFORE they reach the extractor / analyzer prompts.
  */
 
+import { meter } from "@/lib/metering"
 import { standardQwen } from "./qwen-standard"
 import { loadPdfjs } from "./pdfjs"
 import { isFreeAllowanceExhausted, isQwenExhausted, markQwenExhausted } from "./qwen-lanes"
@@ -141,7 +142,13 @@ async function ocrPagePng(png: Buffer, apiKey: string, baseUrl: string, model: s
 }
 
 /** Public entry: OCR a PDF's pages via Qwen-VL-OCR. */
+/** Reads a PDF's pages with a vision model; each page attempted is metered (docs/architecture/58). */
 export async function ocrPdfBuffer(buf: Buffer, opts: OcrOpts = {}): Promise<OcrPdfResult> {
+  const r = await ocrPdfBufferUnmetered(buf, opts)
+  if (r.pagesAttempted > 0) void meter({ unit: "vision_page", qty: r.pagesAttempted, source: opts.tag ?? "pdf-ocr" })
+  return r
+}
+async function ocrPdfBufferUnmetered(buf: Buffer, opts: OcrOpts = {}): Promise<OcrPdfResult> {
   const maxPages = Math.max(1, Math.min(opts.maxPages ?? 15, 40))
   const scale = opts.scale ?? 1.7
   // qwen-vl-ocr first; when its free allowance is spent, a general vision model reads the page.

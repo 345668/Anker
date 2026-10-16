@@ -79,7 +79,7 @@ describe("the erasure registry covers every workspace-keyed table", () => {
   })
   it("retained and anonymised rules say why and how, and never retain a customer's content", () => {
     for (const r of RULES.filter((x) => x.retain)) { expect(r.retain!.length).toBeGreaterThan(20); expect(r.table).toMatch(/^billing_/) }
-    for (const r of RULES.filter((x) => x.anonymize)) expect(r.anonymize).toMatch(/workspace_id = NULL/)
+    for (const r of RULES.filter((x) => x.anonymize)) expect(r.anonymize).toMatch(/(workspace_id|org_id) = NULL/)
   })
   it("the shared directory and the do-not-contact lists can never be erased", () => {
     for (const t of ["investors", "email_suppressions", "li_suppressions", "outreach_consents"]) expect(RULES.map((r) => r.table)).not.toContain(t)

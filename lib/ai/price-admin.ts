@@ -2,6 +2,7 @@ import "server-only"
 import { sql } from "@/lib/db"
 import { catalogRates } from "./model-catalog"
 import { resetPriceCache } from "./pricing"
+import { resetUnitPriceCache, UNITS } from "@/lib/metering"
 
 export interface PriceRow { model: string; calls30d: number; unpriced30d: number; source: "table" | "catalog" | "none"; priceIn: number | null; priceOut: number | null; verified: boolean; note: string | null }
 
@@ -26,4 +27,21 @@ export async function savePrice(input: { model: unknown; priceIn: unknown; price
   await sql`INSERT INTO model_prices (model, price_in, price_out, verified, note, updated_by, updated_at) VALUES (${model}, ${pi}, ${po}, ${input.verified === true}, ${input.note ? String(input.note).slice(0, 300) : null}, ${by}, now())
     ON CONFLICT (model) DO UPDATE SET price_in = EXCLUDED.price_in, price_out = EXCLUDED.price_out, verified = EXCLUDED.verified, note = EXCLUDED.note, updated_by = EXCLUDED.updated_by, updated_at = now()`
   resetPriceCache()
+}
+
+export interface UnitPriceRow { unit: string; priceUsd: number; note: string | null; verified: boolean; events30d: number; qty30d: number; usd30d: number }
+export async function listUnitPrices(): Promise<UnitPriceRow[]> {
+  const rows = (await sql`SELECT p.unit, p.price_usd, p.note, p.verified, COALESCE(e.n, 0)::int AS n, COALESCE(e.q, 0)::float AS q, COALESCE(e.c, 0)::float AS c
+    FROM unit_prices p LEFT JOIN (SELECT unit, count(*) AS n, sum(qty) AS q, sum(cost_usd) AS c FROM usage_events WHERE created_at > now() - interval '30 days' GROUP BY unit) e ON e.unit = p.unit ORDER BY p.unit`) as any[]
+  return rows.map((r) => ({ unit: String(r.unit), priceUsd: Number(r.price_usd), note: r.note ?? null, verified: !!r.verified, events30d: Number(r.n), qty30d: Number(r.q), usd30d: Number(r.c) }))
+}
+/** Saves the list price of one unit (USD per single unit: a second, a character, a token, a page). */
+export async function saveUnitPrice(input: { unit: unknown; priceUsd: unknown; verified?: unknown; note?: unknown }, by: string): Promise<void> {
+  const unit = String(input.unit ?? "")
+  if (!(UNITS as readonly string[]).includes(unit)) throw new PriceError("Unknown unit.")
+  const p = Number(input.priceUsd)
+  if (!Number.isFinite(p) || p < 0 || p > 1000) throw new PriceError("The price is US dollars for one unit, between 0 and 1000.")
+  await sql`INSERT INTO unit_prices (unit, price_usd, verified, note, updated_by, updated_at) VALUES (${unit}, ${p}, ${input.verified === true}, ${input.note ? String(input.note).slice(0, 300) : null}, ${by}, now())
+    ON CONFLICT (unit) DO UPDATE SET price_usd = EXCLUDED.price_usd, verified = EXCLUDED.verified, note = EXCLUDED.note, updated_by = EXCLUDED.updated_by, updated_at = now()`
+  resetUnitPriceCache()
 }

@@ -8,11 +8,12 @@
 import { standardQwen } from "@/lib/ai/qwen-standard"
 import { WorkspaceError } from "@/lib/auth/workspace-context"
 import { AUDIO_MAX_BYTES } from "./attachment-limits"
+import { guessAudioSeconds, meter } from "@/lib/metering"
 
 const MIME: Record<string, string> = { mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac", ogg: "audio/ogg", flac: "audio/flac", webm: "audio/webm" }
 export const audioMime = (name: string) => MIME[name.toLowerCase().split(".").pop() ?? ""] ?? null
 
-export async function transcribeAudio(bytes: Buffer, name: string, signal?: AbortSignal): Promise<string> {
+export async function transcribeAudio(bytes: Buffer, name: string, signal?: AbortSignal, meterAs?: { owner?: string | null; seconds?: number; source?: string }): Promise<string> {
   const mime = audioMime(name)
   if (!mime) throw new WorkspaceError("Unsupported audio format. Use MP3, WAV, M4A, AAC, OGG, FLAC or WebM.", 400)
   if (bytes.length > AUDIO_MAX_BYTES) throw new WorkspaceError("Audio is limited to about 5 minutes (7 MB). Trim the recording and attach it again.", 413)
@@ -35,5 +36,6 @@ export async function transcribeAudio(bytes: Buffer, name: string, signal?: Abor
   const json: any = await res.json().catch(() => ({}))
   const text = String(json?.choices?.[0]?.message?.content ?? "").trim()
   if (!text) throw new WorkspaceError("No speech was recognised in this audio.", 422)
+  void meter({ unit: "asr_second", qty: meterAs?.seconds ?? guessAudioSeconds(bytes.length), estimated: meterAs?.seconds === undefined, source: meterAs?.source ?? "transcribe", owner: meterAs?.owner })
   return text
 }

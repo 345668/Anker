@@ -1,3 +1,4 @@
+import { meter } from "@/lib/metering"
 import "server-only"
 import { sql } from "@/lib/db"
 import { decryptSecret, encryptSecret } from "@/lib/db/secrets"
@@ -140,7 +141,7 @@ const dlError = (e: unknown) => ((e as Error)?.message === "file too large" ? pl
 const PIECE_SECONDS = 240, MAX_VOICE_SECONDS = 45 * 60, PARALLEL = 3
 export function realMedia(b: bot.ProductBot): Media {
   return {
-    async voice(_link, f) {
+    async voice(link, f) {
       const bytes = await bot.downloadFile(b, f.fileId, bot.BOT_DOWNLOAD_MAX).catch((e) => { throw dlError(e) })
       try {
         if (isOgg(bytes)) {
@@ -150,11 +151,11 @@ export function realMedia(b: bot.ProductBot): Media {
           const pieces = splitOggOpus(bytes, PIECE_SECONDS)
           const out: string[] = new Array(pieces.length)
           let next = 0
-          await Promise.all(Array.from({ length: Math.min(PARALLEL, pieces.length) }, async () => { for (;;) { const i = next++; if (i >= pieces.length) return; out[i] = await transcribeAudio(pieces[i], f.name) } }))
+          await Promise.all(Array.from({ length: Math.min(PARALLEL, pieces.length) }, async () => { for (;;) { const i = next++; if (i >= pieces.length) return; out[i] = await transcribeAudio(pieces[i], f.name, undefined, { owner: link.org_id, seconds: Math.max(1, Math.round(info.seconds / pieces.length)), source: "telegram-voice" }) } }))
           return out.join(" ").replace(/\s+/g, " ").trim()
         }
         if (bytes.length > 7 * 1024 * 1024) throw plain("That audio file is longer than I can listen to (about five minutes). A Telegram voice note can be longer.")
-        return await transcribeAudio(bytes, f.name)
+        return await transcribeAudio(bytes, f.name, undefined, { owner: link.org_id, source: "telegram-voice" })
       } catch (e) { if (e instanceof WorkspaceError) throw plain(e.message); throw e }
     },
     async file(link, f) {
@@ -174,7 +175,9 @@ export async function voiceReply(link: LinkRow, answer: string): Promise<Buffer 
     const max = await limitFor(link.org_id, "telegram_voice_replies_per_day", DAILY_LIMIT.voiceReplies)
     const [n] = (await sql`SELECT count(*)::int AS n FROM telegram_sent WHERE org_id = ${link.org_id} AND kind = 'voice_reply' AND sent_at > now() - interval '1 day'`) as any[]
     if (Number(n?.n ?? 0) >= max) return null
-    return (await speakAnswer(answer))?.mp3 ?? null
+    const spoken = await speakAnswer(answer)
+    if (spoken) void meter({ unit: "tts_char", qty: Math.round(spoken.seconds * 14), estimated: true, source: "telegram-voice-reply", owner: link.org_id })
+    return spoken?.mp3 ?? null
   } catch (e) { console.error("[telegram] spoken reply failed:", (e as Error)?.message); return null }
 }
 

@@ -79,3 +79,12 @@ Built and tested; migration `2026-10-16m-metering-m1.sql` applied to Neon.
 - **Found while testing:** the tool-call path would have thrown `prompt is not defined` (the browser's global `prompt` hid it from the type checker); the native-tools tests caught it and it is fixed before deploy.
 - **Backfill limit:** historic rows without token counts cannot be priced, so the last 30 days read 175 exact, 1,931 unpriced (mostly `qwen-flash` calls that returned no usage), 1,184 none (failed calls). New calls are counted properly; the coverage alert measures the last 24 hours only.
 - Next: M2 (`usage_events`, speech/vision/embeddings), M3 (gate, warnings, unit economics).
+
+## 14. Build status, M2 (2026-10-16)
+Built and tested; migration `2026-10-16o-metering-m2.sql` applied to Neon.
+- `usage_events` (append-only, no content) and `unit_prices`; `meter({ unit, qty, source, owner, ref, estimated })` in `lib/metering`. It never throws and never blocks the call it measures. Owner is the workspace given, else the running request's, else a named platform job.
+- Wired: speech to text (`transcribeAudio`: the Telegram voice path passes measured seconds and the workspace; other callers get a size-based guess, marked estimated), text to speech (studio speech and Telegram spoken replies), embeddings (a batch is metered once; estimated from text length), PDF reading (`vision_doc` per document sent, `vision_page` per page read), and generated images and video (at submission, video by requested seconds).
+- `usageThisMonth` now adds `usage_events` to the AI spend, so the monthly allowance sees these costs. SAIL **Model prices** has a second table for the unit prices. The `unpriced_model` alert also fires for a unit with no price (`unit:<name>`).
+- Erasure anonymises `usage_events` (owner removed). Tests: the meter itself, and that speech to text is metered with the right seconds and owner, and not metered on failure.
+- **The seven unit prices are placeholders, unverified.** None has been checked against a provider's price list; correct them in SAIL.
+- **Not wired yet:** the studio's image and video usage is metered at submission, so a job that fails later is still counted (its credits are refunded, its usage event is not); Halyard's local models; any Telegram file download. Chat-completion calls stay in `ai_calls`.
