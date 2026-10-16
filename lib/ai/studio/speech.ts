@@ -9,6 +9,7 @@ import { assertCreation, assertScope } from "./service"
 import { publicAsset, storeAsset } from "./assets"
 import { durationMs, joinWavs, parseWav, wavBytes } from "./wav"
 import { meter } from "@/lib/metering"
+import { assertCan } from "@/lib/metering/allowance"
 /** Qwen3-TTS voices offered in the studio. docs/architecture/48. */
 export const VOICES = [
   { id: "Ethan", label: "Ethan", gender: "male" },
@@ -83,6 +84,7 @@ export async function speakLine(voice: string, text: string, language: string) {
 export async function createSpeech(p: AiPrincipal, input: SpeechInput) {
   assertScope(p, input.scopeKey, true)
   await assertCreation(p)
+  if (p.orgId) await assertCan(p.orgId, "speech_out", input.lines.reduce((a, l) => a + l.text.length, 0))
   await requireConfiguration()
   const [n] =
     await sql`SELECT count(*)::int AS n FROM ai_studio_assets WHERE user_id=${p.userId} AND kind='audio' AND job_id IS NULL AND created_at>now()-interval '1 day'`

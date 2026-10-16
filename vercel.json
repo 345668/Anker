@@ -98,6 +98,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/usage-warnings",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/cron/telegram-notify",
       "schedule": "*/5 * * * *"
     },

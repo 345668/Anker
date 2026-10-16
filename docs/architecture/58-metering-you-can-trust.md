@@ -88,3 +88,15 @@ Built and tested; migration `2026-10-16o-metering-m2.sql` applied to Neon.
 - Erasure anonymises `usage_events` (owner removed). Tests: the meter itself, and that speech to text is metered with the right seconds and owner, and not metered on failure.
 - **The seven unit prices are placeholders, unverified.** None has been checked against a provider's price list; correct them in SAIL.
 - **Not wired yet:** the studio's image and video usage is metered at submission, so a job that fails later is still counted (its credits are refunded, its usage event is not); Halyard's local models; any Telegram file download. Chat-completion calls stay in `ai_calls`.
+
+## 15. Build status, M3 (2026-10-16)
+Built and tested (2,000+ tests green); migration `2026-10-16q-metering-m3.sql` applied to Neon; new cron `usage-warnings` every 30 minutes.
+- **The check.** `whyNot` / `assertCan(orgId, capability, qty)` (`lib/metering/allowance.ts`): the estimate is quantity times the unit's list price (chat is a flat $0.006) and must fit in what is left of `ai_spend_usd_month`. Wired in front of Telegram voice notes and files, Telegram spoken replies (skipped quietly when over, the written answer still goes), studio images and video, and studio speech. A failing check never stops work. The existing monthly check in front of chat, agents and the studio is unchanged.
+- **Warnings.** At 80% and 100% of the month's allowance, once each per workspace per month (recorded before sending, so two runs cannot double-send), owners and admins get an in-app notification with amounts only. New alert rule `workspace_at_limit` (digest) tells the operator.
+- **Workspace usage page** `/dashboard/usage` and `GET /api/usage`: the allowance as a bar, the reset date, and where it went (chat by task, then speech, search, documents and media). Also in the command palette.
+- **SAIL Unit economics:** this month at list price (chat, metered units, platform jobs), workspaces against their limits, cost of one job by task (median and 95th percentile of the cost per run), metered units, and the provider bills the founder enters per month beside the list-price total.
+- **Deviations from section 5, stated plainly:**
+  - When the allowance runs out, **chat is refused with a clear message, not moved to a free lane.** Moving it would change the model router, which is a separate piece of work; the existing refusal already says what happened.
+  - Warnings are in-app only; **Telegram does not carry them yet.**
+  - **Free-lane share is not shown**, because calls do not record which lane served them.
+- Section 8 (a prepaid credit ledger) is still deliberately not built.

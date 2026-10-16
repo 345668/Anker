@@ -55,7 +55,7 @@ export interface Deps {
   remember(link: LinkRow, chatId: number, messageId: number): Promise<void>
   media: Media
   /** Daily limits per device for voice notes and files; a refusal in words, or null. */
-  allow(link: LinkRow, kind: "voice" | "file"): Promise<string | null>
+  allow(link: LinkRow, kind: "voice" | "file", qty?: number): Promise<string | null>
   stash(link: LinkRow, kind: "voice" | "file", title: string, text: string): Promise<string>
   readPending(link: LinkRow, id: string): Promise<{ id: string; kind: "voice" | "file"; title: string; text: string } | null>
   dropPending(link: LinkRow, id: string): Promise<void>
@@ -201,7 +201,7 @@ async function handleMedia(m: TgMessage, link: LinkRow, deps: Deps): Promise<voi
     const longOk = !!m.voice || OGG_NAME.test((m.audio?.file_name ?? m.document?.file_name) ?? "")
     const tooLong = longOk ? (audio.duration ?? 0) > VOICE_MAX_SECONDS || (audio.file_size ?? 0) > FILE_MAX_BYTES : (audio.duration ?? 0) > AUDIO_MAX_SECONDS || (audio.file_size ?? 0) > AUDIO_MAX_BYTES
     if (tooLong) { await reply(deps, chatId, MSG.voiceTooLong); return }
-    const limit = await deps.allow(link, "voice"); if (limit) { await reply(deps, chatId, limit); return }
+    const limit = await deps.allow(link, "voice", audio.duration); if (limit) { await reply(deps, chatId, limit); return }
     await deps.api.sendChatAction(chatId)
     if ((audio.duration ?? 0) > AUDIO_MAX_SECONDS) await reply(deps, chatId, MSG.listening)
     let text: string

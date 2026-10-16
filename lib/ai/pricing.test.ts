@@ -3,7 +3,7 @@ vi.mock("server-only", () => ({}))
 const rows = vi.hoisted(() => ({ v: [] as any[], fail: false }))
 vi.mock("@/lib/db", () => ({ sql: async () => { if (rows.fail) throw new Error("no table"); return rows.v } }))
 import { costCenterOf, priceCall, ratesFor, resetPriceCache, warmPrices } from "./pricing"
-import { costCoverage, unpricedModel, type Snapshot } from "@/lib/ops/alerts/rules"
+import { costCoverage, unpricedModel, workspaceAtLimit, type Snapshot } from "@/lib/ops/alerts/rules"
 
 beforeEach(() => { rows.v = []; rows.fail = false; resetPriceCache() })
 
@@ -60,5 +60,9 @@ describe("alert rules", () => {
   it("one finding per unpriced model, naming the model and the count", () => {
     const f = unpricedModel(snap({ costed: 100, unpriced: 3, unpricedModels: [{ model: "glm-9", calls: 3 }] }))
     expect(f).toHaveLength(1); expect(f[0]).toMatchObject({ rule: "unpriced_model", subject: "glm-9", severity: 2 }); expect(f[0].summary).toContain("glm-9")
+  })
+  it("a workspace that reached its allowance is one digest-level finding each", () => {
+    const f = workspaceAtLimit(snap({ costed: 0, unpriced: 0, unpricedModels: [], atLimit: ["o1", "o2"] }))
+    expect(f.map((x) => x.subject)).toEqual(["o1", "o2"]); expect(f[0]).toMatchObject({ rule: "workspace_at_limit", severity: 3 }); expect(workspaceAtLimit(snap(undefined))).toEqual([])
   })
 })

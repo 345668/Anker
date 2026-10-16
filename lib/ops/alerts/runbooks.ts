@@ -53,6 +53,11 @@ export const RUNBOOKS: Record<RuleKey, Runbook> = {
     check: "The model name in this alert; SAIL, Model prices.",
     fix: "Enter the model's list price per million input and output tokens in SAIL, Model prices. The incident clears when no unpriced call is recorded for a day.",
   },
+  workspace_at_limit: {
+    means: "A workspace used all of its monthly AI allowance, so its AI answers, voice notes, document reading and generation are paused until the month resets.",
+    check: "SAIL, Unit economics: the workspace's spend against its limit and where it went. SAIL, Tenants: its plan and limits.",
+    fix: "If the use is legitimate, raise the workspace's AI limit in SAIL, Tenants, or move it to a larger plan. If it looks wrong (a loop, a very large upload), look at the usage breakdown first. The owners have already been told in the app.",
+  },
   alerter_stale: {
     means: "The alert evaluator itself has stopped. Until it runs again nothing is being watched, so any other fault would go unreported.",
     check: "Vercel, Cron Jobs: is alerts-evaluate scheduled and recent? Function logs for /api/cron/alerts-evaluate: an error, a timeout, a missing CRON_SECRET. SAIL, Alerts, the heartbeat line.",

@@ -1,5 +1,6 @@
 import { meter } from "@/lib/metering"
 import { isMember, purgeFormerMembers } from "./membership"
+import { whyNot } from "@/lib/metering/allowance"
 import "server-only"
 import { sql } from "@/lib/db"
 import { decryptSecret, encryptSecret } from "@/lib/db/secrets"
@@ -126,7 +127,7 @@ export const DAILY_LIMIT = { voice: 40, file: 30, audioMinutes: 120, voiceReplie
 async function limitFor(orgId: string, key: string, fallback: number): Promise<number> {
   try { const v = (await getEffective(orgId)).limits?.[key as keyof Awaited<ReturnType<typeof getEffective>>["limits"]]; return typeof v === "number" ? (v < 0 ? Infinity : v) : fallback } catch { return fallback }
 }
-export async function allow(link: LinkRow, kind: "voice" | "file"): Promise<string | null> {
+export async function allow(link: LinkRow, kind: "voice" | "file", qty?: number): Promise<string | null> {
   const max = await limitFor(link.org_id, kind === "voice" ? "telegram_voice_per_day" : "telegram_files_per_day", DAILY_LIMIT[kind])
   const [r] = (await sql`SELECT count(*)::int AS n FROM telegram_updates WHERE link_id = ${link.id} AND kind = ${kind} AND received_at > now() - interval '1 day'`) as any[]
   if (Number(r?.n ?? 0) > max) return `You have reached today's limit of ${max} ${kind === "voice" ? "voice notes" : "files"} on this device. It resets tomorrow; you can still use Anker in the app.`
@@ -135,7 +136,8 @@ export async function allow(link: LinkRow, kind: "voice" | "file"): Promise<stri
     const [u] = (await sql`SELECT COALESCE(sum(units), 0)::int AS s FROM telegram_updates WHERE org_id = ${link.org_id} AND kind = 'voice' AND received_at > now() - interval '1 day'`) as any[]
     if (Number(u?.s ?? 0) > mins * 60) return `Your workspace has used its ${mins} minutes of voice notes for today. It resets tomorrow; you can still type here or use Anker in the app.`
   }
-  return null
+  // The workspace's monthly AI allowance (docs/architecture/58): what this recording or file would cost must still fit.
+  return whyNot(link.org_id, kind === "voice" ? "speech_in" : "documents", kind === "voice" ? (qty ?? 60) : 1)
 }
 
 const dlError = (e: unknown) => ((e as Error)?.message === "file too large" ? plain("That file is larger than Telegram lets me download (20 MB). Upload it in Anker instead.") : plain("I couldn't download that from Telegram. Please send it again."))
@@ -174,6 +176,7 @@ export async function voiceReply(link: LinkRow, answer: string): Promise<Buffer 
   try {
     const [p] = (await sql`SELECT voice_replies FROM telegram_prefs WHERE link_id = ${link.id}`) as any[]
     if (!p?.voice_replies) return null
+    if (await whyNot(link.org_id, "speech_out", Math.min(answer.length, 1500))) return null      // a spoken reply is never worth the last of the allowance; the written answer still goes
     const max = await limitFor(link.org_id, "telegram_voice_replies_per_day", DAILY_LIMIT.voiceReplies)
     const [n] = (await sql`SELECT count(*)::int AS n FROM telegram_sent WHERE org_id = ${link.org_id} AND kind = 'voice_reply' AND sent_at > now() - interval '1 day'`) as any[]
     if (Number(n?.n ?? 0) >= max) return null

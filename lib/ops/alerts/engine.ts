@@ -79,7 +79,8 @@ export async function gatherMore(snap: Snapshot, thresholds: Thresholds): Promis
     const [c] = (await sql`SELECT count(*) FILTER (WHERE cost_state IN ('exact', 'estimated'))::int AS costed, count(*) FILTER (WHERE cost_state = 'unpriced')::int AS unpriced FROM ai_calls WHERE created_at > now() - interval '24 hours'`) as any[]
     const models = (await sql`SELECT COALESCE(model, '(unknown model)') AS model, count(*)::int AS n FROM ai_calls WHERE created_at > now() - interval '24 hours' AND cost_state = 'unpriced' AND model IS NOT NULL GROUP BY 1 ORDER BY n DESC LIMIT 10`) as any[]
     const units = (await sql`SELECT unit, count(*)::int AS n FROM usage_events WHERE created_at > now() - interval '24 hours' AND cost_state = 'unpriced' GROUP BY unit`.catch(() => [])) as any[]
-    snap.metering = { costed: Number(c?.costed ?? 0), unpriced: Number(c?.unpriced ?? 0), unpricedModels: [...models.map((m) => ({ model: String(m.model), calls: Number(m.n) })), ...units.map((u) => ({ model: `unit:${u.unit}`, calls: Number(u.n) }))] }
+    const atLimit = ((await sql`SELECT DISTINCT org_id FROM usage_warnings WHERE threshold = 100 AND created_at > now() - interval '24 hours'`.catch(() => [])) as any[]).map((r) => String(r.org_id))
+    snap.metering = { atLimit, costed: Number(c?.costed ?? 0), unpriced: Number(c?.unpriced ?? 0), unpricedModels: [...models.map((m) => ({ model: String(m.model), calls: Number(m.n) })), ...units.map((u) => ({ model: `unit:${u.unit}`, calls: Number(u.n) }))] }
   } catch { /* cost columns not there yet */ }
   try {
     const rows = (await sql`SELECT results FROM dependency_checks ORDER BY id DESC LIMIT 3`) as any[]

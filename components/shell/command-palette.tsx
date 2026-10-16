@@ -88,6 +88,8 @@ const EXTRAS: (Dest & { personas?: Persona[] })[] = [
 
 const ACCOUNT: Dest[] = [
   { label: "Settings", href: "/dashboard/settings", group: "Account" },
+  { label: "Usage and AI allowance", href: "/dashboard/usage", group: "Account" },
+  { label: "Connected channels (Telegram)", href: "/dashboard/channels", group: "Account" },
   // API Keys is Owner-Console-only (Anker staff), so it's not in the customer palette.
   {
     label: "Extension",

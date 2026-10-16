@@ -262,6 +262,7 @@
     "potential_duplicates",
     "private_artifacts",
     "profiles",
+    "provider_bills",
     "research_crawl_logs",
     "research_documents",
     "research_organizations",
@@ -312,6 +313,7 @@
     "url_health_jobs",
     "url_repair_candidates",
     "usage_events",
+    "usage_warnings",
     "user_email_settings",
     "user_roles",
     "user_settings",
@@ -652,6 +654,9 @@
       "org_id"
     ],
     "usage_events": [
+      "org_id"
+    ],
+    "usage_warnings": [
       "org_id"
     ],
     "valuation_snapshots": [

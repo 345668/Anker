@@ -1,4 +1,5 @@
 import { meter } from "@/lib/metering"
+import { assertCan } from "@/lib/metering/allowance"
 import { randomBytes, randomUUID } from "node:crypto"
 import { sql } from "@/lib/db"
 import type { AiPrincipal } from "@/lib/assistant/context"
@@ -100,6 +101,7 @@ export async function createJob(p: AiPrincipal, input: GenerationInput) {
     return view(old as Row)
   }
   await assertCreation(p)
+  if (p.orgId) { const video = modelFor(input.model)?.kind === "video"; await assertCan(p.orgId, video ? "video" : "image", video ? Number((input as any).duration ?? 5) : 1) }
   // Generation is sent to Alibaba Cloud: a workspace policy that forbids it stops the job before anything is uploaded (docs/architecture/54 D6).
   { const { filterChainForPolicy } = await import("@/lib/ai/data-policy"); const pol = await filterChainForPolicy(["qwen"], p.orgId); if (pol.refusal) throw new WorkspaceError(pol.refusal, 403) }
   const recipe = modelFor(input.model)?.recipe

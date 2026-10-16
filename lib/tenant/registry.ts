@@ -149,6 +149,7 @@ export const RULES: Rule[] = [
   { scope: O, table: "billing_customers", where: "org_id::text = $1", retain: "Invoices and subscription records are kept for the statutory retention period (German commercial and tax law)." },
   { scope: O, table: "billing_credit_ledger", where: "org_id::text = $1", retain: "Credit and invoice ledger entries are kept for the statutory retention period." },
   // anonymised: the cost history stays, the identity does not
+  { scope: O, table: "usage_warnings", where: "org_id::text = $1" },
   { scope: O, table: "usage_events", where: "org_id::text = $1", anonymize: "org_id = NULL, cost_center = 'platform:erased', ref = NULL" },
   { scope: O, table: "ai_calls", where: "workspace_id::text = $1", anonymize: "workspace_id = NULL, actor_id = NULL, actor_email = NULL, error = NULL" },
   // ── members' own content, for people who belong to no other workspace ──

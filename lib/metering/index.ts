@@ -18,6 +18,8 @@ let cache: { at: number; map: Map<string, number> } | null = null
 const TTL_MS = 60_000
 export const resetUnitPriceCache = () => { cache = null }
 
+export async function unitPrice(unit: Unit): Promise<number | undefined> { return (await prices()).get(unit) }
+
 async function prices(): Promise<Map<string, number>> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.map
   try {
