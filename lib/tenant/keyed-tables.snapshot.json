@@ -294,6 +294,8 @@
     "teams",
     "telegram_link_codes",
     "telegram_links",
+    "telegram_prefs",
+    "telegram_shown",
     "telegram_updates",
     "tenant_entitlements",
     "tenant_lifecycle",
@@ -608,6 +610,12 @@
       "org_id"
     ],
     "telegram_links": [
+      "org_id"
+    ],
+    "telegram_prefs": [
+      "org_id"
+    ],
+    "telegram_shown": [
       "org_id"
     ],
     "telegram_updates": [

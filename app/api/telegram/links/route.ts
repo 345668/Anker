@@ -7,7 +7,7 @@ import { NextResponse } from "next/server"
 import { requireAiPrincipal } from "@/lib/assistant/principal"
 import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 import { productBot } from "@/lib/telegram/api"
-import { createLinkCode, listLinks, CODE_TTL_MIN } from "@/lib/telegram/links"
+import { createLinkCode, listLinks, getPrefs, CODE_TTL_MIN } from "@/lib/telegram/links"
 import { botUsername, gate } from "@/lib/telegram/runtime"
 import { logAudit } from "@/lib/audit/audit-log"
 
@@ -22,7 +22,8 @@ export async function GET() {
     if (!p.orgId) return NextResponse.json({ available: false, reason: "Telegram connects to a company or fund workspace.", links: [] }, { headers: noStore })
     const bot = productBot(), reason = bot ? await gate({ org_id: p.orgId }) : "The Telegram bot has not been set up yet."
     const links = await listLinks(p.userId, p.orgId, mgr(p))
-    return NextResponse.json({ available: !reason, reason, bot: bot ? await botUsername(bot) : null, canManageAll: mgr(p), me: p.userId, ttlMinutes: CODE_TTL_MIN, links: links.map((l) => ({ id: l.id, userId: l.user_id, mine: l.user_id === p.userId, username: l.telegram_username, mode: l.mode, status: l.status, linkedAt: l.linked_at, lastSeenAt: l.last_seen_at })) }, { headers: noStore })
+    const prefs = await getPrefs(links.filter((l) => l.user_id === p.userId).map((l) => l.id))
+    return NextResponse.json({ available: !reason, reason, bot: bot ? await botUsername(bot) : null, canManageAll: mgr(p), canWrite: p.canWrite, me: p.userId, ttlMinutes: CODE_TTL_MIN, links: links.map((l) => ({ id: l.id, userId: l.user_id, mine: l.user_id === p.userId, username: l.telegram_username, mode: l.mode, status: l.status, linkedAt: l.linked_at, lastSeenAt: l.last_seen_at, prefs: prefs[l.id] ?? { approvals: false, replies: false, deadlines: false } })) }, { headers: noStore })
   } catch (e) { return workspaceError(e) }
 }
 

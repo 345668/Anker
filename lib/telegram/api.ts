@@ -40,7 +40,11 @@ export const setWebhook = (bot: ProductBot, url: string, f?: Fetch) => call(bot,
 export const deleteWebhook = (bot: ProductBot, f?: Fetch) => call(bot, "deleteWebhook", { drop_pending_updates: false }, f)
 export const sendChatAction = (bot: ProductBot, chatId: number, action = "typing", f?: Fetch) => call(bot, "sendChatAction", { chat_id: chatId, action }, f, 5_000).catch(() => {})
 export const leaveChat = (bot: ProductBot, chatId: number, f?: Fetch) => call(bot, "leaveChat", { chat_id: chatId }, f).catch(() => {})
-export const sendMessage = (bot: ProductBot, chatId: number, html: string, f?: Fetch) =>
-  call<{ message_id: number }>(bot, "sendMessage", { chat_id: chatId, text: html, parse_mode: "HTML", disable_web_page_preview: true }, f)
-export const editMessage = (bot: ProductBot, chatId: number, messageId: number, html: string, f?: Fetch) =>
-  call(bot, "editMessageText", { chat_id: chatId, message_id: messageId, text: html, parse_mode: "HTML", disable_web_page_preview: true }, f)
+/** Inline buttons under a message: `callback_data` comes back as a callback query; `url` opens a page. */
+export interface Markup { inline_keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> }
+export const sendMessage = (bot: ProductBot, chatId: number, html: string, markup?: Markup | null, f?: Fetch) =>
+  call<{ message_id: number }>(bot, "sendMessage", { chat_id: chatId, text: html, parse_mode: "HTML", disable_web_page_preview: true, ...(markup ? { reply_markup: markup } : {}) }, f)
+export const editMessage = (bot: ProductBot, chatId: number, messageId: number, html: string, markup?: Markup | null, f?: Fetch) =>
+  call(bot, "editMessageText", { chat_id: chatId, message_id: messageId, text: html, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: markup ?? { inline_keyboard: [] } }, f)
+export const answerCallback = (bot: ProductBot, callbackId: string, text?: string, alert = false, f?: Fetch) =>
+  call(bot, "answerCallbackQuery", { callback_query_id: callbackId, ...(text ? { text: text.slice(0, 190), show_alert: alert } : {}) }, f, 5_000).catch(() => {})

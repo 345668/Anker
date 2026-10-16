@@ -25,8 +25,8 @@ const TG = 1810594739, CHAT = 1810594739
 const sent: Array<{ chat: number; html: string }> = []
 const left: number[] = []
 const deps = (o: Partial<Deps> = {}): Deps => ({
-  api: { sendMessage: async (c, h) => { sent.push({ chat: c, html: h }) }, sendChatAction: async () => {}, leaveChat: async (c) => { left.push(c) } },
-  gate: async () => null, ask: async () => ({ answer: "Here is your answer." }), appUrl: "https://app.test", ...o,
+  api: { sendMessage: async (c, h) => { sent.push({ chat: c, html: h }) }, editMessage: async () => {}, answerCallback: async () => {}, sendChatAction: async () => {}, leaveChat: async (c) => { left.push(c) } },
+  gate: async () => null, ask: async () => ({ answer: "Here is your answer." }), newProposals: async () => [], pending: async () => [], decide: async () => { throw new Error("not used") }, today: async () => ({ pending: 0, tasksToday: 0, overdue: 0, replies24h: 0 }), shown: async () => {}, appUrl: "https://app.test", ...o,
 })
 let uid = 1000
 const msg = (text: string | undefined, o: Record<string, unknown> = {}, from = TG, chat = CHAT, type = "private"): TgUpdate => ({ update_id: ++uid, message: { message_id: uid, from: { id: from, username: "rick" }, chat: { id: chat, type }, text, ...o } })
@@ -157,7 +157,7 @@ describe("what the bot does with a message", () => {
   })
   it("/help and /whoami work for an active account, and voice notes, photos and files are declined for now", async () => {
     await activeLink()
-    await handleUpdate(msg("/help"), deps()); expect(sent[0].html).toContain("read-only")
+    await handleUpdate(msg("/help"), deps()); expect(sent[0].html).toContain("Approve and Reject")
     await handleUpdate(msg("/whoami"), deps()); expect(sent[1].html).toBe("Connected to Acme Fund in read-only mode.")
     await handleUpdate(msg(undefined, { voice: { file_id: "x" } }), deps()); expect(sent[2].html).toContain("next release")
     await handleUpdate(msg(undefined, { document: { file_id: "x" } }), deps()); expect(sent[3].html).toContain("next release")
@@ -187,10 +187,10 @@ describe("what the bot does with a message", () => {
     await handleUpdate(msg("long"), deps({ ask: async () => ({ answer: "<script>alert(1)</script> " + ("word ".repeat(600) + "\n\n").repeat(10) }) }))
     expect(sent.length).toBe(4); expect(sent[0].html).toContain("&lt;script&gt;"); expect(sent[3].html).toContain("https://app.test/dashboard/anker-ai")
   })
-  it("an edited message, a callback or a message with no sender does nothing in T1", async () => {
+  it("an edited message, a callback with nothing to act on, or a message with no sender sends nothing", async () => {
     await activeLink()
     await handleUpdate({ update_id: 3, edited_message: { message_id: 1, from: { id: TG }, chat: { id: CHAT, type: "private" }, text: "x" } }, deps())
-    await handleUpdate({ update_id: 4, callback_query: {} }, deps()); await handleUpdate({ update_id: 5, message: { message_id: 1, chat: { id: CHAT, type: "private" }, text: "hi" } }, deps())
+    await handleUpdate({ update_id: 4, callback_query: { id: "cb", from: { id: TG }, data: "x", message: undefined } }, deps()); await handleUpdate({ update_id: 5, message: { message_id: 1, chat: { id: CHAT, type: "private" }, text: "hi" } }, deps())
     expect(sent).toHaveLength(0)
   })
 })
@@ -217,7 +217,7 @@ describe("the update queue", () => {
   })
   it("a failure is retried up to three times and then given up on, with the content wiped and no content in the error", async () => {
     await activeLink(); const u = msg("hello"); await enqueue(u)
-    const boom = deps({ api: { sendMessage: async () => { throw new Error("telegram down") }, sendChatAction: async () => {}, leaveChat: async () => {} } })
+    const boom = deps({ api: { sendMessage: async () => { throw new Error("telegram down") }, editMessage: async () => {}, answerCallback: async () => {}, sendChatAction: async () => {}, leaveChat: async () => {} } })
     for (let i = 1; i < MAX_ATTEMPTS; i++) { expect(await processUpdate(u.update_id, boom)).toBe("failed"); expect((await rows("SELECT status FROM telegram_updates"))[0].status).toBe("queued") }
     expect(await processUpdate(u.update_id, boom)).toBe("failed")
     expect((await rows("SELECT status, payload_enc, error, attempts FROM telegram_updates"))[0]).toEqual({ status: "failed", payload_enc: null, error: "telegram down", attempts: MAX_ATTEMPTS })

@@ -32,8 +32,17 @@ describe("the client", () => {
   })
   it("sends HTML with previews off", async () => {
     let body: any
-    await sendMessage(b, 42, "<b>hi</b>", (async (_u: string, init: any) => { body = JSON.parse(init.body); return new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 }) }) as any)
+    await sendMessage(b, 42, "<b>hi</b>", null, (async (_u: string, init: any) => { body = JSON.parse(init.body); return new Response(JSON.stringify({ ok: true, result: { message_id: 7 } }), { status: 200 }) }) as any)
     expect(body).toMatchObject({ chat_id: 42, text: "<b>hi</b>", parse_mode: "HTML", disable_web_page_preview: true })
+  })
+  it("sends inline buttons with a message, edits a message and clears its buttons, and answers a callback", async () => {
+    const seen: any[] = []
+    const f = (async (u: string, init: any) => { seen.push({ u, body: JSON.parse(init.body) }); return new Response(JSON.stringify({ ok: true, result: { message_id: 1 } }), { status: 200 }) }) as any
+    await sendMessage(b, 42, "x", { inline_keyboard: [[{ text: "Approve", callback_data: "a:1" }]] }, f)
+    expect(seen[0].body.reply_markup).toEqual({ inline_keyboard: [[{ text: "Approve", callback_data: "a:1" }]] })
+    const { editMessage, answerCallback } = await import("./api")
+    await editMessage(b, 42, 9, "done", null, f); expect(seen[1].u).toContain("/editMessageText"); expect(seen[1].body).toMatchObject({ chat_id: 42, message_id: 9, reply_markup: { inline_keyboard: [] } })
+    await answerCallback(b, "cb1", "Done", false, f); expect(seen[2].body).toEqual({ callback_query_id: "cb1", text: "Done", show_alert: false })
   })
   it("a refusal and a network failure are TelegramErrors that never contain the token", async () => {
     const e1 = await getMe(b, (async () => new Response(JSON.stringify({ ok: false, description: `Unauthorized ${TOKEN}` }), { status: 401 })) as any).then(() => null, (e) => e)
