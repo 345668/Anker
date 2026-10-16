@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       const r = await checkEmail(body.email, { timeoutMs: Number(body.timeoutMs) || 12_000 })
       return NextResponse.json({
         results: [r], summary: summarizeVerdicts([r]),
-        hunterAvailable: isHunterAvailable(),
+        hunterAvailable: await isHunterAvailable(),
       })
     }
 
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const owned = owners.length === results.length
       ? results.map((r, i) => ({ ...r, owner: owners[i] }))
       : results
-    return NextResponse.json({ results: owned, summary, hunterAvailable: isHunterAvailable() })
+    return NextResponse.json({ results: owned, summary, hunterAvailable: await isHunterAvailable() })
   } catch (e: any) {
     console.error("[admin/email-check] error:", e)
     return NextResponse.json({ error: e?.message ?? "email-check failed" }, { status: 500 })

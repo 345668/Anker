@@ -17,6 +17,7 @@ import { encryptSecret, decryptSecret, hasEncryptionKey } from "./crypto"
 
 export const INTEGRATION_KEY_NAMES = [
   "RESEND_API_KEY",
+  "HUNTER_API_KEY",
   "OPENSANCTIONS_API_KEY",
   "COMPANIES_HOUSE_API_KEY",
   "COMP_BENCHMARK_API_URL",

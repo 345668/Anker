@@ -5,8 +5,7 @@
  *   Finder:        /v2/email-finder?domain=…&first_name=…&last_name=…
  *   Domain-search: /v2/domain-search?domain=…&limit=…
  *
- * Configured via env:
- *   HUNTER_API_KEY    required for any Hunter call to succeed
+ * Configured by the key HUNTER_API_KEY, from SAIL (Integration keys, stored encrypted) or the Vercel environment; the stored key wins.
  *
  * The wrapper deliberately returns a small, normalised shape the rest
  * of the codebase can lean on — Hunter's raw responses are deeply
@@ -16,15 +15,17 @@
  * so callers can fall back to local-AI / format-check paths.
  */
 
+import { getIntegrationKey } from "@/lib/config/integration-keys"
+
 const HUNTER_BASE = "https://api.hunter.io/v2"
 
-export function isHunterAvailable(): boolean {
-  const k = process.env.HUNTER_API_KEY
+export async function isHunterAvailable(): Promise<boolean> {
+  const k = await getIntegrationKey("HUNTER_API_KEY")
   return !!k && k.trim().length > 0 && k !== "stub"
 }
 
-function key(): string {
-  const k = process.env.HUNTER_API_KEY?.trim()
+async function key(): Promise<string> {
+  const k = (await getIntegrationKey("HUNTER_API_KEY"))?.trim()
   if (!k) throw new Error("HUNTER_API_KEY not set")
   return k
 }
@@ -64,12 +65,12 @@ export async function verifyEmail(
   email: string,
   opts: { timeoutMs?: number } = {},
 ): Promise<VerifyResponse> {
-  if (!isHunterAvailable()) {
+  if (!(await isHunterAvailable())) {
     return offlineVerify(email, "Hunter API key missing")
   }
   const url = new URL(`${HUNTER_BASE}/email-verifier`)
   url.searchParams.set("email", email)
-  url.searchParams.set("api_key", key())
+  url.searchParams.set("api_key", await key())
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 12_000)
   try {
@@ -156,7 +157,7 @@ export async function findEmail(
   args: { domain: string; firstName?: string; lastName?: string; fullName?: string; company?: string },
   opts: { timeoutMs?: number } = {},
 ): Promise<FindResponse> {
-  if (!isHunterAvailable()) {
+  if (!(await isHunterAvailable())) {
     return { ok: false, email: null, score: 0, method: null, detail: "Hunter API key missing" }
   }
   const url = new URL(`${HUNTER_BASE}/email-finder`)
@@ -166,7 +167,7 @@ export async function findEmail(
   if (args.firstName) url.searchParams.set("first_name", args.firstName)
   if (args.lastName) url.searchParams.set("last_name", args.lastName)
   if (!args.firstName && !args.lastName && args.fullName) url.searchParams.set("full_name", args.fullName)
-  url.searchParams.set("api_key", key())
+  url.searchParams.set("api_key", await key())
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 12_000)
   try {
@@ -208,14 +209,14 @@ export async function domainSearch(
   domain: string,
   opts: { limit?: number; type?: "personal" | "generic"; timeoutMs?: number } = {},
 ): Promise<{ ok: boolean; domain: string; emails: DomainSearchEmail[]; detail: string }> {
-  if (!isHunterAvailable()) {
+  if (!(await isHunterAvailable())) {
     return { ok: false, domain, emails: [], detail: "Hunter API key missing" }
   }
   const url = new URL(`${HUNTER_BASE}/domain-search`)
   url.searchParams.set("domain", stripScheme(domain))
   url.searchParams.set("limit", String(Math.max(1, Math.min(100, opts.limit ?? 25))))
   if (opts.type) url.searchParams.set("type", opts.type)
-  url.searchParams.set("api_key", key())
+  url.searchParams.set("api_key", await key())
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 12_000)
   try {

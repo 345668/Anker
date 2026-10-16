@@ -82,7 +82,7 @@ export async function checkEmail(
   }
 
   // Prefer Hunter when configured
-  if (isHunterAvailable()) {
+  if (await isHunterAvailable()) {
     const v = await verifyEmail(email, { timeoutMs: opts.timeoutMs })
     let verdict: EmailVerdict = "unknown"
     if (v.flags.disposable) verdict = "disposable"
@@ -140,7 +140,7 @@ export async function checkEmail(
     verdict: mxOk ? "unknown" : "no_mx",
     score: mxOk ? 50 : 0,
     detail: mxOk
-      ? "format ok, MX present (deliverability not verified — set HUNTER_API_KEY for SMTP-grade verification)"
+      ? "format ok, MX present (deliverability not verified — add the Hunter API key in SAIL, Integration keys, for SMTP-grade verification)"
       : "no MX records",
     durationMs: Date.now() - startedAt,
     checkedAt,

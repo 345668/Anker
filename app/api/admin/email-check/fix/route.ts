@@ -65,9 +65,9 @@ export async function POST(req: NextRequest) {
       proposed = body.email.trim().toLowerCase()
       detail = "user-provided"
     } else if (body.mode === "hunter") {
-      if (!isHunterAvailable()) {
+      if (!(await isHunterAvailable())) {
         return NextResponse.json({
-          error: "Hunter not configured. Set HUNTER_API_KEY in .env.local and restart.",
+          error: "Hunter is not configured. Add the Hunter API key in SAIL, Integration keys.",
         }, { status: 503 })
       }
       const domain = pickFirmDomain(owner)
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
       candidates,
       applied,
       detail,
-      hunterAvailable: isHunterAvailable(),
+      hunterAvailable: await isHunterAvailable(),
     })
   } catch (e: any) {
     console.error("[admin/email-check/fix] error:", e)
