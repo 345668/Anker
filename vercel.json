@@ -86,6 +86,14 @@
       "schedule": "30 2 * * *"
     },
     {
+      "path": "/api/cron/alerts-evaluate",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/alerts-watchdog",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/fit-ranker",
       "schedule": "0 4 1 * *"
     },
