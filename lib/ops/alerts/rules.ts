@@ -6,8 +6,21 @@ import { CRON_MAX_AGE_MIN, type DepCheck } from "@/lib/ops/dependencies"
 
 export type Severity = 1 | 2 | 3
 export interface Finding { rule: RuleKey; subject: string; severity: Severity; summary: string; evidence: Record<string, unknown> }
-export type RuleKey = "cron_stale" | "cron_stuck" | "cron_failing" | "dependency_down" | "alerter_stale"
-export const RULE_KEYS: RuleKey[] = ["cron_stale", "cron_stuck", "cron_failing", "dependency_down", "alerter_stale"]
+export type RuleKey = "cron_stale" | "cron_stuck" | "cron_failing" | "dependency_down" | "dependency_degraded" | "ai_failure_rate" | "privacy_request_due" | "alerter_stale"
+export const RULE_KEYS: RuleKey[] = ["cron_stale", "cron_stuck", "cron_failing", "dependency_down", "dependency_degraded", "ai_failure_rate", "privacy_request_due", "alerter_stale"]
+/** What each rule is for, shown on the SAIL rules page. */
+export const RULE_INFO: Record<RuleKey, { label: string; text: string; defaultSeverity: Severity }> = {
+  cron_stale: { label: "A scheduled job has stopped", text: "A job has not completed successfully for twice its interval.", defaultSeverity: 2 },
+  cron_stuck: { label: "A scheduled job is stuck", text: "A run has been 'running' for over 15 minutes: the platform killed it.", defaultSeverity: 2 },
+  cron_failing: { label: "A scheduled job keeps failing", text: "Three of the last five runs failed, including the latest.", defaultSeverity: 2 },
+  dependency_down: { label: "A dependency is down", text: "The live dependency check reports a check as down (a secret, a mailbox, a provider).", defaultSeverity: 2 },
+  dependency_degraded: { label: "A dependency has been degraded for days", text: "The nightly check has reported the same check as degraded three nights running. Digest only.", defaultSeverity: 3 },
+  ai_failure_rate: { label: "AI calls are failing", text: "A provider's share of failed calls in the window is above the threshold.", defaultSeverity: 2 },
+  privacy_request_due: { label: "A privacy request is due", text: "A confirmed request is due within 7 days or overdue.", defaultSeverity: 2 },
+  alerter_stale: { label: "The alert evaluator has stopped", text: "No successful evaluation for 30 minutes. Raised by the watchdog.", defaultSeverity: 1 },
+}
+export interface Thresholds { ai_failure_rate?: { rate?: number; minCalls?: number; windowMin?: number } }
+export const AI_DEFAULTS = { rate: 0.2, minCalls: 10, windowMin: 15 }
 
 /** Jobs whose silence stops customers' mail: severity 1. */
 export const SEV1_JOBS = new Set(["outreach-send", "outreach-scheduler", "campaign-send"])
@@ -24,6 +37,12 @@ export interface Snapshot {
   /** Statuses of each job's last five runs, newest first. */
   recent: Record<string, string[]>
   deps: DepCheck[]
+  /** Calls and failures per provider in the AI window. */
+  ai?: Record<string, { calls: number; failed: number }>
+  /** Open privacy requests with their due date (no personal data). */
+  privacy?: Array<{ id: string; kind: string; dueAt: number }>
+  /** Statuses of each check in the last three nightly runs, newest first. */
+  depHistory?: Record<string, string[]>
 }
 
 const min = (ms: number) => Math.round(ms / 60000)
@@ -70,7 +89,34 @@ export function alerterStale(now: number, lastRunAt: number | null): Finding[] {
   return age > WATCHDOG_AFTER_MIN ? [{ rule: "alerter_stale", subject: "alerts-evaluate", severity: 1, summary: `The alert evaluator has not run for ${age} minutes. Nothing is being watched.`, evidence: { lastRunMinutesAgo: age, allowedMinutes: WATCHDOG_AFTER_MIN } }] : []
 }
 
-export function evaluate(s: Snapshot): Finding[] {
+export function dependencyDegraded(s: Snapshot): Finding[] {
+  const out: Finding[] = []
+  for (const [name, hist] of Object.entries(s.depHistory ?? {})) {
+    if (hist.length >= 3 && hist.slice(0, 3).every((x) => x === "degraded")) out.push({ rule: "dependency_degraded", subject: name, severity: 3, summary: `${name} has been degraded for three nights running.`, evidence: { check: name, nights: 3 } })
+  }
+  return out
+}
+
+export function aiFailureRate(s: Snapshot, t: Thresholds = {}): Finding[] {
+  const own = Object.fromEntries(Object.entries(t.ai_failure_rate ?? {}).filter(([, v]) => v !== undefined))
+  const { rate, minCalls, windowMin } = { ...AI_DEFAULTS, ...own }
+  const out: Finding[] = []
+  for (const [provider, c] of Object.entries(s.ai ?? {})) {
+    if (c.calls >= minCalls && c.failed / c.calls > rate) out.push({ rule: "ai_failure_rate", subject: provider, severity: 2, summary: `${provider}: ${c.failed} of ${c.calls} AI calls failed in the last ${windowMin} minutes (${Math.round((100 * c.failed) / c.calls)}%).`, evidence: { provider, calls: c.calls, failed: c.failed, windowMinutes: windowMin, threshold: rate } })
+  }
+  return out
+}
+
+export function privacyRequestDue(s: Snapshot): Finding[] {
+  const out: Finding[] = []
+  for (const r of s.privacy ?? []) {
+    const days = Math.floor((r.dueAt - s.now) / 86_400_000)
+    if (days <= 7) out.push({ rule: "privacy_request_due", subject: r.id, severity: 2, summary: days < 0 ? `A ${r.kind} request is ${-days} day(s) overdue.` : `A ${r.kind} request is due in ${days} day(s).`, evidence: { kind: r.kind, daysLeft: days, overdue: days < 0 } })
+  }
+  return out
+}
+
+export function evaluate(s: Snapshot, t: Thresholds = {}): Finding[] {
   const stuck = cronStuck(s)
-  return [...stuck, ...cronStale(s, new Set(stuck.map((f) => f.subject))), ...cronFailing(s), ...dependencyDown(s)]
+  return [...stuck, ...cronStale(s, new Set(stuck.map((f) => f.subject))), ...cronFailing(s), ...dependencyDown(s), ...dependencyDegraded(s), ...aiFailureRate(s, t), ...privacyRequestDue(s)]
 }

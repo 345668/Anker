@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { evaluate, cronStale, cronStuck, cronFailing, dependencyDown, alerterStale, SEV1_JOBS, RULE_KEYS, type Snapshot } from "./rules"
+import { evaluate, cronStale, cronStuck, cronFailing, dependencyDown, dependencyDegraded, aiFailureRate, privacyRequestDue, alerterStale, SEV1_JOBS, RULE_KEYS, RULE_INFO, type Snapshot } from "./rules"
 import { RUNBOOKS } from "./runbooks"
 import { CRON_MAX_AGE_MIN } from "@/lib/ops/dependencies"
 
@@ -71,5 +71,35 @@ describe("the set", () => {
   it("evidence carries no personal data (only names, minutes and counts)", () => {
     const f = evaluate(snap({ latest: { agents: { startedAt: NOW - 99 * M, status: "running" } }, deps: [{ name: "Database", status: "down", detail: "did not answer" }] }))
     expect(JSON.stringify(f)).not.toMatch(/@|password|secret=/i)
+  })
+})
+
+describe("dependency_degraded", () => {
+  it("needs three nights in a row, newest first, and is severity 3", () => {
+    const f = dependencyDegraded(snap({ depHistory: { Footer: ["degraded", "degraded", "degraded"], Mailbox: ["degraded", "ok", "degraded"], New: ["degraded", "degraded"], Fine: ["ok", "ok", "ok"] } }))
+    expect(f).toHaveLength(1); expect(f[0]).toMatchObject({ rule: "dependency_degraded", subject: "Footer", severity: 3 })
+  })
+})
+describe("ai_failure_rate", () => {
+  it("fires above the rate with enough calls, per provider, and reports the numbers", () => {
+    const f = aiFailureRate(snap({ ai: { qwen: { calls: 20, failed: 8 }, mistral: { calls: 4, failed: 4 }, openai: { calls: 30, failed: 3 } } }))
+    expect(f.map((x) => x.subject)).toEqual(["qwen"]); expect(f[0].evidence).toMatchObject({ calls: 20, failed: 8, threshold: 0.2 })
+  })
+  it("honours a threshold and ignores nonsense in it", () => {
+    expect(aiFailureRate(snap({ ai: { qwen: { calls: 100, failed: 10 } } }), { ai_failure_rate: { rate: 0.05 } })).toHaveLength(1)
+    expect(aiFailureRate(snap({ ai: { qwen: { calls: 100, failed: 10 } } }), { ai_failure_rate: { minCalls: 200 } })).toHaveLength(0)
+  })
+})
+describe("privacy_request_due", () => {
+  it("fires within 7 days or overdue, with the kind and days but no other detail", () => {
+    const d = (n: number) => NOW + n * 86_400_000
+    const f = privacyRequestDue(snap({ privacy: [{ id: "a", kind: "access", dueAt: d(10) }, { id: "b", kind: "erasure", dueAt: d(2) }, { id: "c", kind: "objection", dueAt: d(-3) }] }))
+    expect(f.map((x) => x.subject)).toEqual(["b", "c"]); expect(f[1].evidence).toEqual({ kind: "objection", daysLeft: -3, overdue: true })
+  })
+})
+describe("the rule set", () => {
+  it("every rule is described for the settings page and has a default severity", () => {
+    for (const k of RULE_KEYS) { expect(RULE_INFO[k].label.length, k).toBeGreaterThan(5); expect([1, 2, 3]).toContain(RULE_INFO[k].defaultSeverity) }
+    expect(RULE_INFO.dependency_degraded.defaultSeverity).toBe(3)
   })
 })

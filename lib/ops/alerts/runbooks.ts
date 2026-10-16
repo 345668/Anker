@@ -23,6 +23,21 @@ export const RUNBOOKS: Record<RuleKey, Runbook> = {
     check: "The evidence names the check and the fix. Open SAIL, System health for the full list.",
     fix: "Apply the fix the check names (usually set an environment variable in Vercel and redeploy, or connect an account). The incident clears after three clean checks, about 15 minutes.",
   },
+  dependency_degraded: {
+    means: "A dependency has been working only partly for three nights running (for example a missing footer address, or a failing job that is not yet stuck). It is not urgent, which is why it only appears in the morning digest.",
+    check: "SAIL, System health: the check's detail and its fix. The nightly history shows how long it has been degraded.",
+    fix: "Apply the fix the check names. It clears by itself after three clean evaluations.",
+  },
+  ai_failure_rate: {
+    means: "A large share of recent AI calls to one provider failed. Answers, document reading or drafting that depend on it are failing or falling back to a slower or costlier provider.",
+    check: "SAIL, AI config: the provider's key and its free-lane or token-plan allowance. The failing calls' error text in the usage panel. The provider's own status page.",
+    fix: "If a key was rejected, replace it. If the free allowance is spent, add or top up the backup lane. If the provider is down, wait or switch the preferred provider in AI config.",
+  },
+  privacy_request_due: {
+    means: "A confirmed privacy request from a person in the directory is due within 7 days or is overdue. The deadline is 30 days from receipt and is a legal one.",
+    check: "SAIL, Privacy requests: the request, the records found and its due date.",
+    fix: "Act on the request (access, correct, restrict, erase) or, if it is complex, extend it once with a reason. Closing the request clears this incident.",
+  },
   alerter_stale: {
     means: "The alert evaluator itself has stopped. Until it runs again nothing is being watched, so any other fault would go unreported.",
     check: "Vercel, Cron Jobs: is alerts-evaluate scheduled and recent? Function logs for /api/cron/alerts-evaluate: an error, a timeout, a missing CRON_SECRET. SAIL, Alerts, the heartbeat line.",
