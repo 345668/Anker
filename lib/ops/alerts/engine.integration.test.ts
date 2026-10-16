@@ -5,7 +5,7 @@ import { beforeAll, afterAll, beforeEach, describe, it, expect, vi } from "vites
 vi.mock("server-only", () => ({}))
 const state = vi.hoisted(() => ({ q: null as any }))
 vi.mock("@/lib/db", () => { const f: any = (s: TemplateStringsArray, ...v: unknown[]) => state.q(s.reduce((q, t, i) => q + (i ? `$${i}` : "") + t, ""), v); f.unsafe = (t: string, v: unknown[] = []) => state.q(t, v); return { sql: f } })
-import { runEvaluation, runWatchdog, buildMessage, recipients, OPEN_AFTER, RESOLVE_AFTER, REMIND_MS, REMIND_ACK_MS, REOPEN_WITHIN_MS, type Message } from "./engine"
+import { runEvaluation, runWatchdog, buildMessage, recipients, defaultChannels, sendTestNotification, OPEN_AFTER, RESOLVE_AFTER, REMIND_MS, REMIND_ACK_MS, REOPEN_WITHIN_MS, type Message } from "./engine"
 import type { Snapshot } from "./rules"
 
 let db: PGlite
@@ -163,6 +163,42 @@ describe("heartbeat and watchdog", () => {
     await db.exec(`INSERT INTO alert_incidents (rule_key, subject, severity, status, summary, opened_at) VALUES ('alerter_stale', 'alerts-evaluate', 1, 'open', 's', now())`)
     await run(snap(T0)); await run(snap(T0 + 5 * M)); await run(snap(T0 + 10 * M))
     expect((await inc())[0].status).toBe("open")
+  })
+})
+
+describe("channels", () => {
+  const tg: Message[] = []
+  const channels = (failEmail = false, failTg = false) => [
+    { name: "email", send: async (m: Message) => { if (failEmail) throw new Error("smtp refused"); sent.push(m) } },
+    { name: "telegram", send: async (m: Message) => { if (failTg) throw new Error("telegram refused (401)"); tg.push(m) } },
+  ]
+  beforeEach(() => { tg.length = 0 })
+  it("sends each event on every channel and records one timeline entry per channel", async () => {
+    await runEvaluation({ now: T0, channels: channels(), snapshot: stuckSev1(T0) })
+    expect(sent).toHaveLength(1); expect(tg).toHaveLength(1)
+    expect((await rows("SELECT channel, ok FROM alert_events WHERE kind = 'notified' ORDER BY id"))).toEqual([{ channel: "email", ok: true }, { channel: "telegram", ok: true }])
+  })
+  it("a failing channel does not stop the other, and the incident counts as notified", async () => {
+    await runEvaluation({ now: T0, channels: channels(false, true), snapshot: stuckSev1(T0) })
+    expect(sent).toHaveLength(1); expect(tg).toHaveLength(0)
+    expect((await inc())[0].notified_at).not.toBeNull()
+    expect((await rows("SELECT channel, ok, detail FROM alert_events WHERE kind = 'notified' ORDER BY id")).find((e) => e.channel === "telegram")).toMatchObject({ ok: false, detail: "telegram refused (401)" })
+    await runEvaluation({ now: T0 + 5 * M, channels: channels(false, true), snapshot: stuckSev1(T0 + 5 * M) })
+    expect(sent).toHaveLength(1)   // no resend of what was delivered
+  })
+  it("only when every channel fails is the event retried on the next evaluation", async () => {
+    await runEvaluation({ now: T0, channels: channels(true, true), snapshot: stuckSev1(T0) })
+    expect((await inc())[0].notified_at).toBeNull()
+    const r = await runEvaluation({ now: T0 + 5 * M, channels: channels(), snapshot: stuckSev1(T0 + 5 * M) })
+    expect(r.retried).toBe(1); expect(sent).toHaveLength(1); expect(tg).toHaveLength(1)
+  })
+  it("the default channels are email alone until Telegram is configured, then both", () => {
+    expect(defaultChannels({}).map((c) => c.name)).toEqual(["email"])
+    expect(defaultChannels({ TELEGRAM_BOT_TOKEN: "1234567890:AAH-abcdefghijklmnopqrstuvwxyz012345", TELEGRAM_CHAT_ID: "123456789" }).map((c) => c.name)).toEqual(["email", "telegram"])
+  })
+  it("a test notification reports each channel's result", async () => {
+    expect(await sendTestNotification(channels(false, true))).toEqual([{ channel: "email", ok: true }, { channel: "telegram", ok: false, error: "telegram refused (401)" }])
+    expect(sent[0].subject).toBe("[Anker test] alert delivery")
   })
 })
 

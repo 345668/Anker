@@ -2,6 +2,7 @@ import "server-only"
 import { sql } from "@/lib/db"
 import { evaluate, alerterStale, RULE_KEYS, type Finding, type RuleKey, type Snapshot } from "./rules"
 import { RUNBOOKS } from "./runbooks"
+import { sendTelegram, telegramConfig, telegramText } from "./telegram"
 
 /**
  * The alert engine (docs/architecture/56, A1). It turns the facts the platform already collects into incidents and tells a person once.
@@ -16,6 +17,7 @@ export const REMIND_MS = 4 * 3600_000, REMIND_ACK_MS = 24 * 3600_000, REOPEN_WIT
 export type Kind = "opened" | "reopened" | "reminded" | "resolved"
 export interface Message { to: string[]; subject: string; text: string }
 export type Deliver = (m: Message) => Promise<void>
+export interface Channel { name: string; send: Deliver }
 
 export const recipients = (env: Record<string, string | undefined> = process.env): string[] =>
   (env.ALERT_EMAIL_TO || "vc@an-ker.de").split(",").map((x) => x.trim()).filter(Boolean)
@@ -24,6 +26,14 @@ export async function defaultDeliver(m: Message): Promise<void> {
   const { sendEmail, isResendConfigured } = await import("@/lib/email/resend")
   if (!isResendConfigured()) throw new Error("email is not configured")
   for (const to of m.to) await sendEmail({ to, subject: m.subject, text: m.text, noTracking: true, purpose: "transactional", via: "alerts" })
+}
+
+/** The channels that are switched on: email always, Telegram when its two variables are set. */
+export function defaultChannels(env: Record<string, string | undefined> = process.env): Channel[] {
+  const out: Channel[] = [{ name: "email", send: defaultDeliver }]
+  const tg = telegramConfig(env)
+  if (tg) out.push({ name: "telegram", send: async (m) => sendTelegram(tg, telegramText(m.subject, m.text)) })
+  return out
 }
 
 export function buildMessage(kind: Kind, i: { id: number; rule_key: string; subject: string; severity: number; summary: string; evidence: Record<string, unknown>; opened_at?: Date | string | null; times_seen?: number }, env: Record<string, string | undefined> = process.env): Message {
@@ -58,23 +68,30 @@ async function settings(): Promise<Map<string, { enabled: boolean; severity: num
 const event = (id: number, kind: string, o: { channel?: string; ok?: boolean; actor?: string; detail?: string } = {}) =>
   sql`INSERT INTO alert_events (incident_id, kind, channel, ok, actor, detail) VALUES (${id}, ${kind}, ${o.channel ?? null}, ${o.ok ?? null}, ${o.actor ?? null}, ${o.detail ?? null})`
 
-async function notify(kind: Kind, inc: any, deliver: Deliver, now: number): Promise<boolean> {
-  try {
-    await deliver(buildMessage(kind, inc))
+/** Sends one event on every channel, each recorded in the timeline. It counts as delivered if at least one channel got it; a channel that fails never stops the others. */
+async function notify(kind: Kind, inc: any, channels: Channel[], now: number): Promise<boolean> {
+  const msg = buildMessage(kind, inc)
+  let any = false
+  for (const ch of channels) {
+    try {
+      await ch.send(msg)
+      any = true
+      await event(inc.id, kind === "reminded" ? "reminded" : "notified", { channel: ch.name, ok: true })
+    } catch (e) {
+      await event(inc.id, "notified", { channel: ch.name, ok: false, detail: String((e as Error)?.message ?? e).slice(0, 200) })
+    }
+  }
+  if (any) {
     if (kind === "reminded") await sql`UPDATE alert_incidents SET reminded_at = ${new Date(now).toISOString()}::timestamptz WHERE id = ${inc.id}`
     else if (kind !== "resolved") await sql`UPDATE alert_incidents SET notified_at = ${new Date(now).toISOString()}::timestamptz WHERE id = ${inc.id}`
-    await event(inc.id, kind === "reminded" ? "reminded" : "notified", { channel: "email", ok: true })
-    return true
-  } catch (e) {
-    await event(inc.id, "notified", { channel: "email", ok: false, detail: String((e as Error)?.message ?? e).slice(0, 200) })
-    return false
   }
+  return any
 }
 
 export interface Stats { opened: number; reopened: number; resolved: number; reminded: number; pending: number; retried: number }
 
-export async function reconcile(findings: Finding[], evaluated: RuleKey[], opts: { now?: number; deliver?: Deliver } = {}): Promise<Stats> {
-  const now = opts.now ?? Date.now(), deliver = opts.deliver ?? defaultDeliver, iso = new Date(now).toISOString()
+export async function reconcile(findings: Finding[], evaluated: RuleKey[], opts: { now?: number; deliver?: Deliver; channels?: Channel[] } = {}): Promise<Stats> {
+  const now = opts.now ?? Date.now(), channels = opts.channels ?? (opts.deliver ? [{ name: "email", send: opts.deliver }] : defaultChannels()), iso = new Date(now).toISOString()
   const st: Stats = { opened: 0, reopened: 0, resolved: 0, reminded: 0, pending: 0, retried: 0 }
   const seen = new Set(findings.map((f) => `${f.rule}\u0000${f.subject}`))
 
@@ -86,10 +103,10 @@ export async function reconcile(findings: Finding[], evaluated: RuleKey[], opts:
       const [old] = (await sql`SELECT id FROM alert_incidents WHERE rule_key = ${f.rule} AND subject = ${f.subject} AND status = 'resolved' AND resolved_at > ${new Date(now - REOPEN_WITHIN_MS).toISOString()}::timestamptz ORDER BY resolved_at DESC LIMIT 1`) as any[]
       if (old) {
         const [r] = (await sql`UPDATE alert_incidents SET status = 'open', resolved_at = NULL, resolved_by = NULL, clear_count = 0, last_seen_at = ${iso}::timestamptz, times_seen = times_seen + 1, severity = ${f.severity}, summary = ${f.summary}, evidence = ${ev}::jsonb, notified_at = NULL, reminded_at = NULL WHERE id = ${old.id} RETURNING *`) as any[]
-        await event(r.id, "reopened"); st.reopened++; await notify("reopened", r, deliver, now)
+        await event(r.id, "reopened"); st.reopened++; await notify("reopened", r, channels, now)
       } else if (f.severity === 1) {
         const [r] = (await sql`INSERT INTO alert_incidents (rule_key, subject, severity, status, summary, evidence, runbook, opened_at, first_seen_at, last_seen_at) VALUES (${f.rule}, ${f.subject}, ${f.severity}, 'open', ${f.summary}, ${ev}::jsonb, ${runbook}, ${iso}::timestamptz, ${iso}::timestamptz, ${iso}::timestamptz) RETURNING *`) as any[]
-        await event(r.id, "opened"); st.opened++; await notify("opened", r, deliver, now)
+        await event(r.id, "opened"); st.opened++; await notify("opened", r, channels, now)
       } else {
         await sql`INSERT INTO alert_incidents (rule_key, subject, severity, status, summary, evidence, runbook, first_seen_at, last_seen_at) VALUES (${f.rule}, ${f.subject}, ${f.severity}, 'pending', ${f.summary}, ${ev}::jsonb, ${runbook}, ${iso}::timestamptz, ${iso}::timestamptz)`
         st.pending++
@@ -97,14 +114,14 @@ export async function reconcile(findings: Finding[], evaluated: RuleKey[], opts:
     } else if (inc.status === "pending") {
       if (Number(inc.times_seen) + 1 >= OPEN_AFTER) {
         const [r] = (await sql`UPDATE alert_incidents SET status = 'open', opened_at = ${iso}::timestamptz, last_seen_at = ${iso}::timestamptz, times_seen = times_seen + 1, severity = ${f.severity}, summary = ${f.summary}, evidence = ${ev}::jsonb WHERE id = ${inc.id} RETURNING *`) as any[]
-        await event(r.id, "opened"); st.opened++; await notify("opened", r, deliver, now)
+        await event(r.id, "opened"); st.opened++; await notify("opened", r, channels, now)
       } else { await sql`UPDATE alert_incidents SET times_seen = times_seen + 1, last_seen_at = ${iso}::timestamptz, summary = ${f.summary}, evidence = ${ev}::jsonb WHERE id = ${inc.id}`; st.pending++ }
     } else {
       const [r] = (await sql`UPDATE alert_incidents SET times_seen = times_seen + 1, last_seen_at = ${iso}::timestamptz, clear_count = 0, severity = ${f.severity}, summary = ${f.summary}, evidence = ${ev}::jsonb WHERE id = ${inc.id} RETURNING *`) as any[]
-      if (!r.notified_at) { if (await notify("opened", r, deliver, now)) st.retried++ }                         // an earlier delivery failed: try again
+      if (!r.notified_at) { if (await notify("opened", r, channels, now)) st.retried++ }                         // an earlier delivery failed: try again
       else {
         const due = now - new Date(r.reminded_at ?? r.notified_at).getTime() >= (r.status === "acknowledged" ? REMIND_ACK_MS : REMIND_MS)
-        if (due && (await notify("reminded", r, deliver, now))) st.reminded++
+        if (due && (await notify("reminded", r, channels, now))) st.reminded++
       }
     }
   }
@@ -116,21 +133,21 @@ export async function reconcile(findings: Finding[], evaluated: RuleKey[], opts:
     if (inc.status === "pending") { await sql`DELETE FROM alert_incidents WHERE id = ${inc.id}`; continue }          // seen once, gone: a flap, leaves nothing
     if (Number(inc.clear_count) + 1 >= RESOLVE_AFTER) {
       const [r] = (await sql`UPDATE alert_incidents SET status = 'resolved', resolved_at = ${iso}::timestamptz, resolved_by = 'auto', clear_count = clear_count + 1 WHERE id = ${inc.id} RETURNING *`) as any[]
-      await event(r.id, "resolved", { actor: "auto" }); st.resolved++; await notify("resolved", r, deliver, now)
+      await event(r.id, "resolved", { actor: "auto" }); st.resolved++; await notify("resolved", r, channels, now)
     } else await sql`UPDATE alert_incidents SET clear_count = clear_count + 1 WHERE id = ${inc.id}`
   }
   return st
 }
 
 // ───────────── the two jobs ─────────────
-export async function runEvaluation(opts: { now?: number; deliver?: Deliver; snapshot?: Snapshot } = {}): Promise<Stats & { findings: number }> {
+export async function runEvaluation(opts: { now?: number; deliver?: Deliver; channels?: Channel[]; snapshot?: Snapshot } = {}): Promise<Stats & { findings: number }> {
   const now = opts.now ?? Date.now()
   try {
     const cfg = await settings()
     const active = RULE_KEYS.filter((k) => k !== "alerter_stale" && cfg.get(k)?.enabled !== false && !cfg.get(k)?.muted)
     const snap = opts.snapshot ?? (await gather(now))
     const findings = evaluate(snap).filter((f) => active.includes(f.rule)).map((f) => ({ ...f, severity: ((cfg.get(f.rule)?.severity ?? f.severity) as Finding["severity"]) }))
-    const stats = await reconcile(findings, active, { now, deliver: opts.deliver })
+    const stats = await reconcile(findings, active, { now, deliver: opts.deliver, channels: opts.channels })
     const [{ n }] = (await sql`SELECT count(*)::int AS n FROM alert_incidents WHERE status IN ('open', 'acknowledged')`) as any[]
     await sql`UPDATE alert_heartbeat SET last_run_at = ${new Date(now).toISOString()}::timestamptz, last_ok_at = ${new Date(now).toISOString()}::timestamptz, rules_evaluated = ${active.length}, open_incidents = ${Number(n)}, error = NULL WHERE id = 1`
     return { ...stats, findings: findings.length }
@@ -141,9 +158,17 @@ export async function runEvaluation(opts: { now?: number; deliver?: Deliver; sna
 }
 
 /** The separate cron that watches the evaluator: if the heartbeat is stale, raise a severity 1 incident. */
-export async function runWatchdog(opts: { now?: number; deliver?: Deliver } = {}): Promise<Stats> {
+export async function runWatchdog(opts: { now?: number; deliver?: Deliver; channels?: Channel[] } = {}): Promise<Stats> {
   const now = opts.now ?? Date.now()
   const [hb] = (await sql`SELECT last_ok_at FROM alert_heartbeat WHERE id = 1`) as any[]
   const last = hb?.last_ok_at ? new Date(hb.last_ok_at).getTime() : null
-  return reconcile(alerterStale(now, last), ["alerter_stale"], { now, deliver: opts.deliver })
+  return reconcile(alerterStale(now, last), ["alerter_stale"], { now, deliver: opts.deliver, channels: opts.channels })
+}
+
+/** A test message on every switched-on channel, so a person can see the setup works before a real alert needs it. Returns each channel's result. */
+export async function sendTestNotification(channels: Channel[] = defaultChannels()): Promise<Array<{ channel: string; ok: boolean; error?: string }>> {
+  const msg: Message = { to: recipients(), subject: "[Anker test] alert delivery", text: "This is a test of Anker's alert delivery. Nothing is wrong.\n\nFix: nothing to do." }
+  const out = []
+  for (const ch of channels) { try { await ch.send(msg); out.push({ channel: ch.name, ok: true }) } catch (e) { out.push({ channel: ch.name, ok: false, error: String((e as Error)?.message ?? e).slice(0, 200) }) } }
+  return out
 }
