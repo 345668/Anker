@@ -89,3 +89,14 @@ Each slice is tested and deployed alone.
 
 ## 12. Not in scope
 Paging by phone or an on-call rotation (one person); a tenant-facing status page (doc 38 D5); a vendor APM or log service (doc 38 D1, D8: a log drain is the minimum, chosen separately); automatic remediation (SAIL alerts and a person acts); alerts about a single customer's own data.
+
+## 13. Build status
+**A1, the core (2026-10-16), built, tested and live** (migration `2026-10-16g-alerts`).
+- **Tables** `alert_rule_settings`, `alert_incidents` (one live incident per problem by a partial unique index), `alert_events` (the timeline and the proof of each message), `alert_heartbeat`. Runbooks are code (`lib/ops/alerts/runbooks.ts`); a test fails if a rule has none, and the text is stored on the incident when it opens so SAIL shows it.
+- **Rules** (`lib/ops/alerts/rules.ts`, pure): `cron_stale` (not the evaluator itself), `cron_stuck` (running over 15 minutes), `cron_failing` (3 of the last 5 including the latest), `dependency_down` (a live dependency check every evaluation, not the nightly row, so a fix clears in minutes), and `alerter_stale`. Jobs that send (`outreach-send`, `outreach-scheduler`, `campaign-send`) are severity 1.
+- **Engine** (`engine.ts`): opens after two consecutive sightings (severity 1 at once); a problem seen once and gone leaves nothing; reminds every 4 hours (24 acknowledged); resolves itself after three clear evaluations; reopens the same incident within 24 hours; a failed delivery is recorded and retried; a muted or disabled rule opens nothing; a severity override applies.
+- **Jobs:** `alerts-evaluate` every 5 minutes and `alerts-watchdog` every 15 (severity 1 if the evaluator has had no successful run for 30 minutes). Email goes to `ALERT_EMAIL_TO`, default `vc@an-ker.de`; set `SAIL_URL` to put a link to the incident in the message.
+- **SAIL, System, Alerts:** the heartbeat (red when stale), open incidents with their runbook and timeline, acknowledge, note, and resolve (cause and fix required). Audited without evidence.
+- **First production run (13:00 UTC):** three incidents opened and three emails were delivered: `cron_stuck` on `investor-activity`, `dependency_down` on Stripe billing and on Reply detection. A fourth sighting (the evaluator reporting itself on its very first run) was removed by the flap guard, which showed the guard working; that rule now skips the evaluator.
+- **Not in A1** (A2): quiet hours and the morning digest, the webhook, `ai_failure_rate`, `privacy_request_due`, `dependency_degraded`, the rules page (thresholds, mutes, precision). Until then every severity 2 alert is sent immediately, at any hour.
+- 41 tests in Anker (suite 1,757) and 9 in SAIL (176).

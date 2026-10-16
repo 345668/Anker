@@ -41,6 +41,7 @@ export function cronStale(s: Snapshot, stuck: Set<string>): Finding[] {
   const out: Finding[] = []
   for (const [job, maxMin] of Object.entries(CRON_MAX_AGE_MIN)) {
     if (stuck.has(job) || !(job in s.latest)) continue          // a stuck job is reported as stuck; a job never seen has no baseline yet
+    if (job === "alerts-evaluate") continue                    // the evaluator cannot report its own silence; the watchdog does (alerter_stale)
     const ok = s.lastOk[job]
     const age = ok == null ? null : min(s.now - ok)
     if (age == null || age > maxMin) out.push({ rule: "cron_stale", subject: job, severity: SEV1_JOBS.has(job) ? 1 : 2, summary: age == null ? `${job} has never completed successfully (allowed ${maxMin} minutes between runs).` : `${job} last completed ${age} minutes ago (allowed ${maxMin}).`, evidence: { job, lastOkMinutesAgo: age, allowedMinutes: maxMin } })

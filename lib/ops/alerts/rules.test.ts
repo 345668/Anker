@@ -28,6 +28,9 @@ describe("cron_stale", () => {
   it("a job that has run but never succeeded is stale", () => {
     expect(cronStale(snap({ latest: { agents: { startedAt: NOW - M, status: "failed" } }, lastOk: {} }), new Set())[0].evidence.lastOkMinutesAgo).toBeNull()
   })
+  it("never reports the evaluator itself: the watchdog does that", () => {
+    expect(cronStale(snap({ latest: { "alerts-evaluate": { startedAt: NOW - M, status: "running" } }, lastOk: {} }), new Set())).toHaveLength(0)
+  })
   it("severity 1 for the jobs that send", () => {
     const f = cronStale(snap({ latest: { "campaign-send": { startedAt: NOW - M, status: "failed" } }, lastOk: { "campaign-send": NOW - 600 * M } }), new Set())
     expect(f[0].severity).toBe(1); expect(SEV1_JOBS.has("campaign-send")).toBe(true)
