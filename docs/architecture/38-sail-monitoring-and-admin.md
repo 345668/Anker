@@ -1,6 +1,6 @@
 # 38 — SAIL: the monitoring and admin plane for Anker — status and spec
 
-**Date:** 2026-10-03 (third edition: capacity re-cut for a two-person team and new verified findings; §11 lists what changed) · **Status:** assessment and spec, nothing
+**Date:** 2026-10-03 (third edition: capacity re-cut for a two-person team and new verified findings; §11 lists what changed) · **Status:** assessment and spec; much of it has since been built in SAIL (staff security, system health on `cron_runs` and `dependency_checks`, tenant control, entitlements, agents control, privacy and directory consoles). **S-4, alerts, incidents and runbooks, is not built and is specified in [doc 56](56-alerts-incidents-runbooks.md) (2026-10-16): the nightly dependency check has been red for 13 days with nobody told.** Original status: nothing
 built · **Companion:** [37](37-anker-agentic-venture-erp.md) (Anker, the agentic ERP). SAIL is a **separate repository**
 (`345668/SAIL`, Next.js, its own Vercel project); this document lives in the Anker repository because the contract between
 the two apps is mostly Anker's side and the two specs must move together.
