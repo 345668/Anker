@@ -7,7 +7,7 @@ const st = vi.hoisted(() => ({ q: null as any, afterFns: [] as Array<() => unkno
 vi.mock("@/lib/db", () => { const f: any = (s: TemplateStringsArray, ...v: unknown[]) => st.q(s.reduce((q, t, i) => q + (i ? `$${i}` : "") + t, ""), v); f.unsafe = (t: string, v: unknown[] = []) => st.q(t, v); return { sql: f } })
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => { st.afterFns.push(fn) } }))
 process.env.SECRET_KEY = "own-bot-test-secret"; process.env.TELEGRAM_PRODUCT_BOT_TOKEN = "8615616511:AAFX1VFIA4eoTmIKAr7Y5Evap_FZncGSjak"
-import { connectBot, disconnectBot, loadBot, botForOrg, ownBotOf, BotError, webhookUrlFor } from "./bots"
+import { connectBot, disconnectBot, loadBot, botForUser, ownBotOf, personalBotOf, botsOfOrg, BotError, webhookUrlFor } from "./bots"
 import { createLinkCode, consumeLinkCode, linkByTelegramUser } from "./links"
 import { enqueue } from "./runtime"
 import { receive } from "./webhook"
@@ -36,7 +36,7 @@ beforeAll(async () => {
     CREATE TABLE ai_subprocessors (slug text PRIMARY KEY, provider text, role text NOT NULL, purpose text, region text DEFAULT 'unknown', region_basis text DEFAULT 'inferred', data_classes text[] DEFAULT '{}', active boolean DEFAULT true, public boolean DEFAULT true, notes text);
     CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text);
     CREATE TABLE plan_catalog (plan text PRIMARY KEY, features jsonb DEFAULT '{}');`)
-  for (const f of ["2026-10-16i-telegram-channel", "2026-10-16j-telegram-t2", "2026-10-16k-telegram-t3", "2026-10-16l-telegram-t4", "2026-10-16n-telegram-own-bot"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
+  for (const f of ["2026-10-16i-telegram-channel", "2026-10-16j-telegram-t2", "2026-10-16k-telegram-t3", "2026-10-16l-telegram-t4", "2026-10-16n-telegram-own-bot", "2026-10-16p-telegram-personal-bots"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => { calls.length = 0; st.afterFns.length = 0; await db.exec("DELETE FROM telegram_bots; DELETE FROM telegram_updates; DELETE FROM telegram_links; DELETE FROM telegram_link_codes") })
@@ -55,8 +55,8 @@ describe("connecting a bot", () => {
     const b = await connectBot("o1", "u1", TOKEN_A, fake())
     const l = await loadBot(b.id); expect(l!.bot.token).toBe(TOKEN_A); expect(l!.orgId).toBe("o1"); expect(l!.bot.id).toBe(b.id)
     expect(JSON.stringify(await ownBotOf("o1"))).not.toContain(TOKEN_A)
-    const route = await botForOrg("o1"); expect(route).toMatchObject({ own: true, username: "bot_1111" })
-    expect(await botForOrg("o2")).toMatchObject({ own: false })       // falls back to the shared bot
+    const route = await botForUser("o1", "u1"); expect(route).toMatchObject({ kind: "workspace", username: "bot_1111" })
+    expect(await botForUser("o2", "u2")).toMatchObject({ kind: "shared" })       // falls back to the shared bot
   })
   it("refuses a malformed token, a token Telegram rejects, and never leaves a row behind", async () => {
     await expect(connectBot("o1", "u1", "nope", fake())).rejects.toBeInstanceOf(BotError)
@@ -119,12 +119,52 @@ describe("disconnecting", () => {
     await consumeLinkCode((await createLinkCode("u1", "o1", a.id)).code, tgA, "read", a.id); await consumeLinkCode((await createLinkCode("u2", "o2", b.id)).code, tgB, "read", b.id)
     await enqueue({ update_id: 3, message: { message_id: 1, chat: { id: 1, type: "private" }, from: { id: 1 }, text: "x" } } as any, a.id)
     calls.length = 0
-    expect(await disconnectBot("o1", "u1", fake())).toBe(true)
+    expect(await disconnectBot("o1", "u1", { scope: "workspace" }, fake())).toBe(true)
     expect(calls.map((c) => c.method)).toContain("deleteWebhook")
     expect(await rows("SELECT * FROM telegram_bots WHERE org_id = 'o1'")).toHaveLength(0)
     expect((await rows("SELECT status FROM telegram_links WHERE bot_id = $1", [a.id]))[0].status).toBe("revoked")
     expect((await rows("SELECT status, payload_enc FROM telegram_updates WHERE bot_id = $1", [a.id]))[0]).toMatchObject({ status: "dropped", payload_enc: null })
     expect((await rows("SELECT status FROM telegram_links WHERE bot_id = $1", [b.id]))[0].status).toBe("pending")
-    expect(await loadBot(a.id)).toBeNull(); expect(await disconnectBot("o1", "u1", fake())).toBe(false)
+    expect(await loadBot(a.id)).toBeNull(); expect(await disconnectBot("o1", "u1", { scope: "workspace" }, fake())).toBe(false)
+  })
+})
+
+describe("a member's own bot (docs/architecture/57 section 20)", () => {
+  const tgRick = { userId: 11, chatId: 11 }, tgAnna = { userId: 22, chatId: 22 }
+  it("a workspace has one workspace bot and one personal bot per member, side by side", async () => {
+    await connectBot("o1", "u1", TOKEN_A, fake())                                   // the workspace bot
+    const rick = await connectBot("o1", "rick", TOKEN_B, fake(), "personal")
+    expect(rick.userId).toBe("rick"); expect((await ownBotOf("o1"))!.userId).toBeNull(); expect((await personalBotOf("o1", "rick"))!.id).toBe(rick.id); expect(await personalBotOf("o1", "anna")).toBeNull()
+    await expect(connectBot("o1", "rick", "3333333333:CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", fake(), "personal")).rejects.toThrow(/already have a bot/)
+    const anna = await connectBot("o1", "anna", "3333333333:CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", fake(), "personal"); expect(anna.userId).toBe("anna")
+    expect((await botsOfOrg("o1")).map((b) => b.userId).sort((a, b) => String(a).localeCompare(String(b)))).toEqual([null, "anna", "rick"].sort((a, b) => String(a).localeCompare(String(b))))
+  })
+  it("a member's route is their own bot, then the workspace's, then the shared one", async () => {
+    expect((await botForUser("o1", "rick"))!.kind).toBe("shared")
+    const ws = await connectBot("o1", "boss", TOKEN_A, fake()); expect(await botForUser("o1", "rick")).toMatchObject({ kind: "workspace", bot: { id: ws.id } })
+    const mine = await connectBot("o1", "rick", TOKEN_B, fake(), "personal"); expect(await botForUser("o1", "rick")).toMatchObject({ kind: "personal", bot: { id: mine.id } })
+    expect(await botForUser("o1", "anna")).toMatchObject({ kind: "workspace" })      // a colleague is unaffected
+  })
+  it("only the owner can link a phone through a personal bot; the workspace bot takes anyone in the workspace", async () => {
+    const mine = await connectBot("o1", "rick", TOKEN_A, fake(), "personal"); const ws = await connectBot("o1", "boss", TOKEN_B, fake())
+    const annasCode = (await createLinkCode("anna", "o1", mine.id)).code
+    expect(await consumeLinkCode(annasCode, tgAnna, "read", mine.id)).toEqual({ ok: false, reason: "invalid" })      // made by Anna, used on Rick's bot
+    expect((await consumeLinkCode((await createLinkCode("rick", "o1", mine.id)).code, tgRick, "read", mine.id)).ok).toBe(true)
+    expect((await consumeLinkCode((await createLinkCode("anna", "o1", ws.id)).code, tgAnna, "read", ws.id)).ok).toBe(true)
+    expect((await linkByTelegramUser(22, ws.id))!.user_id).toBe("anna"); expect(await linkByTelegramUser(22, mine.id)).toBeNull()
+  })
+  it("a code made for another workspace's bot is refused even with the right bot id", async () => {
+    const mine = await connectBot("o1", "rick", TOKEN_A, fake(), "personal")
+    const foreign = (await createLinkCode("rick", "o2", mine.id)).code
+    expect(await consumeLinkCode(foreign, tgRick, "read", mine.id)).toEqual({ ok: false, reason: "invalid" })
+  })
+  it("disconnecting one member's bot leaves the workspace bot and the others, and an owner can remove any by id", async () => {
+    const ws = await connectBot("o1", "boss", TOKEN_A, fake()); const mine = await connectBot("o1", "rick", TOKEN_B, fake(), "personal")
+    await consumeLinkCode((await createLinkCode("rick", "o1", mine.id)).code, tgRick, "read", mine.id)
+    expect(await disconnectBot("o1", "rick", { scope: "personal", userId: "rick" }, fake())).toBe(true)
+    expect(await personalBotOf("o1", "rick")).toBeNull(); expect(await ownBotOf("o1")).not.toBeNull()
+    expect((await rows("SELECT status FROM telegram_links WHERE bot_id = $1", [mine.id]))[0].status).toBe("revoked")
+    const anna = await connectBot("o1", "anna", "3333333333:CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", fake(), "personal")
+    expect(await disconnectBot("o1", "boss", { botId: anna.id }, fake())).toBe(true); expect(await disconnectBot("o2", "boss", { botId: ws.id }, fake())).toBe(false)      // not another workspace's bot
   })
 })

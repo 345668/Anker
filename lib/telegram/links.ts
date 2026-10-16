@@ -24,6 +24,11 @@ export async function consumeLinkCode(code: string, tg: { userId: number; chatId
   if (!/^[\w-]{16,64}$/.test(code)) return { ok: false, reason: "invalid" }
   const [c] = (await sql`SELECT code_hash, user_id, org_id, bot_id, expires_at, used_at FROM telegram_link_codes WHERE code_hash = ${sha(code)}`) as any[]
   if (!c || c.bot_id !== botId) return { ok: false, reason: "invalid" }       // a code works only on the bot it was made for
+  if (botId !== "platform") {
+    // A workspace's bot serves that workspace; a personal bot serves only its owner (docs/architecture/57 section 20).
+    const [b] = (await sql`SELECT org_id, user_id FROM telegram_bots WHERE id = ${botId}`) as any[]
+    if (!b || b.org_id !== c.org_id || (b.user_id && b.user_id !== c.user_id)) return { ok: false, reason: "invalid" }
+  }
   if (c.used_at) return { ok: false, reason: "used" }
   if (new Date(c.expires_at).getTime() < Date.now()) return { ok: false, reason: "expired" }
   const [live] = (await sql`SELECT id FROM telegram_links WHERE bot_id = ${botId} AND telegram_user_id = ${tg.userId} AND status IN ('pending', 'active', 'suspended')`) as any[]

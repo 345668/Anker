@@ -203,3 +203,25 @@ Built and tested (10 new tests; 1957 Anker tests in all); migration `2026-10-16n
 - **No Vercel variable is created, by design** (section 19). `TELEGRAM_PRODUCT_BOT_TOKEN` is now optional: it is only the shared default for workspaces without their own bot.
 - **Not verified live:** no real bot has been connected. The first real connect should be tried with a throwaway bot.
 - **Known limit:** erasing a workspace deletes its bot row and token but does not call Telegram to remove the webhook; the webhook then answers 401 until the owner revokes the token in BotFather.
+
+## 20. Whose bot: the workspace's, or a member's own (2026-10-16)
+**Request:** the bot should be specific to the workspace and to the user, because several people work in one workspace.
+
+**Decision.** Two kinds of own bot, both stored the same way as in section 19, and a clear order for which one answers:
+1. **A personal bot** (a member's own, made in BotFather by that member). Only that member can link a phone through it; a link code made by someone else is refused on it. Any member who may use the channel can connect one. It reaches the same workspace data the member can reach, never more: every answer still runs as that member.
+2. **The workspace bot** (made by an owner or admin) is shared: each member links their own phone to it, one Telegram account per member.
+3. **The shared Anker bot** (optional, platform-wide) is the default when neither exists.
+
+A member's route is personal, then workspace, then shared. Owners and admins can see every bot in the workspace and disconnect any of them (removing a member from the workspace does not remove their bot automatically yet; an owner or admin disconnects it). Disconnecting works as in section 19: webhook removed, devices on that bot disconnected, token deleted.
+
+**Data.** `telegram_bots.user_id` (null for the workspace bot). One workspace bot per workspace; one personal bot per member per workspace; one Telegram bot in only one place (unchanged). A link code is checked against the bot's owner as well as its workspace.
+
+**Not in scope:** moving a personal bot between workspaces, a member with personal bots in several workspaces sharing one bot (a bot serves one workspace).
+
+### Build status, section 20 (2026-10-16)
+Built and tested (5 new tests; 1972 in all); migration `2026-10-16p-telegram-personal-bots.sql` applied to Neon.
+- Connected channels now has "Your own bot" (any member), "The workspace's bot" (owner or admin to connect, everyone uses it) and, for owners and admins, a list of members' own bots with Disconnect. API: `GET/POST/DELETE /api/telegram/bot` with `scope` or `botId`.
+- A member's phone is routed personal, then workspace, then shared. A personal bot accepts a link code only from its owner, and a code is checked against the bot's workspace as well (tested, including a code made for another workspace).
+- Every answer still runs as the linked member, so a personal bot reaches nothing the member could not reach in the app.
+- **Not done:** removing a member from a workspace does not yet disconnect their personal bot or their phones (an owner or admin does it by hand). Worth wiring to the member-removal path.
+- Still not verified against a real Telegram bot.
