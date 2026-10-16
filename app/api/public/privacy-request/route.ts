@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     if (e instanceof DsarError) return back(`error=${encodeURIComponent(e.message)}`)
     console.error("[privacy-request]", (e as Error)?.message)
-    return back("error=" + encodeURIComponent("We could not take your request just now. Please email privacy@an-ker.de instead."))
+    return back("error=" + encodeURIComponent("We could not take your request just now. Please email vc@an-ker.de instead."))
   }
   return back("sent=1")
 }

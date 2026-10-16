@@ -14,7 +14,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 
 export async function GET(req: NextRequest) {
   const t = req.nextUrl.searchParams.get("t") || ""
-  if (t.length < 20) return page("Link not valid", `<h1>This link is not valid</h1><p>It may be incomplete. Write to <a href="mailto:privacy@an-ker.de">privacy@an-ker.de</a>.</p>`, 400)
+  if (t.length < 20) return page("Link not valid", `<h1>This link is not valid</h1><p>It may be incomplete. Write to <a href="mailto:vc@an-ker.de">vc@an-ker.de</a>.</p>`, 400)
   return page("Confirm your request", `<h1>Confirm your privacy request</h1><p>Press the button to confirm that this request came from you.</p><form method="post" action="/api/public/privacy-request/verify?t=${esc(encodeURIComponent(t))}"><button type="submit">Confirm</button></form>`)
 }
 
@@ -22,6 +22,6 @@ export async function POST(req: NextRequest) {
   const rl = rateLimit(`privacy-verify:${(req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown"}`, { limit: 20, windowMs: 60_000 })
   if (!rl.ok) return rateLimitResponse(rl)
   const r = await verifyRequest(req.nextUrl.searchParams.get("t") || "").catch(() => ({ ok: false as const, reason: "invalid" as const }))
-  if (!r.ok) return page("Link not valid", `<h1>This link is no longer valid</h1><p>${r.reason === "expired" ? "It has expired. Please make the request again." : "It may already have been used."} Questions: <a href="mailto:privacy@an-ker.de">privacy@an-ker.de</a>.</p>`, 400)
+  if (!r.ok) return page("Link not valid", `<h1>This link is no longer valid</h1><p>${r.reason === "expired" ? "It has expired. Please make the request again." : "It may already have been used."} Questions: <a href="mailto:vc@an-ker.de">vc@an-ker.de</a>.</p>`, 400)
   return page("Confirmed", `<h1>Thank you, it is confirmed</h1><p>${r.kind === "objection" ? "We have stopped contacting you and will remove your record from our investor directory. You will get an email when it is done." : "We will answer within 30 days, by email to the same address."}</p>`)
 }

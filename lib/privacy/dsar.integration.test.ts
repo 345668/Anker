@@ -11,8 +11,9 @@ vi.mock("@/lib/compliance/suppression", () => ({
   profileSlug: (u: string) => { const m = String(u ?? "").match(/linkedin\.com\/in\/([^/?#]+)/i); return m ? `in/${m[1].toLowerCase()}` : null },
 }))
 process.env.SECRET_KEY = "dsar-test-secret"; process.env.DIRECTORY_HASH_KEY = "dsar-hash-key"
-import { createRequest, verifyRequest, getRequest, listRequests, sendAccess, rectify, restrict, refuse, extend, erase, expireRequests, dueDigest, makeFormToken, formTokenOk, DsarError } from "./dsar"
+import { createRequest, verifyRequest, getRequest, listRequests, sendAccess, rectify, restrict, refuse, extend, erase, erasePreview, expireRequests, dueDigest, makeFormToken, formTokenOk, DsarError } from "./dsar"
 import { hashEmail } from "@/lib/directory/identity"
+import { PERSON_REFS } from "@/lib/directory/person-registry"
 import { enforceEmailUse, DirectoryUseError } from "@/lib/directory/sources"
 
 let db: PGlite
@@ -24,15 +25,19 @@ const mk = async (kind: string, email = "anna@fund.com", linkedin?: string) => {
 beforeAll(async () => {
   db = new PGlite()
   state.q = async (q: string, v: unknown[] = []) => (await db.query(q, v)).rows
-  await db.exec(`CREATE TABLE investors (id varchar PRIMARY KEY, first_name varchar NOT NULL, last_name varchar, title varchar, email varchar, phone varchar, linkedin_url varchar, person_linkedin_url varchar, twitter_url varchar, location varchar, bio text, investor_type varchar, source varchar, is_active boolean DEFAULT true, updated_at timestamp);
+  await db.exec(`CREATE TABLE investors (id varchar PRIMARY KEY, first_name varchar NOT NULL, last_name varchar, title varchar, email varchar, phone varchar, linkedin_url varchar, person_linkedin_url varchar, twitter_url varchar, location varchar, bio text, investor_type varchar, source varchar, is_active boolean DEFAULT true, avatar varchar, address varchar, folk_id varchar, folk_custom_fields jsonb, investment_thesis text, recent_investments text, embedding text, metadata jsonb DEFAULT '{}', status varchar, created_at timestamp DEFAULT now(), updated_at timestamp);
     CREATE TABLE investment_firms (id serial PRIMARY KEY, name text, source text); CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text);
-    CREATE TABLE crm_people (id serial PRIMARY KEY, org_id text, investor_id text);`)
+    CREATE TABLE crm_people (id serial PRIMARY KEY, org_id text, investor_id text);
+    CREATE TABLE memberships (user_id text, org_id text, org_role text); CREATE TABLE profiles (id text, email text);`)
+  for (const r of PERSON_REFS) await db.exec(`CREATE TABLE IF NOT EXISTS ${r.table} (${r.column} text${r.orgColumn ? ", org_id text" : ""})`)
   await db.exec(readFileSync("scripts/migrations/2026-10-16-directory-sources.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16b-directory-tombstones.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16c-dsar-requests.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-16d-directory-erasure.sql", "utf8"))
 }, 30000)
 afterAll(async () => db.close())
-beforeEach(async () => { state.mails.length = 0; state.suppressed.length = 0; state.failSend = false; await db.exec("DELETE FROM dsar_requests; DELETE FROM investors; DELETE FROM directory_tombstones; DELETE FROM crm_people; DELETE FROM directory_hash_meta") })
+beforeEach(async () => { state.mails.length = 0; state.suppressed.length = 0; state.failSend = false; await db.exec("DELETE FROM dsar_requests; DELETE FROM investors; DELETE FROM directory_tombstones; DELETE FROM directory_hash_meta; DELETE FROM directory_erasure_notices; DELETE FROM memberships; DELETE FROM profiles")
+  for (const r of PERSON_REFS) await db.exec(`DELETE FROM ${r.table}`) })
 
 describe("making a request", () => {
   it("stores the details encrypted, emails a confirmation link, and nothing happens before it is used", async () => {
@@ -162,14 +167,67 @@ describe("operator actions", () => {
     await refuse(id, "ops", "We could not match you to a record")
     expect((await rows("SELECT status, refusal_reason FROM dsar_requests"))[0]).toMatchObject({ status: "refused", refusal_reason: "We could not match you to a record" })
   })
-  it("erasure is not carried out yet and says so, leaving the request open", async () => {
-    const id = await mk("erasure", "e@e.co")
-    await expect(erase(id, "ops")).rejects.toMatchObject({ status: 501 })
-    expect((await rows("SELECT status FROM dsar_requests"))[0].status).toBe("verified")
-  })
   it("the list masks the address and flags overdue requests", async () => {
     await mk("access", "anna@fund.com"); await db.exec("UPDATE dsar_requests SET due_at = now() - interval '1 day'")
     const [r] = await listRequests(); expect(r).toMatchObject({ email: "a***@fund.com", overdue: true, kind: "access" })
+  })
+})
+
+describe("erasure", () => {
+  const setup = async () => {
+    await ins("a", "anna@fund.com", "https://www.linkedin.com/in/anna"); await ins("b", "other@x.com", "https://www.linkedin.com/in/anna-b", "Bea")
+    await db.exec(`INSERT INTO investor_matches (investor_id) VALUES ('a'), ('b'); INSERT INTO crm_people (org_id, investor_id) VALUES ('orgOne', 'a'), ('orgTwo', 'a'), ('orgTwo', 'b'); INSERT INTO crm_entries (org_id, investor_id) VALUES ('orgOne', 'a'), ('orgOne', 'a'), ('orgOne', 'a');
+      INSERT INTO match_outcome_events (investor_id) VALUES ('a'); INSERT INTO memberships VALUES ('u1', 'orgOne', 'workspace_owner'), ('u2', 'orgTwo', 'admin'), ('u3', 'orgTwo', 'member'); INSERT INTO profiles VALUES ('u1', 'one@own.test'), ('u2', 'two@own.test'), ('u3', 'three@own.test')`)
+    return mk("erasure", "anna@fund.com", "https://linkedin.com/in/anna-b")
+  }
+  it("previews the counts per table and the workspaces to tell, and changes nothing", async () => {
+    const id = await setup()
+    const p = await erasePreview(id)
+    expect(p).toMatchObject({ people: 1, wouldDelete: 0, wouldAnonymise: 1, workspacesToTell: 2 })
+    expect(p.byTable.find((t) => t.table === "investor_matches")).toMatchObject({ fate: "delete", rows: 1 })
+    expect(p.byTable.find((t) => t.table === "crm_people")).toMatchObject({ fate: "keep", owner: "workspace", rows: 2 })
+    expect((await rows("SELECT first_name FROM investors WHERE id='a'"))[0].first_name).toBe("Anna"); expect(await rows("SELECT 1 FROM directory_tombstones")).toHaveLength(0)
+  })
+  it("will not erase without the confirmation, and refuses before the address is confirmed", async () => {
+    const id = await setup()
+    await expect(erase(id, "ops", [], false)).rejects.toThrow(/confirm/)
+    await createRequest({ kind: "erasure", email: "z@z.co" }); const un = (await rows("SELECT id FROM dsar_requests WHERE status='verifying'"))[0].id
+    await expect(erase(un, "ops", [], true)).rejects.toMatchObject({ status: 409 })
+    expect((await rows("SELECT first_name FROM investors WHERE id='a'"))[0].first_name).toBe("Anna")
+  })
+  it("erases: suppression, tombstones, derived rows gone, the person a shell, workspaces told once, requester told, request closed", async () => {
+    const id = await setup(); state.mails.length = 0
+    expect(await erase(id, "ops@sail.test", [], true)).toMatchObject({ people: 1, deleted: 0, anonymised: 1, workspacesTold: 2 })
+    expect(state.suppressed).toEqual([{ email: "anna@fund.com", reason: "erasure", source: "dsar" }])
+    const t = await rows("SELECT email_hash, linkedin_hash, source, reason FROM directory_tombstones"); expect(t.length).toBeGreaterThanOrEqual(2); expect(t.every((x) => x.source === null && x.reason === "erasure")).toBe(true)
+    expect(await rows("SELECT investor_id FROM investor_matches")).toEqual([{ investor_id: "b" }])
+    expect(Number((await rows("SELECT count(*)::int n FROM crm_people WHERE investor_id='a'"))[0].n)).toBe(2)   // the workspaces' copies are untouched
+    expect(Number((await rows("SELECT count(*)::int n FROM match_outcome_events"))[0].n)).toBe(1)             // aggregates survive
+    expect((await rows("SELECT first_name, email, linkedin_url, person_linkedin_url, is_active, status FROM investors WHERE id='a'"))[0]).toEqual({ first_name: "Removed", email: null, linkedin_url: null, person_linkedin_url: null, is_active: false, status: "removed" })
+    expect((await rows("SELECT first_name FROM investors WHERE id='b'"))[0].first_name).toBe("Bea")           // an unticked LinkedIn candidate is untouched
+    const notices = await rows("SELECT org_id, records, mailed FROM directory_erasure_notices ORDER BY org_id"); expect(notices).toEqual([{ org_id: "orgOne", records: 3, mailed: 1 }, { org_id: "orgTwo", records: 1, mailed: 1 }])
+    const ws = state.mails.filter((m) => m.via === "privacy-erasure-notice"); expect(ws.map((m) => m.to).sort()).toEqual(["one@own.test", "two@own.test"])
+    expect(JSON.stringify(ws)).not.toMatch(/Anna|anna@|Berg/)
+    expect(state.mails.find((m) => m.to === "anna@fund.com")).toBeTruthy()
+    expect((await rows("SELECT status, handled_by FROM dsar_requests WHERE id=$1", [id]))[0]).toMatchObject({ status: "done", handled_by: "ops@sail.test" })
+    await expect(erase(id, "ops", [], true)).rejects.toThrow(/closed/)
+  })
+  it("a ticked LinkedIn candidate is erased too; a person with no workspace reference is deleted outright", async () => {
+    const id = await setup()
+    expect(await erase(id, "ops", ["b", "ghost"], true)).toMatchObject({ people: 2, anonymised: 2 })
+    await ins("c", "free@x.com", null, "Cy"); const id2 = await mk("erasure", "free@x.com")
+    expect(await erase(id2, "ops", [], true)).toMatchObject({ people: 1, deleted: 1, anonymised: 0, workspacesTold: 0 })
+    expect(await rows("SELECT 1 FROM investors WHERE id='c'")).toHaveLength(0)
+  })
+  it("erases and tombstones even when the address is not in the directory, so it cannot be added later", async () => {
+    const id = await mk("erasure", "unknown@x.com")
+    expect(await erase(id, "ops", [], true)).toMatchObject({ people: 0 })
+    expect((await rows("SELECT email_hash FROM directory_tombstones"))[0].email_hash).toBe(hashEmail("unknown@x.com", "dsar-hash-key"))
+  })
+  it("a repeated notice is not mailed twice for the same request", async () => {
+    const id = await setup(); await erase(id, "ops", [], true); state.mails.length = 0
+    const { workspaceCopies } = await import("./erasure")
+    expect(await workspaceCopies(["a"])).toEqual(new Map([["orgOne", 3], ["orgTwo", 1]]))
   })
 })
 
@@ -178,13 +236,14 @@ describe("housekeeping", () => {
     const id = await mk("access", "a@a.co"); await refuse(id, "ops", "Cannot verify identity here")
     await db.query("UPDATE dsar_requests SET closed_at = now() - interval '31 days' WHERE id = $1", [id])
     await createRequest({ kind: "access", email: "b@b.co" }); await db.exec("UPDATE dsar_requests SET verify_expires_at = now() - interval '1 day' WHERE status = 'verifying'")
-    expect(await expireRequests()).toEqual({ expired: 1, wiped: 1 })
+    await db.exec("INSERT INTO dsar_requests (id, kind, status, requester_email_hash, due_at, closed_at) VALUES ('old', 'access', 'done', 'h', now() - interval '4 years', now() - interval '4 years')")
+    expect(await expireRequests()).toEqual({ expired: 1, wiped: 1, deleted: 1 })
     expect((await rows("SELECT details_enc FROM dsar_requests")).every((r) => r.details_enc === null)).toBe(true)
   })
   it("sends one due digest a day and nothing when nothing is due", async () => {
     expect(await dueDigest()).toEqual({ sent: false, count: 0 })
     await mk("access", "a@a.co"); await db.exec("UPDATE dsar_requests SET due_at = now() + interval '3 days'"); state.mails.length = 0
-    expect(await dueDigest()).toEqual({ sent: true, count: 1 }); expect(state.mails[0].to).toBe("privacy@an-ker.de")
+    expect(await dueDigest()).toEqual({ sent: true, count: 1 }); expect(state.mails[0].to).toBe("vc@an-ker.de")
     expect(await dueDigest()).toEqual({ sent: false, count: 1 })
   })
 })

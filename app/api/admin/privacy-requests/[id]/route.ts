@@ -1,11 +1,11 @@
 /**
  * One privacy request, called by SAIL (docs/architecture/54, D3). Portal service principal only; header x-portal-staff-email names the operator.
  *   GET  -> { request, details, found }
- *   POST { action: "access" | "rectify" | "restrict" | "refuse" | "extend" | "erase", ids?, changes?, reason?, days? }
+ *   POST { action: "access" | "rectify" | "restrict" | "refuse" | "extend" | "erase_preview" | "erase", ids?, changes?, reason?, days?, confirm? }
  */
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
-import { DsarError, erase, extend, getRequest, refuse, rectify, restrict, sendAccess } from "@/lib/privacy/dsar"
+import { DsarError, erase, erasePreview, extend, getRequest, refuse, rectify, restrict, sendAccess } from "@/lib/privacy/dsar"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -38,7 +38,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       case "restrict": return NextResponse.json(await restrict(id, op.email, ids))
       case "refuse": await refuse(id, op.email, String(b.reason ?? "")); return NextResponse.json({ ok: true })
       case "extend": await extend(id, op.email, Number(b.days), String(b.reason ?? "")); return NextResponse.json({ ok: true })
-      case "erase": return NextResponse.json(await erase(id, op.email))
+      case "erase_preview": return NextResponse.json(await erasePreview(id, ids))
+      case "erase": return NextResponse.json(await erase(id, op.email, ids, b.confirm === true))
       default: return NextResponse.json({ error: "Unknown action." }, { status: 400 })
     }
   } catch (e) { return fail(e) }

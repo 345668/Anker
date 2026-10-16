@@ -12,6 +12,7 @@ vi.mock("@/lib/db", () => {
 process.env.DIRECTORY_HASH_KEY = "test-key-1"
 import { fillHashes, isTombstoned, sweepTombstoned, purgeWithdrawn, eraseRows, ensureCanary, HashKeyMismatchError, INVESTOR_REFS, runMaintenance } from "./maintenance"
 import { hashEmail, hashLinkedIn } from "./identity"
+import { PERSON_REFS } from "./person-registry"
 
 let db: PGlite
 const K = "test-key-1"
@@ -23,7 +24,7 @@ beforeAll(async () => {
   db = new PGlite()
   state.q = async (q: string, v: unknown[] = []) => (await db.query(q, v)).rows
   await db.exec(`CREATE TABLE investors (id varchar PRIMARY KEY, first_name varchar NOT NULL, last_name varchar, email varchar, phone varchar, title varchar, linkedin_url varchar, person_linkedin_url varchar, twitter_url varchar, avatar varchar,
-      bio text, address varchar, folk_id varchar, folk_custom_fields jsonb, investment_thesis text, recent_investments text, embedding text, metadata jsonb DEFAULT '{}', status varchar, is_active boolean DEFAULT true, source varchar, updated_at timestamp);
+      bio text, address varchar, folk_id varchar, folk_custom_fields jsonb, investment_thesis text, recent_investments text, embedding text, metadata jsonb DEFAULT '{}', status varchar, is_active boolean DEFAULT true, source varchar, created_at timestamp DEFAULT now(), updated_at timestamp);
     CREATE TABLE investment_firms (id serial PRIMARY KEY, name text, source text);
     CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text);`)
   for (const [t, c] of INVESTOR_REFS) await db.exec(`CREATE TABLE IF NOT EXISTS ${t} (${c} text)`)
@@ -118,12 +119,14 @@ describe("eraseRows", () => {
     expect(u).toMatchObject({ first_name: "Removed", last_name: null, email: null, linkedin_url: null, person_linkedin_url: null, title: null, bio: null, is_active: false, status: "removed", email_hash: null, linkedin_hashes: null })
     expect(u.metadata).toEqual({ anonymised: true })
   })
-  it("every table that holds an investor id counts as a reference", async () => {
-    for (const [t, c] of INVESTOR_REFS) {
+  it("a table that holds a workspace's record of the person keeps the person as a shell; a derived table is cleared and does not keep the person alive", async () => {
+    for (const r of PERSON_REFS) {
       await db.query("DELETE FROM investors"); await ins("x", "x@x.com", null, "s3")
-      await db.query(`INSERT INTO ${t} (${c}) VALUES ('x')`)
-      expect((await eraseRows(["x"])).anonymised, `${t}.${c}`).toBe(1)
-      await db.query(`DELETE FROM ${t}`)
+      await db.query(`INSERT INTO ${r.table} (${r.column}) VALUES ('x')`)
+      const out = await eraseRows(["x"])
+      if (r.fate === "keep") expect(out, `${r.table}.${r.column}`).toEqual({ deleted: 0, anonymised: 1 })
+      else { expect(out, `${r.table}.${r.column}`).toEqual({ deleted: 1, anonymised: 0 }); expect(await rows(`SELECT 1 FROM ${r.table}`), `${r.table} cleared`).toHaveLength(0) }
+      await db.query(`DELETE FROM ${r.table}`)
     }
   })
   it("anonymises rather than deletes when the reference check cannot run (a missing table)", async () => {

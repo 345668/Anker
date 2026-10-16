@@ -195,6 +195,7 @@ export const EXCLUDED: { table: string; reason: string }[] = [
   { table: "tenant_lifecycle_events", reason: "The control plane's audit trail." },
   { table: "tenant_requests", reason: "The request that is being executed." },
   { table: "tenant_tombstones", reason: "Proof that an erasure happened." },
+  { table: "directory_erasure_notices", reason: "Platform record that a workspace was told of a directory person's erasure (counts only, no personal data). Kept as proof the notice was given." },
   { table: "company_audit_log", reason: "Staff action trail." },
   { table: "audit_events", reason: "Platform audit trail." },
   { table: "platform_api_keys", reason: "Platform keys, not customer data." },

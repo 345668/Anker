@@ -1,0 +1,22 @@
+{
+  "takenAt": "2026-10-16",
+  "refs": [
+    "calendar_meetings.related_investor_id",
+    "campaign_crm_entries.investor_id",
+    "contacts.source_investor_id",
+    "crm_entries.investor_id",
+    "crm_people.investor_id",
+    "deal_feedback_events.investor_id",
+    "deal_room_access_grants.investor_id",
+    "deals.investor_id",
+    "interaction_logs.investor_id",
+    "introductions.target_investor_id",
+    "investor_company_links.investor_id",
+    "investor_matches.investor_id",
+    "lp_contact_matches.investor_id",
+    "market_signals.investor_id",
+    "match_outcome_events.investor_id",
+    "matches.investor_id",
+    "outreaches.investor_id"
+  ]
+}

@@ -27,7 +27,7 @@ export default async function PrivacyRequestPage({ searchParams }: { searchParam
         <label className="block font-medium">Your LinkedIn profile address (optional)<input type="url" name="linkedin" maxLength={300} placeholder="https://www.linkedin.com/in/…" className={field} /></label>
         <label className="block font-medium">Anything we should know (optional)<textarea name="note" maxLength={1000} rows={3} className={field} /></label>
         <button type="submit" className="rounded-md bg-neutral-900 px-5 py-2.5 text-white">Send request</button>
-        <p className="text-sm text-neutral-600">We use your answers only to deal with this request. We will email you a link to confirm it is you, and keep the details for 30 days after we close the request. You can also write to <a className="underline" href="mailto:privacy@an-ker.de">privacy@an-ker.de</a>.</p>
+        <p className="text-sm text-neutral-600">We use your answers only to deal with this request. We will email you a link to confirm it is you. Unconfirmed requests are deleted after 14 days, the details of a closed request 30 days after we close it, and a record of the request (counts only, no name) for 3 years. Erased people stay out through an irreversible code that holds no name. You can also write to <a className="underline" href="mailto:vc@an-ker.de">vc@an-ker.de</a>.</p>
       </form>
     </main>
   )

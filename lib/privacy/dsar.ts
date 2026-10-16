@@ -11,8 +11,9 @@ import { hashEmail, hashKey, hashLinkedIn, linkedinSlug, normEmail } from "@/lib
  */
 export const KINDS = ["access", "rectification", "erasure", "restriction", "objection"] as const
 export type Kind = (typeof KINDS)[number]
-export const DUE_DAYS = 30, VERIFY_DAYS = 14, MAX_EXTENSION_DAYS = 60, WIPE_AFTER_CLOSE_DAYS = 30
-export const PRIVACY_ADDRESS = "privacy@an-ker.de"
+export const DUE_DAYS = 30, VERIFY_DAYS = 14, MAX_EXTENSION_DAYS = 60, WIPE_AFTER_CLOSE_DAYS = 30, KEEP_COUNTS_YEARS = 3
+/** Where privacy mail is read and replies go. vc@ until a dedicated privacy@ mailbox is switched on. */
+export const PRIVACY_ADDRESS = process.env.PRIVACY_CONTACT_EMAIL || "vc@an-ker.de"
 export class DsarError extends Error { constructor(message: string, readonly status = 400) { super(message); this.name = "DsarError" } }
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex")
@@ -80,19 +81,23 @@ export async function verifyRequest(token: string): Promise<{ ok: boolean; reaso
   return { ok: true, kind: r.kind }
 }
 
+/** Global tombstones for an email address and the LinkedIn profiles on the rows found at it, so the person is not imported or contacted again. Returns how many were new. */
+export async function tombstoneIdentity(requestId: string, reason: "objection" | "erasure", email: string, rows: Array<{ linkedin_url?: string | null; person_linkedin_url?: string | null }>): Promise<number> {
+  const eh = hashEmail(email)!
+  const lis = [...new Set(rows.flatMap((x) => [hashLinkedIn(x.linkedin_url), hashLinkedIn(x.person_linkedin_url)]).filter((x): x is string => !!x))]
+  let n = ((await sql`INSERT INTO directory_tombstones (email_hash, reason, request_id) SELECT ${eh}, ${reason}, ${requestId} WHERE NOT EXISTS (SELECT 1 FROM directory_tombstones WHERE email_hash = ${eh} AND source IS NULL) RETURNING id`) as any[]).length
+  for (const l of lis) n += ((await sql`INSERT INTO directory_tombstones (linkedin_hash, reason, request_id) SELECT ${l}, ${reason}, ${requestId} WHERE NOT EXISTS (SELECT 1 FROM directory_tombstones WHERE linkedin_hash = ${l} AND source IS NULL) RETURNING id`) as any[]).length
+  return n
+}
+
 /** Global do-not-contact on every channel, and a tombstone so the person is not imported again; the sweep then removes their directory rows. */
 async function carryOutObjection(id: string): Promise<void> {
   const [r] = (await sql`SELECT details_enc FROM dsar_requests WHERE id = ${id}`) as any[]
   const d = open(r?.details_enc); if (!d) return
   const { suppressEverywhere } = await import("@/lib/compliance/suppression")
   const s = await suppressEverywhere({ email: d.email, reason: "objection", source: "dsar" })
-  const eh = hashEmail(d.email)!
   const rows = (await sql`SELECT linkedin_url, person_linkedin_url FROM investors WHERE lower(email) = ${normEmail(d.email)}`) as any[]
-  const lis = [...new Set(rows.flatMap((x) => [hashLinkedIn(x.linkedin_url), hashLinkedIn(x.person_linkedin_url)]).filter((x): x is string => !!x))]
-  let tombstones = 0
-  const t1 = (await sql`INSERT INTO directory_tombstones (email_hash, reason, request_id) SELECT ${eh}, 'objection', ${id} WHERE NOT EXISTS (SELECT 1 FROM directory_tombstones WHERE email_hash = ${eh} AND source IS NULL) RETURNING id`) as any[]
-  tombstones += t1.length
-  for (const l of lis) { const t = (await sql`INSERT INTO directory_tombstones (linkedin_hash, reason, request_id) SELECT ${l}, 'objection', ${id} WHERE NOT EXISTS (SELECT 1 FROM directory_tombstones WHERE linkedin_hash = ${l} AND source IS NULL) RETURNING id`) as any[]; tombstones += t.length }
+  const tombstones = await tombstoneIdentity(id, "objection", d.email, rows)
   await sql`UPDATE dsar_requests SET status = 'done', closed_at = now(), handled_by = 'system:confirmed-address', outcome = ${JSON.stringify({ suppressedEmails: s.emails, suppressedLinkedIn: s.linkedin, tombstones, directoryRows: rows.length })}::jsonb WHERE id = ${id}`
   try { await send(d.email, "Your objection to Anker has been recorded", `We have stopped contacting this address and removed it from our investor directory. The record is deleted within about an hour; we keep only an irreversible code so you are not added again.\n\nQuestions: ${PRIVACY_ADDRESS}`) } catch { /* the request is done either way */ }
 }
@@ -124,7 +129,7 @@ export async function getRequest(id: string) {
   return { request: { id: r.id, kind: r.kind as Kind, status: r.status, created_at: new Date(r.created_at).toISOString(), due_at: new Date(r.due_at).toISOString(), extended_to: r.extended_to ? new Date(r.extended_to).toISOString() : null, extension_reason: r.extension_reason, verified_at: r.verified_at ? new Date(r.verified_at).toISOString() : null, closed_at: r.closed_at ? new Date(r.closed_at).toISOString() : null, handled_by: r.handled_by, outcome: r.outcome, refusal_reason: r.refusal_reason }, details: d, found }
 }
 
-async function loadHandled(id: string) {
+export async function loadHandled(id: string) {
   const [r] = (await sql`SELECT * FROM dsar_requests WHERE id = ${id}`) as any[]
   if (!r) throw new DsarError("Unknown request.", 404)
   if (!r.verified_at) throw new DsarError("The requester has not confirmed their address yet.", 409)
@@ -133,7 +138,7 @@ async function loadHandled(id: string) {
   return { r, d }
 }
 /** The ids an operator may act on: every row at the confirmed address, plus LinkedIn candidates the operator explicitly ticked. */
-async function allowedIds(d: Details, ids: string[]): Promise<string[]> {
+export async function allowedIds(d: Details, ids: string[]): Promise<string[]> {
   const byEmail = ((await sql`SELECT id FROM investors WHERE lower(email) = ${normEmail(d.email)}`) as any[]).map((x) => x.id as string)
   const slug = linkedinSlug(d.linkedin)
   let cand: string[] = []
@@ -205,14 +210,17 @@ export async function extend(id: string, op: string, days: number, reason: strin
   try { await send(d.email, "Your Anker privacy request needs more time", `We need up to ${n} more days for your request: ${why_}\n\nQuestions: ${PRIVACY_ADDRESS}`) } catch { /* recorded either way */ }
 }
 
-/** Erasure is carried out in slice D4 (workspace notification and the table registry). */
-export async function erase(_id: string, _op: string): Promise<never> { throw new DsarError("Erasure arrives with the next release. The request stays open and keeps its due date.", 501) }
+/** Erasure (docs/architecture/54, D4): a preview of the counts, then the erasure itself. */
+export async function erasePreview(id: string, ids: string[] = []) { return (await import("./erasure")).previewErasure(id, ids) }
+export async function erase(id: string, op: string, ids: string[], confirm: boolean) { return (await import("./erasure")).carryOutErasure(id, op, ids, confirm) }
 
 // ───────────── housekeeping (run by the directory-maintenance job) ─────────────
-export async function expireRequests(): Promise<{ expired: number; wiped: number }> {
+export async function expireRequests(): Promise<{ expired: number; wiped: number; deleted: number }> {
   const e = (await sql`UPDATE dsar_requests SET status = 'expired', closed_at = now(), details_enc = NULL, verify_token_hash = NULL, details_wiped_at = now() WHERE status = 'verifying' AND verify_expires_at < now() RETURNING id`) as any[]
   const w = (await sql`UPDATE dsar_requests SET details_enc = NULL, details_wiped_at = now() WHERE closed_at IS NOT NULL AND details_enc IS NOT NULL AND closed_at < now() - make_interval(days => ${WIPE_AFTER_CLOSE_DAYS}) RETURNING id`) as any[]
-  return { expired: e.length, wiped: w.length }
+  // After three years even the counts go (docs/architecture/54 section 8).
+  const d = (await sql`DELETE FROM dsar_requests WHERE closed_at IS NOT NULL AND closed_at < now() - make_interval(years => ${KEEP_COUNTS_YEARS}) RETURNING id`) as any[]
+  return { expired: e.length, wiped: w.length, deleted: d.length }
 }
 
 /** One mail a day to the privacy address when a request is due within 7 days or overdue. */

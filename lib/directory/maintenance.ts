@@ -1,6 +1,7 @@
 import "server-only"
 import { sql } from "@/lib/db"
 import { canaryHash, hashKey, identityHashes } from "./identity"
+import { PERSON_REFS } from "./person-registry"
 
 /**
  * Directory maintenance (docs/architecture/54, D2): fills identity hashes, applies tombstones, and removes withdrawn sources after their hold.
@@ -58,20 +59,26 @@ export async function isTombstoned(p: Probe): Promise<boolean> {
   return !!r
 }
 
-/** Every table that holds an investor id. A row referenced anywhere is anonymised, never deleted (the deals, matches, CRM copies and logs keep working). D4 turns this into a coverage-tested registry. */
-export const INVESTOR_REFS: Array<[string, string]> = [
-  ["calendar_meetings", "related_investor_id"], ["contacts", "source_investor_id"], ["introductions", "target_investor_id"],
-  ["campaign_crm_entries", "investor_id"], ["crm_entries", "investor_id"], ["crm_migration_plan", "investor_id"], ["crm_people", "investor_id"], ["deal_feedback_events", "investor_id"],
-  ["deal_room_access_grants", "investor_id"], ["deals", "investor_id"], ["interaction_logs", "investor_id"], ["investor_company_links", "investor_id"], ["investor_matches", "investor_id"],
-  ["lp_contact_matches", "investor_id"], ["market_signals", "investor_id"], ["match_outcome_events", "investor_id"], ["matches", "investor_id"], ["outreaches", "investor_id"],
-]
+/** Every table that holds an investor id, from the registry (lib/directory/person-registry.ts). */
+export const INVESTOR_REFS: Array<[string, string]> = PERSON_REFS.map((r) => [r.table, r.column])
 const NOT_REFERENCED = INVESTOR_REFS.map(([t, c]) => `NOT EXISTS (SELECT 1 FROM ${t} x WHERE x.${c}::text = i.id)`).join(" AND ")
 
-/** Removes the people with these ids: deleted when nothing refers to them, otherwise their personal data is cleared and the row kept as an inactive shell. */
+/** Removes the rows that are derived from these people (match results, signals, links). Throws on failure: an erasure must not report success with these left behind. */
+export async function deleteDerived(ids: string[]): Promise<number> {
+  let n = 0
+  for (const r of PERSON_REFS.filter((x) => x.fate === "delete")) {
+    const del = (await sql.unsafe(`DELETE FROM ${r.table} WHERE ${r.column}::text = ANY($1::text[]) RETURNING 1`, [ids])) as any[]
+    n += del.length
+  }
+  return n
+}
+
+/** Removes the people with these ids: derived rows go first, then the person is deleted when nothing refers to them, otherwise their personal data is cleared and the row kept as an inactive shell. */
 export async function eraseRows(ids: string[]): Promise<{ deleted: number; anonymised: number }> {
   let deleted = 0, anonymised = 0
   for (let k = 0; k < ids.length; k += 500) {
     const chunk = ids.slice(k, k + 500)
+    await deleteDerived(chunk)
     let free: string[] = []
     try { free = ((await sql.unsafe(`SELECT i.id FROM investors i WHERE i.id = ANY($1::text[]) AND ${NOT_REFERENCED}`, [chunk])) as any[]).map((r) => r.id) } catch { free = [] }
     if (free.length) { await sql`DELETE FROM investors WHERE id = ANY(${free}::text[])`; deleted += free.length }
@@ -122,6 +129,20 @@ export async function purgeWithdrawn(): Promise<Array<{ source: string; people: 
   return out
 }
 
+/** Columns in the live schema that hold a directory person's id but are not in the registry. Reported by the job so a new table is noticed within the hour. */
+export async function unclassifiedPersonRefs(): Promise<string[]> {
+  const rows = (await sql.unsafe(`SELECT c.table_name, c.column_name FROM information_schema.columns c JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name AND t.table_type = 'BASE TABLE'
+    WHERE c.table_schema = 'public' AND c.column_name ~ 'investor_id$'`, [])) as any[]
+  const known = new Set(PERSON_REFS.map((r) => `${r.table}.${r.column}`))
+  return rows.map((r) => `${r.table_name}.${r.column_name}`).filter((x) => !known.has(x)).sort()
+}
+
+/** People nobody has touched for 36 months and no workspace refers to: reported, never deleted by the job (docs/architecture/54 section 8). */
+export async function staleCount(): Promise<number> {
+  const rows = (await sql.unsafe(`SELECT count(*)::int AS n FROM investors i WHERE COALESCE(i.updated_at, i.created_at) < now() - interval '36 months' AND COALESCE(i.metadata->>'anonymised', '') <> 'true' AND ${NOT_REFERENCED}`, [])) as any[]
+  return Number(rows[0]?.n ?? 0)
+}
+
 export async function runMaintenance(opts: { budgetMs?: number } = {}) {
   const hashes = await fillHashes({ budgetMs: opts.budgetMs ?? 150_000 })
   const sweep = hashes.more ? null : await sweepTombstoned()
@@ -129,5 +150,7 @@ export async function runMaintenance(opts: { budgetMs?: number } = {}) {
   // Privacy requests: expire unconfirmed ones, wipe closed ones, and nudge when one is due. Never lets a failure here stop the directory work above.
   let requests: unknown = null
   try { const dsar = await import("@/lib/privacy/dsar"); requests = { ...(await dsar.expireRequests()), digest: await dsar.dueDigest() } } catch { /* the table may not exist yet */ }
-  return { hashes, sweep, purged, requests }
+  let review: unknown = null
+  try { review = { unclassifiedPersonRefs: await unclassifiedPersonRefs(), stale36Months: await staleCount() } } catch { /* reporting only */ }
+  return { hashes, sweep, purged, requests, review }
 }
