@@ -48,3 +48,18 @@ export async function sendTelegram(cfg: TelegramConfig, text: string, fetchImpl:
     throw new Error(redact(`telegram refused (${res.status})${why ? `: ${why}` : ""}`, cfg.token).slice(0, 200))
   }
 }
+
+/**
+ * Why the Telegram channel is not switched on, in words, without echoing any value. Empty when it is configured. Used by the test notification so a person can see
+ * what to fix (a variable missing in Production, quotes or spaces pasted with the token, a chat id that is not a number).
+ */
+export function telegramProblems(env: Record<string, string | undefined> = process.env): string[] {
+  const out: string[] = []
+  const rawToken = env.TELEGRAM_BOT_TOKEN ?? ""
+  const token = rawToken.trim()
+  if (!token) out.push("TELEGRAM_BOT_TOKEN is not set in this deployment's environment (check that it is added for Production, then redeploy)")
+  else if (!/^\d{5,}:[\w-]{20,}$/.test(token)) out.push(/["'\s]/.test(token) ? "TELEGRAM_BOT_TOKEN has quotes or spaces inside it; paste the bare token only" : "TELEGRAM_BOT_TOKEN does not look like a bot token (expected digits, a colon, then letters and digits)")
+  const anyChat = [env.TELEGRAM_CHAT_ID, ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => env[`TELEGRAM_CHAT_ID_${n}`])].some((x) => (x ?? "").trim())
+  if (!telegramChats(env).length) out.push(anyChat ? "TELEGRAM_CHAT_ID is set but is not a chat id (expected a number such as 123456789, or @channelname)" : "TELEGRAM_CHAT_ID is not set in this deployment's environment (check that it is added for Production, then redeploy)")
+  return out
+}

@@ -200,6 +200,11 @@ describe("channels", () => {
     const names = defaultChannels({ TELEGRAM_BOT_TOKEN: "1234567890:AAH-abcdefghijklmnopqrstuvwxyz012345", TELEGRAM_CHAT_ID: "123456789", TELEGRAM_CHAT_ID_2: "987654321" }).map((c) => c.name)
     expect(names).toEqual(["email", "telegram", "telegram 2"])
   })
+  it("a test notification says why Telegram is off instead of leaving it out", async () => {
+    const r = await sendTestNotification(channels().slice(0, 1), ["TELEGRAM_BOT_TOKEN is not set in this deployment's environment"])
+    expect(r).toEqual([{ channel: "telegram", ok: false, error: "not switched on: TELEGRAM_BOT_TOKEN is not set in this deployment's environment" }, { channel: "email", ok: true }])
+    expect(await sendTestNotification(channels().slice(0, 1), [])).toEqual([{ channel: "email", ok: true }])
+  })
   it("a test notification reports each channel's result", async () => {
     expect(await sendTestNotification(channels(false, true))).toEqual([{ channel: "email", ok: true }, { channel: "telegram", ok: false, error: "telegram refused (401)" }])
     expect(sent[0].subject).toBe("[Anker test] alert delivery")

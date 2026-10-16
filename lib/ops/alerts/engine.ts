@@ -2,7 +2,7 @@ import "server-only"
 import { sql } from "@/lib/db"
 import { evaluate, alerterStale, RULE_KEYS, type Finding, type RuleKey, type Snapshot } from "./rules"
 import { RUNBOOKS } from "./runbooks"
-import { sendTelegram, telegramConfigs, telegramText } from "./telegram"
+import { sendTelegram, telegramConfigs, telegramProblems, telegramText } from "./telegram"
 
 /**
  * The alert engine (docs/architecture/56, A1). It turns the facts the platform already collects into incidents and tells a person once.
@@ -165,9 +165,11 @@ export async function runWatchdog(opts: { now?: number; deliver?: Deliver; chann
 }
 
 /** A test message on every switched-on channel, so a person can see the setup works before a real alert needs it. Returns each channel's result. */
-export async function sendTestNotification(channels: Channel[] = defaultChannels()): Promise<Array<{ channel: string; ok: boolean; error?: string }>> {
+export async function sendTestNotification(channels: Channel[] = defaultChannels(), problems: string[] = telegramProblems()): Promise<Array<{ channel: string; ok: boolean; error?: string }>> {
   const msg: Message = { to: recipients(), subject: "[Anker test] alert delivery", text: "This is a test of Anker's alert delivery. Nothing is wrong.\n\nFix: nothing to do." }
-  const out = []
+  const out: Array<{ channel: string; ok: boolean; error?: string }> = []
+  // A channel that is off because of a configuration problem is reported, not silently absent.
+  if (!channels.some((c) => c.name.startsWith("telegram")) && problems.length) out.push({ channel: "telegram", ok: false, error: `not switched on: ${problems.join("; ")}` })
   for (const ch of channels) { try { await ch.send(msg); out.push({ channel: ch.name, ok: true }) } catch (e) { out.push({ channel: ch.name, ok: false, error: String((e as Error)?.message ?? e).slice(0, 200) }) } }
   return out
 }

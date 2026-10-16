@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { telegramConfig, telegramConfigs, telegramChats, telegramText, sendTelegram } from "./telegram"
+import { telegramConfig, telegramConfigs, telegramChats, telegramProblems, telegramText, sendTelegram } from "./telegram"
 
 const TOKEN = "1234567890:AAH-abcdefghijklmnopqrstuvwxyz012345"
 describe("telegramConfig", () => {
@@ -22,6 +22,20 @@ describe("more than one chat", () => {
     expect(telegramConfigs({ ...base, TELEGRAM_BOT_TOKEN: "bad" })).toEqual([])
     expect(telegramConfig({ ...base, TELEGRAM_CHAT_ID_2: "987654321" })?.chatId).toBe("123456789")
     expect(telegramConfig({ TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_CHAT_ID_2: "987654321" })?.chatId).toBe("987654321")
+  })
+})
+describe("telegramProblems", () => {
+  it("is empty when configured, and never repeats a value", () => {
+    expect(telegramProblems({ TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_CHAT_ID: "123456789" })).toEqual([])
+    const all = JSON.stringify([telegramProblems({ TELEGRAM_BOT_TOKEN: `"${TOKEN}"`, TELEGRAM_CHAT_ID: "me" }), telegramProblems({ TELEGRAM_BOT_TOKEN: "bad-token", TELEGRAM_CHAT_ID: "123456789" })])
+    expect(all).not.toContain(TOKEN); expect(all).not.toContain("bad-token")
+  })
+  it("says which variable is missing, which has quotes or spaces, and which is not a chat id", () => {
+    expect(telegramProblems({}).join("|")).toMatch(/TELEGRAM_BOT_TOKEN is not set.*TELEGRAM_CHAT_ID is not set/)
+    expect(telegramProblems({ TELEGRAM_BOT_TOKEN: `"${TOKEN}"`, TELEGRAM_CHAT_ID: "123456789" })[0]).toMatch(/quotes or spaces/)
+    expect(telegramProblems({ TELEGRAM_BOT_TOKEN: "abc", TELEGRAM_CHAT_ID: "123456789" })[0]).toMatch(/does not look like a bot token/)
+    expect(telegramProblems({ TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_CHAT_ID: "me" })[0]).toMatch(/is not a chat id/)
+    expect(telegramProblems({ TELEGRAM_BOT_TOKEN: TOKEN })[0]).toMatch(/TELEGRAM_CHAT_ID is not set/)
   })
 })
 describe("telegramText", () => {
