@@ -50,6 +50,7 @@ beforeAll(async () => {
   await db.exec(readFileSync("scripts/migrations/2026-10-16j-telegram-t2.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16k-telegram-t3.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16l-telegram-t4.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-16n-telegram-own-bot.sql", "utf8"))
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => { sent.length = 0; left.length = 0; await db.exec("DELETE FROM telegram_updates; DELETE FROM telegram_links; DELETE FROM telegram_link_codes; DELETE FROM anker_chats") })

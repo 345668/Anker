@@ -53,7 +53,7 @@ beforeAll(async () => {
     CREATE TABLE anker_chats (id text PRIMARY KEY DEFAULT gen_random_uuid()::text, user_id text, scope_key text, title text, model text, messages jsonb DEFAULT '[]', created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
     CREATE TABLE ai_subprocessors (slug text PRIMARY KEY, provider text, role text NOT NULL, purpose text, region text DEFAULT 'unknown', region_basis text DEFAULT 'inferred', data_classes text[] DEFAULT '{}', active boolean DEFAULT true, public boolean DEFAULT true, notes text);
     CREATE TABLE platform_flags (key text PRIMARY KEY, enabled boolean DEFAULT false, rollout_pct int DEFAULT 100, description text); CREATE TABLE plan_catalog (plan text PRIMARY KEY, features jsonb DEFAULT '{}');`)
-  for (const f of ["2026-10-16i-telegram-channel", "2026-10-16j-telegram-t2", "2026-10-16k-telegram-t3", "2026-10-16l-telegram-t4"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
+  for (const f of ["2026-10-16i-telegram-channel", "2026-10-16j-telegram-t2", "2026-10-16k-telegram-t3", "2026-10-16l-telegram-t4", "2026-10-16n-telegram-own-bot"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => { sent.length = 0; edits.length = 0; answers.length = 0; asks.length = 0; stashed.length = 0; st.saved.length = 0; st.savedIds.clear(); st.uploads.length = 0; st.transcripts.length = 0; st.untrusted = 0; st.limits = {}; st.canWrite = true

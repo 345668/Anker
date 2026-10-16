@@ -4,13 +4,22 @@ import { createHmac } from "node:crypto"
  * The Telegram Bot API for the customer channel (docs/architecture/57). This is the PRODUCT bot (TELEGRAM_PRODUCT_BOT_TOKEN), not the operator alert bot of doc 56.
  * The token never appears in an error, a log line or a return value. The webhook secret is derived from the platform secret, so no second secret needs to be entered anywhere.
  */
-export interface ProductBot { token: string; secret: string }
+/** `id` is 'platform' for the shared bot, or the id of a workspace's own bot (docs/architecture/57 section 19). */
+export interface ProductBot { token: string; secret: string; id: string }
+
+export const TOKEN_SHAPE = /^\d{5,}:[\w-]{20,}$/
+/** The webhook secret of one bot: derived from the platform key and the bot id, so no secret is ever entered by hand and each bot has its own. */
+export function webhookSecretFor(id: string, key: string): string {
+  return createHmac("sha256", key).update(id === "platform" ? "telegram-webhook-v1" : `telegram-webhook-v1:${id}`).digest("hex")
+}
+export function makeBot(token: string, id: string, env: Record<string, string | undefined> = process.env): ProductBot | null {
+  const key = env.SECRET_KEY, t = token.trim()
+  if (!TOKEN_SHAPE.test(t) || !key) return null
+  return { token: t, id, secret: webhookSecretFor(id, key) }
+}
 
 export function productBot(env: Record<string, string | undefined> = process.env): ProductBot | null {
-  const token = (env.TELEGRAM_PRODUCT_BOT_TOKEN ?? "").trim()
-  const key = env.SECRET_KEY
-  if (!/^\d{5,}:[\w-]{20,}$/.test(token) || !key) return null
-  return { token, secret: createHmac("sha256", key).update("telegram-webhook-v1").digest("hex") }
+  return makeBot(env.TELEGRAM_PRODUCT_BOT_TOKEN ?? "", "platform", env)
 }
 
 /** True when the request carries the secret Telegram was told to send. Constant-time. */

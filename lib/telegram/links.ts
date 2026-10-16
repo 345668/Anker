@@ -9,34 +9,34 @@ import { sql } from "@/lib/db"
 export const CODE_TTL_MIN = 10, IDLE_SUSPEND_DAYS = 90
 const sha = (s: string) => createHash("sha256").update(s).digest("hex")
 
-export interface LinkRow { id: string; user_id: string; org_id: string; telegram_user_id: string; chat_id: string; telegram_username: string | null; mode: "write" | "read"; status: "pending" | "active" | "suspended" | "revoked"; anker_chat_id: string | null; linked_at: string; confirmed_in_app_at: string | null; last_seen_at: string | null }
+export interface LinkRow { bot_id: string; id: string; user_id: string; org_id: string; telegram_user_id: string; chat_id: string; telegram_username: string | null; mode: "write" | "read"; status: "pending" | "active" | "suspended" | "revoked"; anker_chat_id: string | null; linked_at: string; confirmed_in_app_at: string | null; last_seen_at: string | null }
 
-export async function createLinkCode(userId: string, orgId: string): Promise<{ code: string; expiresAt: string }> {
+export async function createLinkCode(userId: string, orgId: string, botId = "platform"): Promise<{ code: string; expiresAt: string }> {
   const code = randomBytes(18).toString("base64url")            // 24 characters, within Telegram's 64 for a start parameter
-  const [r] = (await sql`INSERT INTO telegram_link_codes (code_hash, user_id, org_id, expires_at) VALUES (${sha(code)}, ${userId}, ${orgId}, now() + make_interval(mins => ${CODE_TTL_MIN})) RETURNING expires_at`) as any[]
+  const [r] = (await sql`INSERT INTO telegram_link_codes (code_hash, user_id, org_id, bot_id, expires_at) VALUES (${sha(code)}, ${userId}, ${orgId}, ${botId}, now() + make_interval(mins => ${CODE_TTL_MIN})) RETURNING expires_at`) as any[]
   return { code, expiresAt: new Date(r.expires_at).toISOString() }
 }
 
 export type StartResult = { ok: true; link: LinkRow } | { ok: false; reason: "invalid" | "expired" | "used" | "already_linked" }
 
 /** The person pressed Start with a code: records a pending link for that Telegram account. The code is consumed exactly once. */
-export async function consumeLinkCode(code: string, tg: { userId: number; chatId: number; username?: string | null }, mode: "write" | "read" = "read"): Promise<StartResult> {
+export async function consumeLinkCode(code: string, tg: { userId: number; chatId: number; username?: string | null }, mode: "write" | "read" = "read", botId = "platform"): Promise<StartResult> {
   if (!/^[\w-]{16,64}$/.test(code)) return { ok: false, reason: "invalid" }
-  const [c] = (await sql`SELECT code_hash, user_id, org_id, expires_at, used_at FROM telegram_link_codes WHERE code_hash = ${sha(code)}`) as any[]
-  if (!c) return { ok: false, reason: "invalid" }
+  const [c] = (await sql`SELECT code_hash, user_id, org_id, bot_id, expires_at, used_at FROM telegram_link_codes WHERE code_hash = ${sha(code)}`) as any[]
+  if (!c || c.bot_id !== botId) return { ok: false, reason: "invalid" }       // a code works only on the bot it was made for
   if (c.used_at) return { ok: false, reason: "used" }
   if (new Date(c.expires_at).getTime() < Date.now()) return { ok: false, reason: "expired" }
-  const [live] = (await sql`SELECT id FROM telegram_links WHERE telegram_user_id = ${tg.userId} AND status IN ('pending', 'active', 'suspended')`) as any[]
+  const [live] = (await sql`SELECT id FROM telegram_links WHERE bot_id = ${botId} AND telegram_user_id = ${tg.userId} AND status IN ('pending', 'active', 'suspended')`) as any[]
   if (live) return { ok: false, reason: "already_linked" }
   const [claimed] = (await sql`UPDATE telegram_link_codes SET used_at = now() WHERE code_hash = ${sha(code)} AND used_at IS NULL RETURNING code_hash`) as any[]
   if (!claimed) return { ok: false, reason: "used" }                    // someone else used it a moment ago
   const id = randomUUID()
-  const [row] = (await sql`INSERT INTO telegram_links (id, user_id, org_id, telegram_user_id, chat_id, telegram_username, mode, status) VALUES (${id}, ${c.user_id}, ${c.org_id}, ${tg.userId}, ${tg.chatId}, ${tg.username ?? null}, ${mode}, 'pending') RETURNING *`) as any[]
+  const [row] = (await sql`INSERT INTO telegram_links (id, user_id, org_id, bot_id, telegram_user_id, chat_id, telegram_username, mode, status) VALUES (${id}, ${c.user_id}, ${c.org_id}, ${botId}, ${tg.userId}, ${tg.chatId}, ${tg.username ?? null}, ${mode}, 'pending') RETURNING *`) as any[]
   return { ok: true, link: row }
 }
 
-export async function linkByTelegramUser(telegramUserId: number): Promise<LinkRow | null> {
-  const [r] = (await sql`SELECT * FROM telegram_links WHERE telegram_user_id = ${telegramUserId} AND status IN ('pending', 'active', 'suspended') ORDER BY created_at DESC LIMIT 1`) as any[]
+export async function linkByTelegramUser(telegramUserId: number, botId = "platform"): Promise<LinkRow | null> {
+  const [r] = (await sql`SELECT * FROM telegram_links WHERE bot_id = ${botId} AND telegram_user_id = ${telegramUserId} AND status IN ('pending', 'active', 'suspended') ORDER BY created_at DESC LIMIT 1`) as any[]
   return r ?? null
 }
 
@@ -53,8 +53,8 @@ export async function revokeLink(linkId: string, by: string, ownerOrUser: { user
   return r ?? null
 }
 
-export async function revokeByTelegramUser(telegramUserId: number): Promise<LinkRow | null> {
-  const [r] = (await sql`UPDATE telegram_links SET status = 'revoked', revoked_at = now(), revoked_by = 'telegram' WHERE telegram_user_id = ${telegramUserId} AND status IN ('pending', 'active', 'suspended') RETURNING *`) as any[]
+export async function revokeByTelegramUser(telegramUserId: number, botId = "platform"): Promise<LinkRow | null> {
+  const [r] = (await sql`UPDATE telegram_links SET status = 'revoked', revoked_at = now(), revoked_by = 'telegram' WHERE bot_id = ${botId} AND telegram_user_id = ${telegramUserId} AND status IN ('pending', 'active', 'suspended') RETURNING *`) as any[]
   if (r) await sql`UPDATE telegram_updates SET status = 'dropped', payload_enc = NULL, finished_at = now() WHERE link_id = ${r.id} AND status IN ('queued', 'running')`
   return r ?? null
 }

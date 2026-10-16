@@ -106,6 +106,7 @@ export const RULES: Rule[] = [
   { scope: O, table: "telegram_updates", where: "org_id::text = $1" },
   { scope: O, table: "telegram_prefs", where: "org_id::text = $1" },
   { scope: O, table: "telegram_shown", where: "org_id::text = $1" },
+  { scope: O, table: "telegram_bots", where: "org_id::text = $1", secret: ["token_enc"] },
   { scope: O, table: "telegram_sent", where: "org_id::text = $1" },
   { scope: O, table: "telegram_pending", where: "org_id::text = $1" },
   { scope: O, table: "crm_activities", where: "org_id::text = $1" },

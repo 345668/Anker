@@ -174,3 +174,32 @@ Caveats, stated plainly:
 - **Not verified live.** ASR, TTS and Telegram delivery have been tested against mocks and recorded fixtures only; the product bot does not exist yet (founder step: BotFather, `TELEGRAM_PRODUCT_BOT_TOKEN`, webhook, feature, flag).
 - **LGPL.** `lamejs` (MP3 encoding) is LGPL; it is used unmodified as a dependency. Counsel should confirm this is acceptable for the distribution model.
 - Deferred: save-to-data-room and CRM notes as proposals, agent-result messages, T5.
+
+## 19. A workspace's own bot (2026-10-16): connect it in the app, no Vercel step
+**Request:** instead of the founder creating one bot and putting its token into Vercel, a workspace owner should create the bot and connect it inside Anker, the way the LinkedIn extension is connected, with the token saved under that workspace.
+
+**Decision.** A Vercel environment variable is one value for the whole platform, so it cannot be per workspace, and changing it needs a redeploy. So the token is a **workspace setting stored encrypted in the database**, and the app does the Vercel-equivalent steps itself: it checks the token with Telegram, registers the webhook and shows the result. The shared platform bot (`TELEGRAM_PRODUCT_BOT_TOKEN`) stays as an optional default for workspaces that do not want their own. We do not call the Vercel API: it would need a Vercel token with write access to production, and it would still be one bot for everyone.
+
+**The flow (Connected channels, owner or admin only):**
+1. The page says: open @BotFather in Telegram, send `/newbot`, choose a name and a username ending in `bot`, copy the token it gives you.
+2. The owner pastes the token. Anker calls `getMe` (token valid and it is a bot), refuses a bot that is already connected to any workspace or is the platform bot, saves the token **encrypted**, registers the webhook `https://<app>/api/telegram/webhook/<bot id>` with a secret derived from the platform key and the bot id, and shows "Connected: @name".
+3. The token is never shown again, never logged, never returned by any route and never in an export (`secret` column in the tenant registry). Disconnecting removes the webhook, revokes every device linked through that bot and deletes the token. The page tells the owner they can also revoke the token in BotFather.
+4. Devices then link exactly as before (code, Start, approve in the app), through the workspace's own bot.
+
+**Data model (migration `2026-10-16n`).** `telegram_bots` (one per workspace: `id`, `org_id` unique, `bot_user_id` unique, `username`, `token_enc`, `created_by`). `bot_id` (default `platform`) added to `telegram_links`, `telegram_link_codes`, `telegram_updates` and `telegram_sent`: a Telegram `update_id` and a message id are only unique **per bot**, so the keys become `(bot_id, update_id)` and `(bot_id, chat_id, message_id)`, and one Telegram account may be linked once per bot.
+
+**Isolation.** A link code is made for one bot and works only there, so a code from workspace A cannot link a phone through workspace B's bot. Each webhook URL has its own derived secret. Every send, download, notification, sweep and `/forget` uses the bot the link belongs to.
+
+**Costs and limits.** The workspace owns its bot, so Telegram traffic is theirs. Anker's AI, speech and storage costs follow the workspace as before (doc 58 will meter them). The plan feature `channel_telegram` and the flag `telegram_channel` still gate the workspace.
+
+**Not in scope:** creating the bot for the person (Telegram does not allow it; BotFather is the only way), bot avatars and descriptions (set in BotFather), webhook secrets entered by the owner, one workspace with several bots.
+
+### Build status, section 19 (2026-10-16)
+Built and tested (10 new tests; 1957 Anker tests in all); migration `2026-10-16n-telegram-own-bot.sql` applied to Neon.
+- Connected channels shows a "Your workspace's bot" panel to owners and admins: three steps for BotFather, a password-style token field, then "Connected: @name" with the webhook status and a Disconnect button. API: `GET/POST/DELETE /api/telegram/bot`.
+- The token is stored encrypted in `telegram_bots`, excluded from exports (`secret: ["token_enc"]`), never returned, logged or put in an error (tested). The webhook is registered by the app at `/api/telegram/webhook/<bot id>` with a secret derived per bot; the shared bot's secret does not open a workspace bot's route.
+- Everything that talked to "the" bot now takes the bot the link belongs to: webhook, queue (`(bot_id, update_id)`), sweep, notifications, replies, files, voice, `/forget`.
+- A link code works only on the bot it was made for (tested); one Telegram account can be linked once per bot.
+- **No Vercel variable is created, by design** (section 19). `TELEGRAM_PRODUCT_BOT_TOKEN` is now optional: it is only the shared default for workspaces without their own bot.
+- **Not verified live:** no real bot has been connected. The first real connect should be tried with a throwaway bot.
+- **Known limit:** erasing a workspace deletes its bot row and token but does not call Telegram to remove the webhook; the webhook then answers 401 until the owner revokes the token in BotFather.

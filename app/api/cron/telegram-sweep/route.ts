@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { productBot } from "@/lib/telegram/api"
+import { loadBot } from "@/lib/telegram/bots"
 import { sweep, realDeps } from "@/lib/telegram/runtime"
 import { trackCron, isCronAuthorised } from "@/lib/cron/track"
 
@@ -13,8 +14,8 @@ export const maxDuration = 300
 
 async function handle(req: NextRequest) {
   if (!isCronAuthorised(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  const bot = productBot()
-  if (!bot) return NextResponse.json({ ok: true, configured: false })
-  try { return NextResponse.json({ ok: true, configured: true, ...(await sweep(realDeps(bot))) }) } catch (e: any) { console.error("[telegram-sweep]", e?.message ?? e); return NextResponse.json({ error: "Sweep failed" }, { status: 500 }) }
+  const shared = productBot()
+  const depsFor = async (id: string) => { const l = await loadBot(id); return l ? realDeps(l.bot) : null }
+  try { return NextResponse.json({ ok: true, configured: !!shared, ...(await sweep(shared ? realDeps(shared) : null, 10, depsFor)) }) } catch (e: any) { console.error("[telegram-sweep]", e?.message ?? e); return NextResponse.json({ error: "Sweep failed" }, { status: 500 }) }
 }
 export const GET = trackCron("telegram-sweep", handle)

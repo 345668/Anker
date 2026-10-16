@@ -30,19 +30,19 @@ const appUrl = () => (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 
 export const RUN_BUDGET_MS = 240_000
 
 /** Records the id of each message the bot sends (no text), so /forget can delete them within Telegram's 48 hours. */
-async function recordSent(chatId: number, messageId: number | undefined, kind: "text" | "voice_reply" | "file"): Promise<void> {
+async function recordSent(botId: string, chatId: number, messageId: number | undefined, kind: "text" | "voice_reply" | "file"): Promise<void> {
   if (!messageId) return
   try {
-    const [l] = (await sql`SELECT org_id FROM telegram_links WHERE chat_id = ${chatId} AND status <> 'revoked' ORDER BY created_at DESC LIMIT 1`) as any[]
-    await sql`INSERT INTO telegram_sent (chat_id, message_id, org_id, kind) VALUES (${chatId}, ${messageId}, ${l?.org_id ?? null}, ${kind}) ON CONFLICT DO NOTHING`
+    const [l] = (await sql`SELECT org_id FROM telegram_links WHERE bot_id = ${botId} AND chat_id = ${chatId} AND status <> 'revoked' ORDER BY created_at DESC LIMIT 1`) as any[]
+    await sql`INSERT INTO telegram_sent (bot_id, chat_id, message_id, org_id, kind) VALUES (${botId}, ${chatId}, ${messageId}, ${l?.org_id ?? null}, ${kind}) ON CONFLICT DO NOTHING`
   } catch { /* remembering is best effort: /forget then simply cannot delete that one */ }
 }
 
 export function realApi(b: bot.ProductBot): Api {
   return {
-    sendMessage: async (c, h, m) => { const r = await bot.sendMessage(b, c, h, m); await recordSent(c, r?.message_id, "text"); return r },
+    sendMessage: async (c, h, m) => { const r = await bot.sendMessage(b, c, h, m); await recordSent(b.id, c, r?.message_id, "text"); return r },
     editMessage: (c, id, h, m) => bot.editMessage(b, c, id, h, m), answerCallback: (id, t, a) => bot.answerCallback(b, id, t, a),
-    sendVoice: async (c, mp3) => { const r = await bot.sendVoice(b, c, mp3); await recordSent(c, r?.message_id, "voice_reply"); return r },
+    sendVoice: async (c, mp3) => { const r = await bot.sendVoice(b, c, mp3); await recordSent(b.id, c, r?.message_id, "voice_reply"); return r },
     sendChatAction: (c) => bot.sendChatAction(b, c), leaveChat: (c) => bot.leaveChat(b, c),
   }
 }
@@ -186,50 +186,50 @@ export async function sendFileFor(b: bot.ProductBot, link: LinkRow, chatId: numb
   if (!a || Number(a.n) > 20 * 1024 * 1024) return false
   const [c] = (await sql`SELECT content FROM private_artifacts WHERE id = ${id} AND org_id = ${link.org_id}`) as any[]
   const r = await bot.sendDocument(b, chatId, Buffer.from(c.content), String(a.filename), String(a.content_type).split(";")[0])
-  await recordSent(chatId, r?.message_id, "file")
+  await recordSent(b.id, chatId, r?.message_id, "file")
   return true
 }
 
 /** /forget: delete what Telegram lets a bot delete (the last 48 hours of this chat, both sides), and clear the conversation kept in Anker. */
 export async function forgetChat(b: bot.ProductBot, link: LinkRow, chatId: number): Promise<number> {
-  const rows = (await sql`SELECT message_id FROM telegram_sent WHERE chat_id = ${chatId} AND sent_at > now() - interval '48 hours' ORDER BY message_id`) as any[]
+  const rows = (await sql`SELECT message_id FROM telegram_sent WHERE bot_id = ${b.id} AND chat_id = ${chatId} AND sent_at > now() - interval '48 hours' ORDER BY message_id`) as any[]
   const ids = rows.map((r) => Number(r.message_id))
   let removed = 0
   for (let i = 0; i < ids.length; i += 100) { try { await bot.deleteMessages(b, chatId, ids.slice(i, i + 100)); removed += ids.slice(i, i + 100).length } catch { /* some may already be gone */ } }
-  await sql`DELETE FROM telegram_sent WHERE chat_id = ${chatId}`
+  await sql`DELETE FROM telegram_sent WHERE bot_id = ${b.id} AND chat_id = ${chatId}`
   if (link.anker_chat_id) await sql`UPDATE anker_chats SET messages = '[]'::jsonb, updated_at = now() WHERE id = ${link.anker_chat_id} AND user_id = ${link.user_id}`
   await sql`DELETE FROM telegram_pending WHERE link_id = ${link.id}`
   return removed
 }
 export async function rememberIncoming(link: LinkRow, chatId: number, messageId: number): Promise<void> {
-  await sql`INSERT INTO telegram_sent (chat_id, message_id, org_id, kind) VALUES (${chatId}, ${messageId}, ${link.org_id}, 'incoming') ON CONFLICT DO NOTHING`
+  await sql`INSERT INTO telegram_sent (bot_id, chat_id, message_id, org_id, kind) VALUES (${link.bot_id ?? 'platform'}, ${chatId}, ${messageId}, ${link.org_id}, 'incoming') ON CONFLICT DO NOTHING`
 }
 
-export function realDeps(b: bot.ProductBot): Deps { return { api: realApi(b), gate, ask, newProposals, pending, decide, today, shown, media: realMedia(b), allow, stash: stashPending, readPending, dropPending, saveNote: saveAsCallNote, voiceReply, sendFile: (l, c, f) => sendFileFor(b, l, c, f), forget: (l, c) => forgetChat(b, l, c), remember: rememberIncoming, appUrl: appUrl() } }
+export function realDeps(b: bot.ProductBot): Deps { return { botId: b.id, api: realApi(b), gate, ask, newProposals, pending, decide, today, shown, media: realMedia(b), allow, stash: stashPending, readPending, dropPending, saveNote: saveAsCallNote, voiceReply, sendFile: (l, c, f) => sendFileFor(b, l, c, f), forget: (l, c) => forgetChat(b, l, c), remember: rememberIncoming, appUrl: appUrl() } }
 
 // ───────────── the queue: received updates are stored, acknowledged, then processed ─────────────
 const STALE_RUNNING_MS = 5 * 60_000
 export const MAX_ATTEMPTS = 3
 
 /** Stores a received update (once: the unique update id makes Telegram's retries harmless). Returns true when it is new. */
-export async function enqueue(update: TgUpdate): Promise<boolean> {
+export async function enqueue(update: TgUpdate, botId = "platform"): Promise<boolean> {
   const key = process.env.SECRET_KEY
   if (!key) throw new Error("SECRET_KEY is required to queue a Telegram update")
   const chatId = update.message?.chat.id ?? update.callback_query?.message?.chat.id ?? update.my_chat_member?.chat.id ?? null
   const kind = update.message ? (update.message.text ? "text" : update.message.voice || update.message.audio || (update.message.document && /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|webm)$/i.test(update.message.document.file_name ?? "")) ? "voice" : update.message.document || update.message.photo ? "file" : "other") : update.callback_query ? "callback" : update.my_chat_member ? "member" : "other"
   const fromId = update.message?.from?.id ?? update.callback_query?.from?.id ?? null
-  const [l] = fromId == null ? [] : ((await sql`SELECT id, org_id FROM telegram_links WHERE telegram_user_id = ${fromId} AND status <> 'revoked' ORDER BY created_at DESC LIMIT 1`) as any[])
+  const [l] = fromId == null ? [] : ((await sql`SELECT id, org_id FROM telegram_links WHERE bot_id = ${botId} AND telegram_user_id = ${fromId} AND status <> 'revoked' ORDER BY created_at DESC LIMIT 1`) as any[])
   const units = kind === "voice" ? Math.max(0, Math.round(update.message?.voice?.duration ?? update.message?.audio?.duration ?? 0)) : null
-  const rows = (await sql`INSERT INTO telegram_updates (update_id, link_id, org_id, chat_id, kind, units, payload_enc) VALUES (${update.update_id}, ${l?.id ?? null}, ${l?.org_id ?? null}, ${chatId}, ${kind}, ${units}, ${encryptSecret(JSON.stringify(update))}) ON CONFLICT (update_id) DO NOTHING RETURNING update_id`) as any[]
+  const rows = (await sql`INSERT INTO telegram_updates (bot_id, update_id, link_id, org_id, chat_id, kind, units, payload_enc) VALUES (${botId}, ${update.update_id}, ${l?.id ?? null}, ${l?.org_id ?? null}, ${chatId}, ${kind}, ${units}, ${encryptSecret(JSON.stringify(update))}) ON CONFLICT (bot_id, update_id) DO NOTHING RETURNING update_id`) as any[]
   return rows.length > 0
 }
 
 /** Claims an update for processing: not while an earlier update of the same chat is still being worked on, so a chat's messages are answered in order. */
-async function claim(updateId: number): Promise<{ payload: TgUpdate; attempts: number } | null> {
+async function claim(botId: string, updateId: number): Promise<{ payload: TgUpdate; attempts: number } | null> {
   const [r] = (await sql`UPDATE telegram_updates u SET status = 'running', started_at = now(), attempts = attempts + 1
-    WHERE u.update_id = ${updateId} AND (u.status = 'queued' OR (u.status = 'running' AND u.started_at < now() - make_interval(secs => ${STALE_RUNNING_MS / 1000})))
+    WHERE u.bot_id = ${botId} AND u.update_id = ${updateId} AND (u.status = 'queued' OR (u.status = 'running' AND u.started_at < now() - make_interval(secs => ${STALE_RUNNING_MS / 1000})))
       AND u.attempts < ${MAX_ATTEMPTS}
-      AND NOT EXISTS (SELECT 1 FROM telegram_updates e WHERE e.chat_id = u.chat_id AND e.update_id < u.update_id AND (e.status = 'queued' OR (e.status = 'running' AND e.started_at > now() - make_interval(secs => ${STALE_RUNNING_MS / 1000}))) AND e.attempts < ${MAX_ATTEMPTS})
+      AND NOT EXISTS (SELECT 1 FROM telegram_updates e WHERE e.bot_id = u.bot_id AND e.chat_id = u.chat_id AND e.update_id < u.update_id AND (e.status = 'queued' OR (e.status = 'running' AND e.started_at > now() - make_interval(secs => ${STALE_RUNNING_MS / 1000}))) AND e.attempts < ${MAX_ATTEMPTS})
     RETURNING payload_enc, attempts`) as any[]
   if (!r?.payload_enc) return null
   const plain = decryptSecret(r.payload_enc)
@@ -237,37 +237,40 @@ async function claim(updateId: number): Promise<{ payload: TgUpdate; attempts: n
   return { payload: JSON.parse(plain) as TgUpdate, attempts: Number(r.attempts) }
 }
 
-export async function processUpdate(updateId: number, deps: Deps): Promise<"done" | "failed" | "skipped"> {
-  const c = await claim(updateId)
+export async function processUpdate(updateId: number, deps: Deps, botId = deps.botId ?? "platform"): Promise<"done" | "failed" | "skipped"> {
+  const c = await claim(botId, updateId)
   if (!c) return "skipped"
   try {
     await handleUpdate(c.payload, deps)
-    await sql`UPDATE telegram_updates SET status = 'done', finished_at = now(), payload_enc = NULL, error = NULL WHERE update_id = ${updateId}`
+    await sql`UPDATE telegram_updates SET status = 'done', finished_at = now(), payload_enc = NULL, error = NULL WHERE bot_id = ${botId} AND update_id = ${updateId}`
     return "done"
   } catch (e) {
     const last = c.attempts >= MAX_ATTEMPTS
     const err = String((e as Error)?.message ?? e).slice(0, 200)
-    if (last) await sql`UPDATE telegram_updates SET status = 'failed', error = ${err}, payload_enc = NULL, finished_at = now() WHERE update_id = ${updateId}`.catch(() => {})
-    else await sql`UPDATE telegram_updates SET status = 'queued', error = ${err} WHERE update_id = ${updateId}`.catch(() => {})
+    if (last) await sql`UPDATE telegram_updates SET status = 'failed', error = ${err}, payload_enc = NULL, finished_at = now() WHERE bot_id = ${botId} AND update_id = ${updateId}`.catch(() => {})
+    else await sql`UPDATE telegram_updates SET status = 'queued', error = ${err} WHERE bot_id = ${botId} AND update_id = ${updateId}`.catch(() => {})
     return "failed"
   }
 }
 
 /** Every update that is waiting: new ones the webhook could not start, or ones left behind by a killed function. Oldest first, one chat at a time (the claim enforces the order). */
-export async function sweep(deps: Deps, limit = 10): Promise<{ processed: number; failed: number; expired?: number }> {
+export async function sweep(deps: Deps | null, limit = 10, depsFor?: (botId: string) => Promise<Deps | null>): Promise<{ processed: number; failed: number; expired?: number }> {
   const expired = await sweepPending().catch(() => 0)
-  const rows = (await sql`SELECT update_id FROM telegram_updates WHERE attempts < ${MAX_ATTEMPTS} AND (status = 'queued' OR (status = 'running' AND started_at < now() - make_interval(secs => ${STALE_RUNNING_MS / 1000}))) ORDER BY update_id LIMIT ${limit}`) as any[]
+  const rows = (await sql`SELECT bot_id, update_id FROM telegram_updates WHERE attempts < ${MAX_ATTEMPTS} AND (status = 'queued' OR (status = 'running' AND started_at < now() - make_interval(secs => ${STALE_RUNNING_MS / 1000}))) ORDER BY received_at, update_id LIMIT ${limit}`) as any[]
   let processed = 0, failed = 0
-  for (const r of rows) { const o = await processUpdate(Number(r.update_id), deps); if (o === "done") processed++; else if (o === "failed") failed++ }
+  for (const r of rows) { const bid = String(r.bot_id), d = deps && (deps.botId ?? "platform") === bid ? deps : depsFor ? await depsFor(bid) : null; if (!d) continue; const o = await processUpdate(Number(r.update_id), d, bid); if (o === "done") processed++; else if (o === "failed") failed++ }
   return { processed, failed, expired }
 }
 
-let me: { at: number; username: string | null } | null = null
-/** The bot's @username for the deep link, read once from Telegram and remembered for ten minutes. */
+const names = new Map<string, { at: number; username: string | null }>()
+/** The bot's @username for the deep link, read once from Telegram and remembered for ten minutes (a failed read is retried after a minute). */
 export async function botUsername(b: bot.ProductBot): Promise<string | null> {
-  if (me && Date.now() - me.at < 600_000) return me.username
-  try { const r = await getMe(b); me = { at: Date.now(), username: r.username ?? null } } catch { me = { at: Date.now() - 540_000, username: null } }
-  return me.username
+  const c = names.get(b.id)
+  if (c && Date.now() - c.at < 600_000) return c.username
+  let e: { at: number; username: string | null }
+  try { const r = await getMe(b); e = { at: Date.now(), username: r.username ?? null } } catch { e = { at: Date.now() - 540_000, username: null } }
+  names.set(b.id, e)
+  return e.username
 }
 
 // ───────────── proactive notifications (opt-in, counts only, quiet hours) ─────────────
@@ -277,10 +280,10 @@ export interface NotifyStats { links: number; sent: number; held: number; failed
  * Tells people what is waiting, only if they turned it on, never more than a count and a link, and never during their quiet hours. Watermarks mean a night's worth is one message in
  * the morning, and nothing old is repeated. Proposals already shown in the chat are not announced again.
  */
-export async function notifyAll(api: Api, app: string, now = Date.now()): Promise<NotifyStats> {
+export async function notifyAll(api: Api, app: string, now = Date.now(), botId = "platform"): Promise<NotifyStats> {
   const st: NotifyStats = { links: 0, sent: 0, held: 0, failed: 0 }
   const rows = (await sql`SELECT l.id, l.org_id, l.user_id, l.chat_id, l.mode, l.status, p.approvals, p.replies, p.deadlines, p.daily_brief, p.last_brief_on::text AS last_brief_on, p.quiet_start, p.quiet_end, p.tz, p.last_approvals_at, p.last_replies_at, p.last_deadlines_on::text AS last_deadlines_on
-    FROM telegram_links l JOIN telegram_prefs p ON p.link_id = l.id WHERE l.status = 'active' AND (p.approvals OR p.replies OR p.deadlines OR p.daily_brief)`) as any[]
+    FROM telegram_links l JOIN telegram_prefs p ON p.link_id = l.id WHERE l.status = 'active' AND l.bot_id = ${botId} AND (p.approvals OR p.replies OR p.deadlines OR p.daily_brief)`) as any[]
   for (const r of rows) {
     st.links++
     const q = { start: Number(r.quiet_start), end: Number(r.quiet_end), tz: String(r.tz || DEFAULT_QUIET.tz) }

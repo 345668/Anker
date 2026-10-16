@@ -216,6 +216,7 @@
     "mcp_tokens",
     "memberships",
     "messages",
+    "model_prices",
     "neon_bak_investment_firms_2026_06_01_2226",
     "neon_bak_investment_firms_2026_07_25_1512",
     "neon_bak_investors_2026_06_01_2226",
@@ -292,6 +293,7 @@
     "team_invitations",
     "team_members",
     "teams",
+    "telegram_bots",
     "telegram_link_codes",
     "telegram_links",
     "telegram_pending",
@@ -606,6 +608,9 @@
       "fund_id"
     ],
     "tasks": [
+      "org_id"
+    ],
+    "telegram_bots": [
       "org_id"
     ],
     "telegram_link_codes": [

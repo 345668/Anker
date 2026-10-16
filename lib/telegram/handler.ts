@@ -63,6 +63,8 @@ export interface Deps {
   /** Remembers that a proposal was shown in the chat, so a notification does not repeat it. */
   shown(link: LinkRow, proposalIds: string[]): Promise<void>
   appUrl: string
+  /** The bot this update arrived on: 'platform' (the shared bot) or a workspace's own bot. */
+  botId?: string
   now?: () => number
 }
 
@@ -108,15 +110,15 @@ export async function handleUpdate(update: TgUpdate, deps: Deps): Promise<void> 
   const text = (m.text ?? "").trim()
   const start = /^\/start(?:@\w+)?(?:\s+(\S+))?$/i.exec(text)
   if (start?.[1]) {
-    const r = await consumeLinkCode(start[1], { userId: tgId, chatId, username: m.from.username ?? null })
+    const r = await consumeLinkCode(start[1], { userId: tgId, chatId, username: m.from.username ?? null }, "read", deps.botId ?? "platform")
     if (r.ok) await reply(deps, chatId, MSG.pending)
     else await reply(deps, chatId, r.reason === "already_linked" ? MSG.alreadyLinked : MSG.codeBad)
     return
   }
 
-  const link = await linkByTelegramUser(tgId)
+  const link = await linkByTelegramUser(tgId, deps.botId ?? "platform")
   if (!link) { await reply(deps, chatId, MSG.unknown); return }
-  if (/^\/unlink(?:@\w+)?$/i.test(text)) { await revokeByTelegramUser(tgId); await reply(deps, chatId, MSG.unlinked); return }
+  if (/^\/unlink(?:@\w+)?$/i.test(text)) { await revokeByTelegramUser(tgId, deps.botId ?? "platform"); await reply(deps, chatId, MSG.unlinked); return }
   if (link.status === "pending") { await reply(deps, chatId, MSG.pending); return }
   if (link.status === "suspended") { await reply(deps, chatId, MSG.suspended); return }
   await deps.remember(link, chatId, m.message_id).catch(() => {})
@@ -261,7 +263,7 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>, deps:
   const answer = (t: string, alert = true) => deps.api.answerCallback(cq.id, t, alert)
   const chat = cq.message?.chat
   if (!chat || chat.type !== "private" || !cq.from) { await answer("This only works in a private chat."); return }
-  const link = await linkByTelegramUser(cq.from.id)
+  const link = await linkByTelegramUser(cq.from.id, deps.botId ?? "platform")
   if (!link || link.status !== "active") { await answer("This device is not connected. Connect it again from Anker."); return }
   const note = parseNoteCallback(cq.data)
   if (note && cq.message) { const g = await deps.gate(link); if (g) { await answer(g); return } await handleNoteTap(cq, link, note, deps); return }

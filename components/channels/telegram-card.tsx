@@ -4,8 +4,63 @@ import { useCallback, useEffect, useState } from "react"
 
 interface Prefs { approvals: boolean; replies: boolean; deadlines: boolean; voiceReplies: boolean; dailyBrief: boolean }
 interface Link { id: string; mine: boolean; username: string | null; mode: string; status: string; linkedAt: string; lastSeenAt: string | null; prefs: Prefs }
-interface State { available: boolean; reason: string | null; bot: string | null; canManageAll: boolean; canWrite: boolean; ttlMinutes: number; links: Link[] }
+interface State { available: boolean; reason: string | null; bot: string | null; botKind: "own" | "shared" | null; ownBot: { username: string; connectedAt: string } | null; canManageBot: boolean; canManageAll: boolean; canWrite: boolean; ttlMinutes: number; links: Link[] }
 const STATUS: Record<string, string> = { pending: "Waiting for your approval", active: "Connected", suspended: "Paused (idle for a long time)" }
+
+interface BotStatus { gate: string | null; bot: { username: string; connectedAt: string; webhookOk: boolean; pending: number; lastError: string | null } | null }
+
+/** Connect, check and remove the workspace's own bot. The token is typed once, sent over HTTPS, stored encrypted and never shown again. */
+function BotSetup({ onChange }: { onChange: () => void }) {
+  const [st, setSt] = useState<BotStatus | null>(null)
+  const [token, setToken] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const load = useCallback(async () => { const r = await fetch("/api/telegram/bot", { cache: "no-store" }); setSt(r.ok ? await r.json() : null) }, [])
+  useEffect(() => { void load() }, [load])
+  async function connect(e: React.FormEvent) {
+    e.preventDefault(); setBusy(true); setMsg(null)
+    const r = await fetch("/api/telegram/bot", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) })
+    const j = await r.json().catch(() => ({}))
+    if (r.ok) { setToken(""); await load(); onChange() } else setMsg(j.error ?? "Could not connect the bot.")
+    setBusy(false)
+  }
+  async function remove() {
+    if (!window.confirm("Disconnect this bot? Every phone connected through it is disconnected too, and the saved token is deleted.")) return
+    setBusy(true); setMsg(null)
+    const r = await fetch("/api/telegram/bot", { method: "DELETE" })
+    if (!r.ok) setMsg((await r.json().catch(() => ({}))).error ?? "Could not disconnect.")
+    setBusy(false); await load(); onChange()
+  }
+  const btn = "h-9 rounded-md border px-4 text-sm disabled:opacity-50"
+  if (!st) return null
+  return (
+    <div className="mt-4 rounded-md border p-4 text-sm" aria-labelledby="tg-bot-h">
+      <h3 id="tg-bot-h" className="font-medium">Your workspace's bot</h3>
+      {st.bot ? (
+        <div className="mt-2 space-y-2">
+          <p>Connected: <strong>@{st.bot.username}</strong>. {st.bot.webhookOk ? "Telegram is delivering messages to Anker." : "Telegram is not delivering messages yet. Disconnect and connect the bot again."}</p>
+          {st.bot.lastError && <p className="text-xs text-amber-700">Telegram reported: {st.bot.lastError}</p>}
+          <p className="text-xs text-muted-foreground">The token is stored encrypted and is never shown again. To cut off access completely, also send /revoke to @BotFather.</p>
+          <button className={btn} disabled={busy} onClick={remove}>Disconnect this bot</button>
+        </div>
+      ) : (
+        <form onSubmit={connect} className="mt-2 space-y-3">
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>In Telegram, open <a className="underline" href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">@BotFather</a> and send <code>/newbot</code>.</li>
+            <li>Choose a name (for example "Acme Anker") and a username ending in <code>bot</code>.</li>
+            <li>BotFather replies with a token. Paste it here.</li>
+          </ol>
+          <label className="block"><span className="font-medium">Bot token</span>
+            <input type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} placeholder="123456789:AA…" className="mt-1 h-9 w-full max-w-md rounded-md border bg-transparent px-3 text-sm" />
+          </label>
+          <p className="text-xs text-muted-foreground">Anker checks the token with Telegram, saves it encrypted under this workspace and sets up the connection. You do not need to change anything anywhere else.</p>
+          <button className={btn} disabled={busy || token.trim().length < 20}>Connect bot</button>
+        </form>
+      )}
+      {msg && <p role="alert" className="mt-2 text-sm text-red-600">{msg}</p>}
+    </div>
+  )
+}
 
 export function TelegramCard() {
   const [s, setS] = useState<State | null>(null)
@@ -35,6 +90,8 @@ export function TelegramCard() {
     <section className="rounded-xl border p-5" aria-labelledby="tg-h">
       <h2 id="tg-h" className="text-lg font-semibold">Telegram</h2>
       <p className="mt-1 text-sm text-muted-foreground">Ask Anker AI about this workspace from your phone. Messages pass through Telegram, which is a separate company and does not encrypt bot chats end to end. By default the bot only answers. If you switch on \"Allow changes\" for a device, it can propose changes to your records, and nothing is changed until you tap Approve. It never sends email or messages to other people from the chat.</p>
+      {s.botKind === "own" && s.bot && <p className="mt-2 text-sm">Your workspace's bot: <strong>@{s.bot}</strong>.</p>}
+      {s.canManageBot && <BotSetup onChange={load} />}
       {!s.available ? <p className="mt-3 text-sm" role="status">{s.reason ?? "Telegram is not available for this workspace."}</p> : (
         <div className="mt-4 space-y-3">
           {url ? (
