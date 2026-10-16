@@ -237,6 +237,9 @@ export default function PrivacyPage() {
           Privacy questions, data requests, or complaints:{" "}
           <a href="mailto:privacy@an-ker.de">privacy@an-ker.de</a>.
         </p>
+        <p>
+          If you are in our investor directory you can <Link href="/privacy/request">ask what we hold, or have it corrected, restricted or erased</Link>.
+        </p>
 
 </section>
         <a href="#policy-top" className={s.backToTop}>Back to top ↑</a>

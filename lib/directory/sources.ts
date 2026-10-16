@@ -78,6 +78,10 @@ async function sourcesForLinkedIn(url: string): Promise<Array<SourceRow | null>>
 
 /** The same gate for a LinkedIn target, called when an outreach action is queued. */
 export async function enforceLinkedInUse(url: string, purpose: Purpose = "outreach_linkedin"): Promise<void> {
+  try {
+    const { profileSlug } = await import("@/lib/compliance/suppression"); const slug = profileSlug(url)
+    if (slug) { const like = `%linkedin.com/in/${slug.slice(3)}%`; const [r] = (await sql`SELECT 1 AS x FROM investors WHERE restricted_at IS NOT NULL AND (lower(linkedin_url) LIKE ${like} OR lower(person_linkedin_url) LIKE ${like}) LIMIT 1`) as any[]; if (r) throw new DirectoryUseError("Not queued: this person asked us to restrict the use of their data.", null) }
+  } catch (e) { if (e instanceof DirectoryUseError) throw e }
   let rows: Array<SourceRow | null>, d: UseDecision
   try { rows = await sourcesForLinkedIn(url); d = decideForSources(rows, purpose, await gateOn()) } catch { return }
   if (d.ok) return
@@ -97,6 +101,8 @@ export async function checkEmailUse(email: string, purpose: Purpose): Promise<Us
  * and lets the send continue. A failure of the check itself never blocks a send.
  */
 export async function enforceEmailUse(email: string, purpose: Purpose = "outreach_email"): Promise<void> {
+  // A person who asked for their data to be restricted is not contacted (docs/architecture/54 D3).
+  try { const [r] = (await sql`SELECT 1 AS x FROM investors WHERE lower(email) = ${email.trim().toLowerCase()} AND restricted_at IS NOT NULL LIMIT 1`) as any[]; if (r) throw new DirectoryUseError("Not sent: this person asked us to restrict the use of their data.", null) } catch (e) { if (e instanceof DirectoryUseError) throw e }
   let d: Awaited<ReturnType<typeof checkEmailUse>>
   try { d = await checkEmailUse(email, purpose) } catch { return }
   if (d.ok) return

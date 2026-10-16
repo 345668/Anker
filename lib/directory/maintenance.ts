@@ -126,5 +126,8 @@ export async function runMaintenance(opts: { budgetMs?: number } = {}) {
   const hashes = await fillHashes({ budgetMs: opts.budgetMs ?? 150_000 })
   const sweep = hashes.more ? null : await sweepTombstoned()
   const purged = hashes.more ? [] : await purgeWithdrawn()
-  return { hashes, sweep, purged }
+  // Privacy requests: expire unconfirmed ones, wipe closed ones, and nudge when one is due. Never lets a failure here stop the directory work above.
+  let requests: unknown = null
+  try { const dsar = await import("@/lib/privacy/dsar"); requests = { ...(await dsar.expireRequests()), digest: await dsar.dueDigest() } } catch { /* the table may not exist yet */ }
+  return { hashes, sweep, purged, requests }
 }
