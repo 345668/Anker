@@ -74,7 +74,7 @@ export async function getPortalData(lp: PortalLp): Promise<PortalData> {
         from fund_lps where id = ${lp.lpId} limit 1` as Promise<Array<Record<string, any>>>,
     sql`select as_of, commitment, called, distributed, nav from lp_positions
         where lp_id = ${lp.lpId} order by as_of desc limit 48` as Promise<Array<Record<string, any>>>,
-    sql`select id, title, quarter_label, sent_at from lp_quarterly_reports
+    sql`select id, quarter_label, sent_at from lp_quarterly_reports
         where fund_id = ${lp.fundId} and status in ('sent','published','approved')
         order by quarter_end desc nulls last limit 24` as Promise<Array<Record<string, any>>>,
     sql`select id, title, report_type, pdf_url, approved_at from lp_reports
@@ -98,7 +98,7 @@ export async function getPortalData(lp: PortalLp): Promise<PortalData> {
       asOf: String(p.as_of).slice(0, 10),
       commitment: num(p.commitment), called: num(p.called), distributed: num(p.distributed), nav: num(p.nav),
     })),
-    letters: letters.map((l) => ({ id: l.id, title: l.title, quarter: l.quarter_label ?? null, sentAt: l.sent_at ? String(l.sent_at).slice(0, 10) : null })),
+    letters: letters.map((l) => ({ id: l.id, title: l.quarter_label ? `Quarterly letter, ${l.quarter_label}` : "Quarterly letter", quarter: l.quarter_label ?? null, sentAt: l.sent_at ? String(l.sent_at).slice(0, 10) : null })),
     documents: docs.map((d) => ({ id: d.id, title: d.title, type: d.report_type ?? null, url: d.pdf_url ?? null, at: d.approved_at ? String(d.approved_at).slice(0, 10) : null })),
   }
 }
@@ -106,12 +106,12 @@ export async function getPortalData(lp: PortalLp): Promise<PortalData> {
 /** Full markdown of a single letter, scoped to this LP's fund. */
 export async function getPortalLetter(fundId: string, letterId: string): Promise<{ title: string; quarter: string | null; contentMd: string } | null> {
   const rows = await sql`
-    select title, quarter_label, content_md from lp_quarterly_reports
+    select quarter_label, content_md from lp_quarterly_reports
     where id = ${letterId}::uuid and fund_id = ${fundId} and status in ('sent','published','approved') limit 1
-  ` as Array<{ title: string; quarter_label: string | null; content_md: string | null }>
+  ` as Array<{ quarter_label: string | null; content_md: string | null }>
   const r = rows[0]
   if (!r) return null
-  return { title: r.title, quarter: r.quarter_label, contentMd: r.content_md ?? "" }
+  return { title: r.quarter_label ? `Quarterly letter, ${r.quarter_label}` : "Quarterly letter", quarter: r.quarter_label, contentMd: r.content_md ?? "" }
 }
 
 export async function logPortalAccess(tokenId: string, lpId: string, path: string, ip: string | null) {
