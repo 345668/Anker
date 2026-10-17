@@ -17,14 +17,16 @@ export function LpVerificationCard({ token, view }: { token: string; view: Verif
   const [msg, setMsg] = useState<string | null>(null)
   async function call(key: string, init: RequestInit) {
     setBusy(key); setMsg(null)
-    const r = await fetch(`/api/portal/${token}/verification`, init)
-    const j = await r.json().catch(() => ({}))
+    const r = await fetch(`/api/portal/${token}/verification`, init).catch(() => null)
+    const j = await r?.json().catch(() => ({})) ?? {}
     setBusy(null)
-    if (!r.ok) { setMsg(j.error ?? "That did not work. Please try again."); return false }
+    if (!r) { setMsg("Your connection dropped before the file was sent. Please try again."); return false }
+    if (!r.ok) { setMsg(r.status === 413 ? "That file is too large. The limit is 4 MB. Please send a smaller file." : j.error ?? "That did not work. Please try again."); return false }
     router.refresh(); return true
   }
   const upload = (type: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
+    if (file.size > 4 * 1024 * 1024) { setMsg(`That file is ${(file.size / 1048576).toFixed(1)} MB. The limit is 4 MB. Please send a smaller file.`); e.target.value = ""; return }
     const f = new FormData(); f.set("docType", type); f.set("file", file)
     void call(type, { method: "POST", body: f }).then(() => { e.target.value = "" })
   }

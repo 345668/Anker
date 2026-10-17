@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 
 interface File { id: string; filename: string; sizeBytes: number; title?: string }
 export interface SubscriptionView { status: "sent" | "returned" | "countersigned" | "rejected"; commitment: number; shareClass: string | null; subscriptionDate: string | null; rejectionReason: string | null; returnedAt: string | null; decidedAt: string | null; docs: File[]; signedCopy: File | null; countersignedCopy: File | null }
+const MAX_BYTES = 4 * 1024 * 1024
 const kb = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
 
 /** The investor's subscription documents: read them, sign them outside the portal, confirm and send the signed PDF back (docs/architecture/60 section 7). */
@@ -15,11 +16,16 @@ export function LpSubscriptionCard({ token, view }: { token: string; view: Subsc
   const [agree, setAgree] = useState(false)
   const link = (f: File) => <a className="underline" href={`/api/portal/${token}/subscription/${f.id}`}>{f.title ?? f.filename}</a>
   async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setBusy(true); setMsg(null)
-    const r = await fetch(`/api/portal/${token}/subscription`, { method: "POST", body: new FormData(e.currentTarget) })
-    const j = await r.json().catch(() => ({}))
+    e.preventDefault(); setMsg(null)
+    const form = new FormData(e.currentTarget)
+    const file = form.get("file")
+    if (file instanceof File && file.size > MAX_BYTES) { setMsg(`That file is ${(file.size / 1048576).toFixed(1)} MB. The limit is 4 MB. Please send a smaller PDF (for example, scan in black and white or at a lower resolution).`); return }
+    setBusy(true)
+    const r = await fetch(`/api/portal/${token}/subscription`, { method: "POST", body: form }).catch(() => null)
+    const j = await r?.json().catch(() => ({})) ?? {}
     setBusy(false)
-    if (!r.ok) { setMsg(j.error ?? "That did not work. Please try again."); return }
+    if (!r) { setMsg("Your connection dropped before the file was sent. Please try again."); return }
+    if (!r.ok) { setMsg(r.status === 413 ? "That file is too large. The limit is 4 MB. Please send a smaller PDF." : j.error ?? "That did not work. Please try again."); return }
     router.refresh()
   }
   return (

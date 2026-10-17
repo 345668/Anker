@@ -66,7 +66,7 @@ export function LpOnboardingCard({ token, view, defaultName }: { token: string; 
           <button className="h-9 rounded-md border px-4 disabled:opacity-50" disabled={busy || !agree} onClick={() => post({ action: "accept_terms" })}>Accept</button>
         </div>)}
       {msg && <p role="alert" className="mt-3 text-sm text-red-600">{msg}</p>}
-      {allDone && <p className="mt-3 text-xs text-muted-foreground">Next the fund will send your subscription documents and ask for identity verification. You will find them here.</p>}
+      {allDone && <p className="mt-3 text-xs text-muted-foreground">{view.steps.find((s) => s.key === "verification")?.done && view.steps.find((s) => s.key === "subscription")?.done ? "Everything you need to do has been done. The fund will contact you if it needs anything else." : "The fund will send your subscription documents here, and you can send your identity documents below. Each appears as soon as it is ready."}</p>}
     </section>
   )
 }
