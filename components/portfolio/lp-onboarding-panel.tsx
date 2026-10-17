@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react"
 
-interface Row { id: string; name: string; type: string | null; state: string; email: string | null; contactName: string | null; invitedAt: string | null; openedAt: string | null; waitingDays: number | null; differs: boolean; detailsToReview: boolean; submitted: { legalName: string; entityType: string; country: string | null; taxResidence: string | null; taxIdLast4: string | null } | null }
+interface Row { id: string; name: string; type: string | null; state: string; email: string | null; contactName: string | null; invitedAt: string | null; openedAt: string | null; waitingDays: number | null; differs: boolean; detailsToReview: boolean; submitted: { legalName: string; entityType: string; country: string | null; taxResidence: string | null; taxIdLast4: string | null } | null; subscription: Sub | null }
+interface Sub { status: string; commitment: number; shareClass: string | null; sentAt: string; returnedAt: string | null; ackName: string | null; rejectionReason: string | null; signedCopy: { id: string; filename: string; sizeBytes: number; sha256: string; scanned: boolean } | null }
+const READY = new Set(["terms_accepted", "verification_submitted", "subscription_returned", "countersigned"])
 const LABEL: Record<string, string> = { not_invited: "Not invited", invited: "Invited", opened: "Opened the portal", details_confirmed: "Details confirmed", terms_accepted: "Terms accepted", verification_submitted: "Verification sent", subscription_returned: "Subscription returned", countersigned: "Countersigned" }
 
 /** The fund's view of its LPs' onboarding: who has an email, who has been invited, who is stuck (docs/architecture/60). */
@@ -31,6 +33,15 @@ export function LpOnboardingPanel({ fundId }: { fundId: string }) {
     setMsg(r.ok ? `Invitation sent to ${j.sentTo}.` : j.error ?? "Could not send.")
     setBusy(null); await load()
   }
+  async function subscription(lp: Row, e: React.FormEvent<HTMLFormElement>, action: "send" | "reject" | "accept") {
+    e.preventDefault(); setBusy(lp.id); setMsg(null)
+    const f = new FormData(e.currentTarget)
+    let r: Response
+    if (action === "accept") { f.set("action", "accept"); r = await fetch(`/api/portfolio/lps/${lp.id}/subscription`, { method: "POST", body: f }) }
+    else r = await fetch(`/api/portfolio/lps/${lp.id}/subscription`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, shareClass: f.get("shareClass"), date: f.get("date"), reason: f.get("reason") }) })
+    setMsg(r.ok ? (action === "send" ? `Subscription documents sent to ${lp.name}.` : action === "accept" ? `${lp.name} is countersigned.` : "Sent back with your reason.") : (await r.json().catch(() => ({}))).error ?? "That did not work.")
+    setBusy(null); await load()
+  }
   async function reviewed(lp: Row) { setBusy(lp.id); await fetch(`/api/portfolio/lps/${lp.id}/review`, { method: "POST" }); setBusy(null); await load() }
 
   const missing = rows.filter((r) => !r.email).length
@@ -54,6 +65,30 @@ export function LpOnboardingPanel({ fundId }: { fundId: string }) {
                 <button className={small} disabled={busy === lp.id}>Save address</button>
               </form>
             ) : <p className="mt-1 text-xs text-muted-foreground">{lp.contactName ? `${lp.contactName}, ` : ""}{lp.email}</p>}
+            {(READY.has(lp.state) || lp.subscription) && (
+              <div className="mt-2 rounded-md border border-foreground/10 p-2 text-xs">
+                <span className="font-medium">Subscription:</span>{" "}
+                {!lp.subscription || lp.subscription.status === "rejected" ? (
+                  <form onSubmit={(e) => subscription(lp, e, "send")} className="mt-1 flex flex-wrap items-center gap-2">
+                    {lp.subscription?.status === "rejected" && <span className="text-amber-700">Sent back: {lp.subscription.rejectionReason}.</span>}
+                    <input name="shareClass" placeholder="class (optional)" aria-label="Share class" className="h-8 w-32 rounded-md border bg-transparent px-2" />
+                    <input name="date" type="date" aria-label="Subscription date" className="h-8 rounded-md border bg-transparent px-2" />
+                    <button className={small} disabled={busy === lp.id}>{lp.subscription ? "Send again" : "Send subscription documents"}</button>
+                  </form>
+                ) : lp.subscription.status === "sent" ? <span>Sent {lp.subscription.sentAt}, waiting for the signed copy.</span>
+                  : lp.subscription.status === "countersigned" ? <span>Countersigned. Commitment {lp.subscription.commitment.toLocaleString("en", { maximumFractionDigits: 0 })}.</span> : (
+                  <div className="mt-1 space-y-2">
+                    <p>Returned {lp.subscription.returnedAt}, confirmed by {lp.subscription.ackName}. {lp.subscription.signedCopy && <><a className="underline" href={`/api/portfolio/subscription-files/${lp.subscription.signedCopy.id}`}>Download the signed copy</a> ({Math.round(lp.subscription.signedCopy.sizeBytes / 1024)} KB, not virus-scanned{lp.subscription.signedCopy.scanned ? ", scanned" : ""}; fingerprint {lp.subscription.signedCopy.sha256.slice(0, 12)}).</>}</p>
+                    <form onSubmit={(e) => subscription(lp, e, "accept")} className="flex flex-wrap items-center gap-2">
+                      <input type="file" name="file" accept="application/pdf,.pdf" aria-label="Your countersigned PDF (optional)" className="text-xs" />
+                      <button className={small} disabled={busy === lp.id}>Countersign and accept</button>
+                    </form>
+                    <form onSubmit={(e) => subscription(lp, e, "reject")} className="flex flex-wrap items-center gap-2">
+                      <input name="reason" required minLength={5} placeholder="what needs fixing" aria-label="Reason" className="h-8 w-64 rounded-md border bg-transparent px-2" />
+                      <button className={small} disabled={busy === lp.id}>Send back</button>
+                    </form>
+                  </div>)}
+              </div>)}
             {lp.submitted && (
               <p className="mt-1 text-xs">Submitted by the LP: <strong>{lp.submitted.legalName}</strong> ({lp.submitted.entityType.replace("_", " ")}){lp.submitted.country ? `, ${lp.submitted.country}` : ""}{lp.submitted.taxIdLast4 ? `, tax number ending ${lp.submitted.taxIdLast4}` : ""}.
                 {lp.differs && <span className="text-amber-700"> The name differs from your record.</span>}

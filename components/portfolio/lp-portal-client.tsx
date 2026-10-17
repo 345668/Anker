@@ -12,6 +12,7 @@
 
 import { useState } from "react"
 import { LpOnboardingCard } from "./lp-onboarding-card"
+import { LpSubscriptionCard, type SubscriptionView } from "./lp-subscription-card"
 import {
   FileText, Download, Send, Loader2, X, Sparkles, ExternalLink,
 } from "lucide-react"
@@ -26,7 +27,7 @@ interface PortalData {
 
 const usd = (n: number | null) => (n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 }))
 
-export function LpPortalClient({ token, data, onboarding }: { token: string; data: PortalData; onboarding?: Parameters<typeof LpOnboardingCard>[0]["view"] | null }) {
+export function LpPortalClient({ token, data, onboarding, subscription }: { token: string; data: PortalData; subscription?: SubscriptionView | null; onboarding?: Parameters<typeof LpOnboardingCard>[0]["view"] | null }) {
   const [letter, setLetter] = useState<{ title: string; html: string } | null>(null)
   const [loadingLetter, setLoadingLetter] = useState<string | null>(null)
   const [q, setQ] = useState("")
@@ -76,6 +77,7 @@ export function LpPortalClient({ token, data, onboarding }: { token: string; dat
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-10">
         {onboarding && <LpOnboardingCard token={token} view={onboarding} defaultName={data.lp.name} />}
+        {subscription && <LpSubscriptionCard token={token} view={subscription} />}
         {/* Capital summary */}
         <section>
           <h2 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-3">Capital account</h2>

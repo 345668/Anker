@@ -16,6 +16,9 @@ vi.mock("@/lib/portfolio/lp-onboarding", async () => {
     confirmDetails: async () => {}, acceptTerms: async () => {}, onboardingView: async () => ({ state: "details_confirmed" }),
   }
 })
+vi.mock("@/lib/portfolio/lp-subscription", () => ({ returnSigned: async () => {}, lpSubscriptionView: async () => ({ status: "returned" }), fileForLp: async () => ({ filename: "a.pdf", contentType: "application/pdf", bytes: Buffer.from("%PDF-") }) }))
+import { POST as subPost } from "./[token]/subscription/route"
+import { GET as subGet } from "./[token]/subscription/[id]/route"
 import { POST as code } from "./[token]/code/route"
 import { POST as onboarding } from "./[token]/onboarding/route"
 import { GET as letter } from "./[token]/letters/[id]/route"
@@ -32,6 +35,16 @@ describe("the portal needs the emailed code", () => {
     expect((await letter(req(), ctx({ id: "l1" }))).status).toBe(401)
     expect((await ask(req({ question: "hi" }), ctx())).status).toBe(401)
     expect((await doc(req(), ctx({ id: "d1" }))).status).toBe(401)
+  })
+  it("returning signed documents and opening subscription files need the session too; with it, a file downloads as an attachment that browsers must not sniff", async () => {
+    const form = () => { const f = new FormData(); f.set("file", new File([Buffer.from("%PDF-1.4")], "s.pdf", { type: "application/pdf" })); f.set("ackName", "Anna Berg"); f.set("agree", "true"); return new Request("https://x.test/p", { method: "POST", body: f }) as any }
+    expect((await subPost(form(), ctx())).status).toBe(401)
+    expect((await subGet(req(), ctx({ id: "11111111-1111-1111-1111-111111111111" }))).status).toBe(401)
+    st.session = true
+    expect((await subPost(form(), ctx())).status).toBe(200)
+    const r = await subGet(req(undefined, "S"), ctx({ id: "11111111-1111-1111-1111-111111111111" }))
+    expect(r.status).toBe(200); expect(r.headers.get("content-disposition")).toContain("attachment"); expect(r.headers.get("x-content-type-options")).toBe("nosniff"); expect(r.headers.get("cache-control")).toContain("no-store")
+    expect((await subGet(req(undefined, "S"), ctx({ id: "not-a-uuid" }))).status).toBe(404)
   })
   it("with a session the onboarding step and the letter answer", async () => {
     st.session = true

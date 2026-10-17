@@ -136,6 +136,7 @@
     "fund_investments",
     "fund_lps",
     "fund_profiles",
+    "fund_subscription_packages",
     "fundraising_rounds",
     "funds",
     "grant_exercises",
@@ -207,6 +208,8 @@
     "lp_quarterly_reports",
     "lp_reports",
     "lp_statement_imports",
+    "lp_subscription_files",
+    "lp_subscriptions",
     "lp_terms_acceptances",
     "market_signals",
     "match_outcome_events",
@@ -500,6 +503,9 @@
     "fund_profiles": [
       "org_id"
     ],
+    "fund_subscription_packages": [
+      "fund_id"
+    ],
     "fundraising_rounds": [
       "org_id"
     ],
@@ -561,6 +567,12 @@
       "fund_id"
     ],
     "lp_statement_imports": [
+      "fund_id"
+    ],
+    "lp_subscription_files": [
+      "fund_id"
+    ],
+    "lp_subscriptions": [
       "fund_id"
     ],
     "mc_actuals": [

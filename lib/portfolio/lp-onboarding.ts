@@ -165,7 +165,7 @@ export async function onboardingView(lpId: string): Promise<OnboardingView | nul
       { key: "details", label: "Confirm your details", done: i >= stateIndex("details_confirmed"), at: at(l.details_confirmed_at) },
       { key: "terms", label: "Accept the terms and privacy notice", done: i >= stateIndex("terms_accepted"), at: at(l.terms_accepted_at) },
       { key: "verification", label: "Identity verification (coming next)", done: i >= stateIndex("verification_submitted"), at: null },
-      { key: "subscription", label: "Subscription documents (coming next)", done: i >= stateIndex("subscription_returned"), at: null },
+      { key: "subscription", label: "Return your signed subscription documents", done: i >= stateIndex("subscription_returned"), at: null },
     ],
     details: d ? { legalName: d.legal_name, entityType: d.entity_type, address: d.address, country: d.country, taxResidence: d.tax_residence, taxIdLast4: tax ? String(tax).slice(-4) : null, signatoryName: d.signatory_name } : null,
     termsVersion: TERMS_VERSION,

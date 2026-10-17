@@ -16,6 +16,7 @@
  */
 
 import { LpOnboardingPanel } from "./lp-onboarding-panel"
+import { LpSubscriptionPackagePanel } from "./lp-subscription-package-panel"
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
@@ -332,6 +333,7 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup, initi
           <AddLpPanel onSubmit={addLp} onCancel={() => setShowAddLp(false)} currency={fund.currency} />
         )}
 
+        <LpSubscriptionPackagePanel fundId={fund.id} />
         <LpOnboardingPanel fundId={fund.id} />
 
         {lps.length === 0 ? (
