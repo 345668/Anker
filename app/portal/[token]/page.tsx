@@ -5,6 +5,7 @@ import { LpPortalClient } from "@/components/portfolio/lp-portal-client"
 import { LpCodeGate } from "@/components/portfolio/lp-code-gate"
 import { lpSubscriptionView } from "@/lib/portfolio/lp-subscription"
 import { verificationView } from "@/lib/portfolio/lp-verification"
+import { documentsAndStatement } from "@/lib/portfolio/lp-statement-page"
 
 export const dynamic = "force-dynamic"
 
@@ -43,6 +44,6 @@ export default async function LpPortalPage({ params }: { params: Promise<{ token
   }
 
   await logPortalAccess(lp.tokenId, lp.lpId, "home", ip)
-  const [data, onboarding, subscription, verification] = await Promise.all([getPortalData(lp), onboardingView(lp.lpId), lpSubscriptionView(lp.lpId), verificationView(lp.lpId)])
-  return <LpPortalClient token={token} data={data} onboarding={onboarding} subscription={subscription} verification={verification} />
+  const [data, onboarding, subscription, verification, account] = await Promise.all([getPortalData(lp), onboardingView(lp.lpId), lpSubscriptionView(lp.lpId), verificationView(lp.lpId), documentsAndStatement(lp.fundId, lp.lpId)])
+  return <LpPortalClient token={token} data={data} onboarding={onboarding} subscription={subscription} verification={verification} account={account} />
 }

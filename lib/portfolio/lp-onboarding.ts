@@ -63,20 +63,28 @@ const defaultSend: Send = async (m) => {
  * Invites an LP: a personal link valid 30 days, sent to their address. Earlier links of the same LP are revoked, so a resend never leaves several live.
  * The link is minted only after the address is known and sending is possible, and revoked again if the email fails.
  */
-export async function inviteLp(lpId: string, by: string, appUrl: string, send: Send = defaultSend): Promise<{ sentTo: string; expiresAt: string | null }> {
+export type InviteKind = "invite" | "reminder" | "new_material"
+const NEXT_STEP: Record<string, string> = { not_invited: "open your portal", invited: "open your portal", opened: "confirm your details", details_confirmed: "accept the terms", terms_accepted: "send your identity documents", verification_submitted: "return your signed subscription documents", subscription_returned: "wait for the fund to countersign" }
+/** The words of each kind of email: short, with a link, and never an amount or a name of a document. */
+export function inviteText(kind: InviteKind, o: { fundName: string; first: string | null; link: string; state: string }): { subject: string; lines: string[] } {
+  const hello = o.first ? `Hello ${o.first},` : "Hello,", fund = o.fundName
+  const tail = [`The link is valid for ${LINK_DAYS} days and is personal to you. When you open it you will be sent a six-digit code at this address, so please do not forward the email.`, "", fund]
+  if (kind === "new_material") return { subject: `Something new in your investor portal: ${fund}`, lines: [hello, "", `${fund} has added something to your investor portal. Open it here:`, o.link, "", ...tail] }
+  if (kind === "reminder") return { subject: `A step is waiting in your investor portal: ${fund}`, lines: [hello, "", `A step is still open in your investor portal at ${fund}: ${NEXT_STEP[o.state] ?? "continue where you left off"}. Open it here:`, o.link, "", ...tail] }
+  return { subject: `Your investor portal: ${fund}`, lines: [hello, "", `${fund} has set up a private investor portal for you. Open it here:`, o.link, "", ...tail] }
+}
+
+export async function inviteLp(lpId: string, by: string, appUrl: string, send: Send = defaultSend, kind: InviteKind = "invite"): Promise<{ sentTo: string; expiresAt: string | null }> {
   const lp = await lpEmail(lpId)
   if (!lp) throw new LpError("LP not found.", 404)
   if (!lp.email) throw new LpError("Add this LP's email address first.", 422, "no_email")
   const minted = await mintPortalToken(lpId, lp.fundId, { days: LINK_DAYS, label: `invited ${new Date().toISOString().slice(0, 10)}`, createdBy: by })
   const hash = sha(minted.token)
   const link = `${appUrl.replace(/\/$/, "")}/portal/${minted.token}`
+  const [cur] = (await sql`SELECT onboarding_state FROM fund_lps WHERE id = ${lpId}`) as any[]
+  const msg = inviteText(kind, { fundName: lp.fundName ?? "your fund", first: lp.name ? lp.name.split(" ")[0] : null, link, state: String(cur?.onboarding_state ?? "invited") })
   try {
-    await send({
-      to: lp.email,
-      subject: `Your investor portal: ${lp.fundName ?? "your fund"}`,
-      text: [lp.name ? `Hello ${lp.name.split(" ")[0]},` : "Hello,", "", `${lp.fundName ?? "Your fund"} has set up a private investor portal for you. Open it here:`, link, "",
-        `The link is valid for ${LINK_DAYS} days and is personal to you. When you open it you will be sent a six-digit code at this address, so please do not forward the email.`, "", `${lp.fundName ?? "The fund team"}`].join("\n"),
-    })
+    await send({ to: lp.email, subject: msg.subject, text: msg.lines.join("\n") })
   } catch (e) {
     await sql`UPDATE lp_portal_tokens SET revoked = true WHERE token_hash = ${hash}`.catch(() => {})
     throw e

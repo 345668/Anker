@@ -52,6 +52,19 @@ export function LpOnboardingPanel({ fundId }: { fundId: string }) {
     setBusy(null); await load()
   }
   async function owners(lp: Row) { const r = await fetch(`/api/portfolio/lps/${lp.id}/verification`, { cache: "no-store" }); const j = await r.json().catch(() => ({})); alert(j.owners ? `Who owns and controls ${lp.name}, as the investor stated it:\n\n${j.owners}` : "Nothing was provided.") }
+  async function tell(lp: Row, kind: "reminder" | "new_material") {
+    if (!confirm(kind === "reminder" ? `Email ${lp.name} a reminder with a new link? Their earlier link stops working.` : `Email ${lp.name} that something new is in their portal, with a new link? Their earlier link stops working. The email names no document and no amount.`)) return
+    setBusy(lp.id); setMsg(null)
+    const r = await fetch(`/api/portfolio/lps/${lp.id}/invite`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind }) })
+    const j = await r.json().catch(() => ({}))
+    setMsg(r.ok ? `Email sent to ${j.sentTo}.` : j.error ?? "Could not send.")
+    setBusy(null); await load()
+  }
+  async function activity(lp: Row) {
+    const r = await fetch(`/api/portfolio/lps/${lp.id}/activity`, { cache: "no-store" }); const j = await r.json().catch(() => null)
+    if (!j) return
+    alert(j.recent.length ? `${lp.name}: last seen ${j.lastSeen?.slice(0, 16).replace("T", " ")}.\n\n` + j.recent.map((a: { at: string; what: string }) => `${a.at.slice(0, 16).replace("T", " ")}  ${a.what}`).join("\n") : `${lp.name} has not opened the portal yet.`)
+  }
   async function reviewed(lp: Row) { setBusy(lp.id); await fetch(`/api/portfolio/lps/${lp.id}/review`, { method: "POST" }); setBusy(null); await load() }
 
   const missing = rows.filter((r) => !r.email).length
@@ -66,7 +79,14 @@ export function LpOnboardingPanel({ fundId }: { fundId: string }) {
           <li key={lp.id} className="py-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span><strong>{lp.name}</strong> <span className="text-xs text-muted-foreground">· {LABEL[lp.state] ?? lp.state}{lp.waitingDays != null && lp.waitingDays >= 10 ? ` · waiting ${lp.waitingDays} days` : ""}</span></span>
-              {lp.email && <button className={small} disabled={busy === lp.id} onClick={() => invite(lp)}>{lp.state === "not_invited" ? "Invite to portal" : "Send a new link"}</button>}
+              {lp.email && (
+                <span className="flex flex-wrap gap-1.5">
+                  <button className={small} disabled={busy === lp.id} onClick={() => invite(lp)}>{lp.state === "not_invited" ? "Invite to portal" : "Send a new link"}</button>
+                  {lp.state !== "not_invited" && lp.state !== "countersigned" && <button className={small} disabled={busy === lp.id} onClick={() => tell(lp, "reminder")}>Remind</button>}
+                  {lp.state !== "not_invited" && <button className={small} disabled={busy === lp.id} onClick={() => tell(lp, "new_material")}>Tell them there is something new</button>}
+                  {lp.state !== "not_invited" && <button className={small} onClick={() => activity(lp)}>Activity</button>}
+                  <a className={`${small} inline-flex items-center`} href={`/api/portfolio/lps/${lp.id}/statement-pdf`}>Statement PDF</a>
+                </span>)}
             </div>
             {!lp.email ? (
               <form onSubmit={(e) => saveContact(lp, e)} className="mt-2 flex flex-wrap items-center gap-2">

@@ -16,6 +16,7 @@
  */
 
 import { LpOnboardingPanel } from "./lp-onboarding-panel"
+import { LpDocumentsPanel } from "./lp-documents-panel"
 import { LpSubscriptionPackagePanel } from "./lp-subscription-package-panel"
 import { useMemo, useState } from "react"
 import Link from "next/link"
@@ -335,6 +336,7 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup, initi
 
         <LpSubscriptionPackagePanel fundId={fund.id} />
         <LpOnboardingPanel fundId={fund.id} />
+        <LpDocumentsPanel fundId={fund.id} lps={lps.map((l) => ({ id: l.id, name: l.lp_name }))} />
 
         {lps.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">

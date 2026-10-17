@@ -18,6 +18,9 @@ vi.mock("@/lib/portfolio/lp-onboarding", async () => {
 })
 vi.mock("@/lib/portfolio/lp-subscription", () => ({ returnSigned: async () => {}, lpSubscriptionView: async () => ({ status: "returned" }), fileForLp: async () => ({ filename: "a.pdf", contentType: "application/pdf", bytes: Buffer.from("%PDF-") }) }))
 vi.mock("@/lib/portfolio/lp-verification", () => ({ uploadDocument: async () => {}, declare: async () => {}, submit: async () => {}, verificationView: async () => ({ ready: false }) }))
+vi.mock("@/lib/portfolio/lp-statement", () => ({ statementFor: async () => ({ asOf: "2026-10-17" }), statementPdf: async () => new Uint8Array(Buffer.from("%PDF-1.4")), documentForLp: async (_f: string, _l: string, id: string) => (id === "11111111-1111-1111-1111-111111111111" ? { filename: "t.pdf", contentType: "application/pdf", bytes: Buffer.from("%PDF-"), title: "T" } : null) }))
+import { GET as stmtGet } from "./[token]/statement/route"
+import { GET as docGet } from "./[token]/doc/[id]/route"
 import { POST as verPost } from "./[token]/verification/route"
 import { POST as subPost } from "./[token]/subscription/route"
 import { GET as subGet } from "./[token]/subscription/[id]/route"
@@ -53,6 +56,13 @@ describe("the portal needs the emailed code", () => {
     expect((await verPost(file(), ctx())).status).toBe(401); expect((await verPost(req({ action: "submit" }), ctx())).status).toBe(401)
     st.session = true
     expect((await verPost(file(), ctx())).status).toBe(200); expect((await verPost(req({ action: "declare", category: "unsure" }, "S"), ctx())).status).toBe(200); expect((await verPost(req({ action: "wipe" }, "S"), ctx())).status).toBe(400)
+  })
+  it("the statement PDF and published documents need the session; with it they download as attachments, and another investor's document id finds nothing", async () => {
+    expect((await stmtGet(req(), ctx())).status).toBe(401); expect((await docGet(req(), ctx({ id: "11111111-1111-1111-1111-111111111111" }))).status).toBe(401)
+    st.session = true
+    const p = await stmtGet(req(undefined, "S"), ctx()); expect(p.status).toBe(200); expect(p.headers.get("content-type")).toBe("application/pdf"); expect(p.headers.get("content-disposition")).toContain("capital-account-statement-2026-10-17.pdf"); expect(p.headers.get("cache-control")).toContain("no-store")
+    expect((await docGet(req(undefined, "S"), ctx({ id: "11111111-1111-1111-1111-111111111111" }))).status).toBe(200)
+    expect((await docGet(req(undefined, "S"), ctx({ id: "22222222-2222-2222-2222-222222222222" }))).status).toBe(404); expect((await docGet(req(undefined, "S"), ctx({ id: "nope" }))).status).toBe(404)
   })
   it("with a session the onboarding step and the letter answer", async () => {
     st.session = true

@@ -15,8 +15,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ lpId: stri
   const { lpId } = await ctx.params
   const g = await requireLpManager(lpId); if (g instanceof NextResponse) return g
   try {
-    const r = await inviteLp(lpId, g.id, appUrl(req))
-    await logAudit({ actorId: g.id, action: "lp.invited", targetType: "fund_lp", targetId: lpId, metadata: {} })
+    const body = await req.json().catch(() => ({}))
+    const kind = body?.kind === "reminder" ? "reminder" : body?.kind === "new_material" ? "new_material" : "invite"
+    const r = await inviteLp(lpId, g.id, appUrl(req), undefined, kind)
+    await logAudit({ actorId: g.id, action: kind === "invite" ? "lp.invited" : `lp.invite_${kind}`, targetType: "fund_lp", targetId: lpId, metadata: {} })
     return NextResponse.json({ ok: true, ...r }, { status: 201 })
   } catch (e) {
     if (e instanceof LpError) return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })

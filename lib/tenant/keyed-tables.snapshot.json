@@ -194,6 +194,7 @@
     "lp_commitments",
     "lp_contact_matches",
     "lp_distributions",
+    "lp_documents",
     "lp_entities",
     "lp_firm_matches",
     "lp_information_sharing",
@@ -554,6 +555,9 @@
       "fund_id"
     ],
     "lp_distributions": [
+      "fund_id"
+    ],
+    "lp_documents": [
       "fund_id"
     ],
     "lp_information_sharing": [
