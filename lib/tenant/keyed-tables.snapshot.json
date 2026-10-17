@@ -189,6 +189,7 @@
     "loan_payments",
     "loans",
     "local_users",
+    "lp_accounts",
     "lp_capital_calls",
     "lp_commitment_events",
     "lp_commitments",
@@ -209,6 +210,7 @@
     "lp_positions",
     "lp_quarterly_reports",
     "lp_reports",
+    "lp_requests",
     "lp_statement_imports",
     "lp_subscription_files",
     "lp_subscriptions",
@@ -545,6 +547,9 @@
     "linkedin_connections": [
       "owner_user_id"
     ],
+    "lp_accounts": [
+      "fund_id"
+    ],
     "lp_capital_calls": [
       "fund_id"
     ],
@@ -574,6 +579,10 @@
     ],
     "lp_reports": [
       "fund_id"
+    ],
+    "lp_requests": [
+      "fund_id",
+      "org_id"
     ],
     "lp_statement_imports": [
       "fund_id"

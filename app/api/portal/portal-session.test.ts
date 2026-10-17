@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-const st = vi.hoisted(() => ({ tokenOk: true, session: false, verifyThrows: null as null | { message: string; status: number; code: string } }))
+const st = vi.hoisted(() => ({ requests: [] as any[], tokenOk: true, session: false, verifyThrows: null as null | { message: string; status: number; code: string } }))
 vi.mock("@/lib/db", () => ({ sql: async () => [] }))
 vi.mock("@/lib/ai/provider", () => ({ generate: async () => "x" }))
 vi.mock("@/lib/newsroom/markdown", () => ({ renderArticleHtml: (s: string) => s }))
@@ -19,6 +19,12 @@ vi.mock("@/lib/portfolio/lp-onboarding", async () => {
 vi.mock("@/lib/portfolio/lp-subscription", () => ({ returnSigned: async () => {}, lpSubscriptionView: async () => ({ status: "returned" }), fileForLp: async () => ({ filename: "a.pdf", contentType: "application/pdf", bytes: Buffer.from("%PDF-") }) }))
 vi.mock("@/lib/portfolio/lp-verification", () => ({ uploadDocument: async () => {}, declare: async () => {}, submit: async () => {}, verificationView: async () => ({ ready: false }) }))
 vi.mock("@/lib/portfolio/lp-statement", () => ({ statementFor: async () => ({ asOf: "2026-10-17" }), statementPdf: async () => new Uint8Array(Buffer.from("%PDF-1.4")), documentForLp: async (_f: string, _l: string, id: string) => (id === "11111111-1111-1111-1111-111111111111" ? { filename: "t.pdf", contentType: "application/pdf", bytes: Buffer.from("%PDF-"), title: "T" } : null) }))
+vi.mock("@/lib/portfolio/lp-account", () => ({ enableAccount: async () => ({ created: true, email: "a@x.com" }) }))
+vi.mock("@/lib/portfolio/lp-requests", () => ({ classifyRequest: (q: string) => (/withdraw/i.test(q) ? "redemption" : null), KIND_LABEL: { redemption: "Withdrawal or redemption" }, submitRequest: async (_lp: unknown, i: { kind: string }) => { st.requests.push(i); return { id: "r1", kind: i.kind, proposalId: null } }, requestsForLp: async () => [] }))
+vi.mock("@/lib/actions/store", () => ({ propose: async () => ({ proposal: { id: "p" } }) }))
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ auth: { admin: {} } }) }))
+import { POST as accountPost } from "./[token]/account/route"
+import { POST as requestPost } from "./[token]/request/route"
 import { GET as stmtGet } from "./[token]/statement/route"
 import { GET as docGet } from "./[token]/doc/[id]/route"
 import { POST as verPost } from "./[token]/verification/route"
@@ -32,7 +38,7 @@ import { GET as doc } from "./[token]/documents/[id]/route"
 
 const ctx = (extra: Record<string, string> = {}) => ({ params: Promise.resolve({ token: "lp_abc", id: "x", ...extra }) })
 const req = (body?: unknown, cookie?: string) => new Request("https://x.test/p", { method: body === undefined ? "GET" : "POST", headers: { "content-type": "application/json", ...(cookie ? { cookie: `lp_s_test=${cookie}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }) as any
-beforeEach(() => { st.tokenOk = true; st.session = false; st.verifyThrows = null })
+beforeEach(() => { st.requests.length = 0; st.tokenOk = true; st.session = false; st.verifyThrows = null })
 
 describe("the portal needs the emailed code", () => {
   it("nothing but the code step answers without a session: onboarding, letters, ask and documents all say 'enter your code first'", async () => {
@@ -63,6 +69,17 @@ describe("the portal needs the emailed code", () => {
     const p = await stmtGet(req(undefined, "S"), ctx()); expect(p.status).toBe(200); expect(p.headers.get("content-type")).toBe("application/pdf"); expect(p.headers.get("content-disposition")).toContain("capital-account-statement-2026-10-17.pdf"); expect(p.headers.get("cache-control")).toContain("no-store")
     expect((await docGet(req(undefined, "S"), ctx({ id: "11111111-1111-1111-1111-111111111111" }))).status).toBe(200)
     expect((await docGet(req(undefined, "S"), ctx({ id: "22222222-2222-2222-2222-222222222222" }))).status).toBe(404); expect((await docGet(req(undefined, "S"), ctx({ id: "nope" }))).status).toBe(404)
+  })
+  it("making an account and asking the fund for something need the session; the assistant hands an action request to the fund instead of answering it", async () => {
+    expect((await accountPost(req({ password: "a-long-enough-pw" }), ctx())).status).toBe(401); expect((await requestPost(req({ kind: "other", body: "hello there" }), ctx())).status).toBe(401)
+    expect((await ask(req({ question: "I want to withdraw my money" }), ctx())).status).toBe(401)
+    st.session = true
+    const a = await accountPost(req({ password: "a-long-enough-pw" }, "S"), ctx()); expect(a.status).toBe(200); expect(await a.json()).toMatchObject({ created: true, signIn: "/auth/login?redirect=/lp" })
+    expect((await requestPost(req({ kind: "other", body: "Please call me back" }, "S"), ctx())).status).toBe(201); expect(st.requests[0]).toMatchObject({ kind: "other", source: "form" })
+    st.requests.length = 0
+    const r = await ask(req({ question: "I want to withdraw my money" }, "S"), ctx()); const j = await r.json()
+    expect(j.requestSent).toBe(true); expect(j.answer).toContain("I have not changed anything"); expect(st.requests[0]).toMatchObject({ kind: "redemption", source: "assistant" })
+    const plain = await ask(req({ question: "What is my commitment?" }, "S"), ctx()); expect((await plain.json()).requestSent).toBeUndefined(); expect(st.requests).toHaveLength(1)
   })
   it("with a session the onboarding step and the letter answer", async () => {
     st.session = true

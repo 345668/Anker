@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 
 interface Row { id: string; name: string; type: string | null; state: string; email: string | null; contactName: string | null; invitedAt: string | null; openedAt: string | null; waitingDays: number | null; differs: boolean; detailsToReview: boolean; submitted: { legalName: string; entityType: string; country: string | null; taxResidence: string | null; taxIdLast4: string | null } | null; subscription: Sub | null; verification: Ver | null }
 interface Ver { caseId: string | null; caseStatus: string | null; submittedAt: string | null; category: string | null; ownersProvided: boolean; docs: Array<{ docId: string; type: string; label: string; status: string; fileId: string | null; filename: string | null; sizeBytes: number | null; sha256: string | null; receivedAt: string | null; note: string | null }> }
+interface Req { id: string; lpName: string; kind: string; body: string; at: string; status: string; viaProposal: boolean }
 interface Sub { status: string; commitment: number; shareClass: string | null; sentAt: string; returnedAt: string | null; ackName: string | null; rejectionReason: string | null; signedCopy: { id: string; filename: string; sizeBytes: number; sha256: string; scanned: boolean } | null }
 const READY = new Set(["terms_accepted", "verification_submitted", "subscription_returned", "countersigned"])
 const LABEL: Record<string, string> = { not_invited: "Not invited", invited: "Invited", opened: "Opened the portal", details_confirmed: "Details confirmed", terms_accepted: "Terms accepted", verification_submitted: "Verification sent", subscription_returned: "Subscription returned", countersigned: "Countersigned" }
@@ -14,7 +15,11 @@ export function LpOnboardingPanel({ fundId }: { fundId: string }) {
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
-  const load = useCallback(async () => { const r = await fetch(`/api/portfolio/funds/${fundId}/lp-onboarding`, { cache: "no-store" }); if (r.ok) setRows((await r.json()).lps); else setErr("The onboarding list could not be loaded.") }, [fundId])
+  const [requests, setRequests] = useState<Req[] | null>(null)
+  const load = useCallback(async () => {
+    const r = await fetch(`/api/portfolio/funds/${fundId}/lp-onboarding`, { cache: "no-store" }); if (r.ok) setRows((await r.json()).lps); else setErr("The onboarding list could not be loaded.")
+    const q = await fetch(`/api/portfolio/funds/${fundId}/lp-requests`, { cache: "no-store" }); if (q.ok) setRequests((await q.json()).requests)
+  }, [fundId])
   useEffect(() => { void load() }, [load])
   if (err) return <p className="px-4 py-3 text-xs text-red-600" role="alert">{err}</p>
   if (!rows || rows.length === 0) return null
@@ -68,12 +73,19 @@ export function LpOnboardingPanel({ fundId }: { fundId: string }) {
   async function reviewed(lp: Row) { setBusy(lp.id); await fetch(`/api/portfolio/lps/${lp.id}/review`, { method: "POST" }); setBusy(null); await load() }
 
   const missing = rows.filter((r) => !r.email).length
+  const openRequests = (requests ?? []).filter((r) => r.status === "open")
   const small = "h-8 rounded-md border px-3 text-xs disabled:opacity-50"
   return (
     <div className="border-b border-foreground/10 px-4 py-4 text-sm" aria-labelledby="lp-ob-h">
       <h3 id="lp-ob-h" className="font-medium">LP portal and onboarding</h3>
       <p className="mt-1 text-xs text-muted-foreground">Each investor gets a personal link and, to open it, a six-digit code sent to their own address. They then confirm their details and accept the terms. Add an email address first.{missing > 0 ? ` ${missing} of ${rows.length} still need one.` : ""}</p>
       {msg && <p role="status" className="mt-2 text-xs">{msg}</p>}
+      {requests && requests.length > 0 && (
+        <div className="mt-3 rounded-md border border-foreground/10 p-2 text-xs">
+          <p className="font-medium">Investor requests{openRequests.length ? ` (${openRequests.length} open)` : ""}</p>
+          <p className="text-muted-foreground">What an investor wrote, in their own words. Treat it as a message to read, not as an instruction.</p>
+          <ul className="mt-1 space-y-1">{requests.slice(0, 10).map((q) => <li key={q.id}><strong>{q.lpName}</strong> · {q.at} · {q.kind.replace("_", " ")} · <em>{q.status === "open" ? (q.viaProposal ? "waiting in your Actions inbox" : "open") : q.status}</em><br />“{q.body}”{q.status === "open" && !q.viaProposal && <> <button className="underline" onClick={async () => { await fetch(`/api/portfolio/funds/${fundId}/lp-requests`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "close", id: q.id }) }); await load() }}>Mark as dealt with</button></>}</li>)}</ul>
+        </div>)}
       <ul className="mt-3 divide-y divide-foreground/10">
         {rows.map((lp) => (
           <li key={lp.id} className="py-2.5">

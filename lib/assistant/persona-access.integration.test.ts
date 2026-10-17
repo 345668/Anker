@@ -45,6 +45,7 @@ beforeAll(async()=>{
     CREATE TABLE contacts(id text PRIMARY KEY,email text);
     CREATE TABLE system_settings(key text PRIMARY KEY,value jsonb,updated_by text,updated_at timestamptz DEFAULT now());
     CREATE TABLE fund_lps(id text PRIMARY KEY,fund_id text,lp_contact_id text,lp_name text,commitment_amount numeric,called_amount numeric,distributed_amount numeric,status text);
+    CREATE TABLE lp_accounts(lp_id text PRIMARY KEY,fund_id text,user_id text,email text);
     CREATE TABLE private_artifacts(id text PRIMARY KEY,user_id text,org_id text NOT NULL,filename text,content_type text,content bytea,expires_at timestamptz DEFAULT now()+interval '30 days');
     INSERT INTO organizations VALUES('org-a','Alpha','fund','fund-a'),('org-b','Beta','fund','fund-b'),('startup','Startup','company',NULL);
     INSERT INTO memberships(user_id,org_id,org_role,persona) VALUES('gp','org-a','workspace_owner','vc'),('gp','org-b','admin','vc'),('founder','startup','workspace_owner','founder');

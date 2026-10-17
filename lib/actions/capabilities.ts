@@ -300,5 +300,47 @@ const sendBatch: Capability = {
   },
 }
 
-export const CAPABILITIES: Record<string, Capability> = { crm_update_stage: stageMove, crm_add_task: addTask, memory_remember: remember, outreach_save_drafts: saveDrafts, outreach_send_batch: sendBatch }
-export const isProposeCapability = (name: string) => Object.hasOwn(CAPABILITIES, name)
+/**
+ * An investor's request to the fund (docs/architecture/60 section 8). The input is only the request's id: the investor's words live in lp_requests and are shown as text, never
+ * acted on. Approving means "the fund has seen it and will answer": it adds a task to the approver's queue. It changes nothing about the investor's holding.
+ */
+const lpRequestFollowup: Capability = {
+  name: "lp_request_followup",
+  risk: "R0",
+  check(input) {
+    const requestId = String(input?.requestId ?? "").trim()
+    if (!/^[0-9a-f-]{36}$/i.test(requestId)) throw new ActionError("requestId is required.")
+    return { requestId }
+  },
+  async plan(scope, input) {
+    const { requestId } = this.check(input)
+    const [r] = (await sql`SELECT r.kind, r.body, l.lp_name FROM lp_requests r JOIN fund_lps l ON l.id = r.lp_id WHERE r.id = ${requestId}::uuid AND r.org_id = ${scope.orgId}`) as any[]
+    if (!r) throw new ActionError("Request not found in this workspace.")
+    const kind = String(r.kind).replace("_", " ")
+    return {
+      summary: `Investor request from ${r.lp_name}: ${kind}`,
+      diff: [{ label: "Investor", before: null, after: String(r.lp_name) }, { label: "Their request (their words)", before: null, after: String(r.body).slice(0, 400) }, { label: "If you approve", before: null, after: "A task is added for you to reply. Nothing about their holding changes." }],
+      evidence: { records: [{ type: "lp_request", id: requestId, label: String(r.lp_name) }] },
+    }
+  },
+  async apply(scope, input) {
+    const { requestId } = this.check(input)
+    const [r] = (await sql`SELECT r.kind, l.lp_name FROM lp_requests r JOIN fund_lps l ON l.id = r.lp_id WHERE r.id = ${requestId}::uuid AND r.org_id = ${scope.orgId}`) as any[]
+    if (!r) throw new ActionError("Request no longer exists in this workspace.")
+    const due = new Date(Date.now() + 3 * 86_400_000).toISOString()
+    const [t] = (await sql`INSERT INTO crm_tasks (org_id, user_id, title, due_at) VALUES (${scope.orgId}, ${scope.userId}, ${`Reply to investor ${r.lp_name}: ${String(r.kind).replace("_", " ")} request`}, ${due}) RETURNING id`) as any[]
+    await sql`UPDATE lp_requests SET status = 'seen', decided_at = now() WHERE id = ${requestId}::uuid AND org_id = ${scope.orgId}`
+    return { undo: { taskId: String(t.id), requestId }, message: `Task created to reply to ${r.lp_name}.` }
+  },
+  async undo(scope, _input, u) {
+    const rows = (await sql`DELETE FROM crm_tasks WHERE id::text = ${String(u.taskId)} AND org_id = ${scope.orgId} AND done_at IS NULL RETURNING id`) as any[]
+    if (!rows.length) throw new ActionError("Not undone: the task was already completed or removed.")
+    await sql`UPDATE lp_requests SET status = 'open', decided_at = NULL WHERE id = ${String(u.requestId)}::uuid AND org_id = ${scope.orgId}`
+    return "Task removed. The request is open again."
+  },
+}
+
+export const CAPABILITIES: Record<string, Capability> = { lp_request_followup: lpRequestFollowup, crm_update_stage: stageMove, crm_add_task: addTask, memory_remember: remember, outreach_save_drafts: saveDrafts, outreach_send_batch: sendBatch }
+/** Capabilities only the platform itself proposes (an investor's request): the assistant can never name them. */
+const INTERNAL_ONLY = new Set(["lp_request_followup"])
+export const isProposeCapability = (name: string) => Object.hasOwn(CAPABILITIES, name) && !INTERNAL_ONLY.has(name)

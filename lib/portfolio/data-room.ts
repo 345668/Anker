@@ -460,10 +460,13 @@ export async function getLpMembershipsForEmail(email: string): Promise<LpMembers
       fl.called_amount,
       fl.distributed_amount
     FROM fund_lps fl
-    JOIN contacts c ON c.id = fl.lp_contact_id
     JOIN funds f    ON f.id = fl.fund_id
-    WHERE LOWER(c.email) = LOWER(${e})
-      AND fl.status != 'transferred'
+    WHERE fl.status != 'transferred'
+      AND (
+        EXISTS (SELECT 1 FROM contacts c WHERE c.id = fl.lp_contact_id AND LOWER(c.email) = LOWER(${e}))
+        -- An account made from inside the investor's own code-verified portal session (docs/architecture/60 section 4).
+        OR EXISTS (SELECT 1 FROM lp_accounts la WHERE la.lp_id = fl.id AND LOWER(la.email) = LOWER(${e}))
+      )
     ORDER BY f.vintage_year DESC NULLS LAST, f.name ASC
   `
   return rows.map(normLpMembership)

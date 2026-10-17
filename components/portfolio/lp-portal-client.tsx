@@ -15,6 +15,7 @@ import { LpOnboardingCard } from "./lp-onboarding-card"
 import { LpSubscriptionCard, type SubscriptionView } from "./lp-subscription-card"
 import { LpVerificationCard, type VerificationViewData } from "./lp-verification-card"
 import { LpAccountCard, type AccountData } from "./lp-account-card"
+import { LpAccountDoor, LpRequestCard, type DoorState, type MyRequest } from "./lp-help-cards"
 import {
   FileText, Download, Send, Loader2, X, Sparkles, ExternalLink,
 } from "lucide-react"
@@ -29,7 +30,7 @@ interface PortalData {
 
 const usd = (n: number | null) => (n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 }))
 
-export function LpPortalClient({ token, data, onboarding, subscription, verification, account }: { token: string; data: PortalData; account?: AccountData | null; subscription?: SubscriptionView | null; verification?: VerificationViewData | null; onboarding?: Parameters<typeof LpOnboardingCard>[0]["view"] | null }) {
+export function LpPortalClient({ token, data, onboarding, subscription, verification, account, door, requests }: { token: string; data: PortalData; door?: DoorState | null; requests?: MyRequest[]; account?: AccountData | null; subscription?: SubscriptionView | null; verification?: VerificationViewData | null; onboarding?: Parameters<typeof LpOnboardingCard>[0]["view"] | null }) {
   const [letter, setLetter] = useState<{ title: string; html: string } | null>(null)
   const [loadingLetter, setLoadingLetter] = useState<string | null>(null)
   const [q, setQ] = useState("")
@@ -82,6 +83,8 @@ export function LpPortalClient({ token, data, onboarding, subscription, verifica
         {account && <LpAccountCard token={token} data={account} />}
         {verification?.unlocked && <LpVerificationCard token={token} view={verification} />}
         {subscription && <LpSubscriptionCard token={token} view={subscription} />}
+        <LpRequestCard token={token} initial={requests ?? []} />
+        {door && door.email && <LpAccountDoor token={token} door={door} />}
         {/* Capital summary */}
         <section>
           <h2 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-3">Capital account</h2>

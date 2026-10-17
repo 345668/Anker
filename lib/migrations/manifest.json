@@ -159,6 +159,7 @@
     "2026-10-17c-lp-subscription.sql",
     "2026-10-17d-lp-verification.sql",
     "2026-10-17e-lp-documents.sql",
+    "2026-10-17f-lp-accounts-requests.sql",
     "2026_06_02_email_oauth_accounts.sql"
   ]
 }

@@ -13,6 +13,7 @@ import { verifyPortalToken, getPortalData, getPortalLetter, logPortalAccess } fr
 import { sql } from "@/lib/db"
 import { generate } from "@/lib/ai/provider"
 import { sessionCookieName, sessionOk } from "@/lib/portfolio/lp-onboarding"
+import { classifyRequest, submitRequest, KIND_LABEL } from "@/lib/portfolio/lp-requests"
 
 export const runtime = "nodejs"
 export const maxDuration = 90
@@ -29,6 +30,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
   if (!question) return NextResponse.json({ error: "Ask a question." }, { status: 400 })
 
   await logPortalAccess(lp.tokenId, lp.lpId, "ask", req.headers.get("x-forwarded-for")?.split(",")[0] ?? null)
+
+  // A question that asks the fund to DO something (withdraw, transfer, change details) is not answered as if it were done: it becomes a request the fund sees (docs/architecture/60 section 8).
+  const asked = classifyRequest(question)
+  if (asked) {
+    try {
+      const { propose } = await import("@/lib/actions/store")
+      await submitRequest({ lpId: lp.lpId, fundId: lp.fundId }, { kind: asked, body: question, source: "assistant" }, propose as never)
+      return NextResponse.json({ answer: `I cannot do that from here, and I have not changed anything. I have passed your request (${KIND_LABEL[asked].toLowerCase()}) to the fund team, in your own words, and they will get back to you.`, requestSent: true })
+    } catch (e) {
+      return NextResponse.json({ answer: (e as Error)?.message || "I could not pass that on just now. Please contact the fund team directly." })
+    }
+  }
 
   const data = await getPortalData(lp)
   // Pull letter bodies (scoped) so the analyst can answer from their content.
