@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyPortalToken, getPortalLetter, logPortalAccess } from "@/lib/portfolio/lp-portal"
 import { renderArticleHtml } from "@/lib/newsroom/markdown"
+import { sessionCookieName, sessionOk } from "@/lib/portfolio/lp-onboarding"
 
 export const runtime = "nodejs"
 
@@ -12,6 +13,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
   const { token, id } = await ctx.params
   const lp = await verifyPortalToken(token)
   if (!lp) return NextResponse.json({ error: "Invalid or expired link." }, { status: 401 })
+  if (!(await sessionOk(lp.tokenId, req.cookies.get(sessionCookieName(lp.tokenId))?.value))) return NextResponse.json({ error: "Please enter your code first." }, { status: 401 })
 
   const letter = await getPortalLetter(lp.fundId, id)
   if (!letter) return NextResponse.json({ error: "Letter not found" }, { status: 404 })

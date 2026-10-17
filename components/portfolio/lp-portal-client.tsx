@@ -11,6 +11,7 @@
  */
 
 import { useState } from "react"
+import { LpOnboardingCard } from "./lp-onboarding-card"
 import {
   FileText, Download, Send, Loader2, X, Sparkles, ExternalLink,
 } from "lucide-react"
@@ -25,7 +26,7 @@ interface PortalData {
 
 const usd = (n: number | null) => (n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 }))
 
-export function LpPortalClient({ token, data }: { token: string; data: PortalData }) {
+export function LpPortalClient({ token, data, onboarding }: { token: string; data: PortalData; onboarding?: Parameters<typeof LpOnboardingCard>[0]["view"] | null }) {
   const [letter, setLetter] = useState<{ title: string; html: string } | null>(null)
   const [loadingLetter, setLoadingLetter] = useState<string | null>(null)
   const [q, setQ] = useState("")
@@ -74,6 +75,7 @@ export function LpPortalClient({ token, data }: { token: string; data: PortalDat
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-10">
+        {onboarding && <LpOnboardingCard token={token} view={onboarding} defaultName={data.lp.name} />}
         {/* Capital summary */}
         <section>
           <h2 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-3">Capital account</h2>
@@ -150,7 +152,7 @@ export function LpPortalClient({ token, data }: { token: string; data: PortalDat
               <ul className="space-y-1.5">
                 {data.documents.map((d) => (
                   <li key={d.id}>
-                    <a href={d.url ?? "#"} target="_blank" rel="noreferrer"
+                    <a href={d.url ? `/api/portal/${token}/documents/${d.id}` : "#"} target="_blank" rel="noreferrer"
                       className="flex items-center gap-3 px-3 py-2.5 rounded-md border border-foreground/10 hover:bg-foreground/[0.03]">
                       <Download className="w-4 h-4 text-muted-foreground shrink-0" />
                       <span className="flex-1 text-sm truncate">{d.title}</span>

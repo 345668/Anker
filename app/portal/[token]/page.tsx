@@ -1,6 +1,8 @@
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { verifyPortalToken, getPortalData, logPortalAccess } from "@/lib/portfolio/lp-portal"
+import { lpEmail, maskEmail, onboardingView, sessionCookieName, sessionOk } from "@/lib/portfolio/lp-onboarding"
 import { LpPortalClient } from "@/components/portfolio/lp-portal-client"
+import { LpCodeGate } from "@/components/portfolio/lp-code-gate"
 
 export const dynamic = "force-dynamic"
 
@@ -10,9 +12,8 @@ export const metadata = {
 }
 
 /**
- * /portal/[token] — the LP-facing portal. The token is the auth: no login,
- * no Supabase account. Resolves to a single LP and shows ONLY their
- * materials. Feature adapted from Hemrock Portfolio Reporting (Apache-2.0).
+ * /portal/[token] — the LP-facing portal. The link identifies one investor; a six-digit code sent to that investor's own address opens it (docs/architecture/60).
+ * Until the code is entered the page shows the fund's name and a masked address, nothing else. No Supabase account is needed.
  */
 export default async function LpPortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -31,9 +32,15 @@ export default async function LpPortalPage({ params }: { params: Promise<{ token
     )
   }
 
+  const jar = await cookies()
   const h = await headers()
-  await logPortalAccess(lp.tokenId, lp.lpId, "home", h.get("x-forwarded-for")?.split(",")[0] ?? null)
-  const data = await getPortalData(lp)
+  const ip = h.get("x-forwarded-for")?.split(",")[0] ?? null
+  if (!(await sessionOk(lp.tokenId, jar.get(sessionCookieName(lp.tokenId))?.value))) {
+    const who = await lpEmail(lp.lpId)
+    return <LpCodeGate token={token} fundName={lp.fundName} maskedEmail={who?.email ? maskEmail(who.email) : null} />
+  }
 
-  return <LpPortalClient token={token} data={data} />
+  await logPortalAccess(lp.tokenId, lp.lpId, "home", ip)
+  const [data, onboarding] = await Promise.all([getPortalData(lp), onboardingView(lp.lpId)])
+  return <LpPortalClient token={token} data={data} onboarding={onboarding} />
 }

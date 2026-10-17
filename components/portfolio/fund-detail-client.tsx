@@ -15,6 +15,7 @@
  * skip the switcher entirely.
  */
 
+import { LpOnboardingPanel } from "./lp-onboarding-panel"
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
@@ -331,6 +332,8 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup, initi
           <AddLpPanel onSubmit={addLp} onCancel={() => setShowAddLp(false)} currency={fund.currency} />
         )}
 
+        <LpOnboardingPanel fundId={fund.id} />
+
         {lps.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
             <Users className="w-6 h-6 mx-auto mb-2 opacity-40" />
@@ -542,12 +545,12 @@ function LpRow({
           onClick={async () => {
             try {
               const r = await fetch(`/api/portfolio/lps/${lp.id}/portal-token`, {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 180 }),
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 30 }),
               })
               const d = await r.json()
               if (!r.ok || !d.link) { alert(d?.error ?? "Could not create portal link"); return }
               try { await navigator.clipboard.writeText(d.link) } catch {}
-              alert(`Investor-portal link (copied to clipboard, valid 180 days):\n\n${d.link}`)
+              alert(`Investor-portal link (copied to clipboard, valid 30 days):\n\n${d.link}`)
             } catch { alert("Could not create portal link") }
           }}
           className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5 mr-1"
@@ -560,12 +563,12 @@ function LpRow({
           onClick={async () => {
             if (!confirm(`Email a private investor-portal link to ${lp.lp_name}? It goes to their contact email on file.`)) return
             try {
-              const r = await fetch(`/api/portfolio/lps/${lp.id}/portal-token/send`, {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 180 }),
+              const r = await fetch(`/api/portfolio/lps/${lp.id}/invite`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
               })
               const d = await r.json()
               if (!r.ok) { alert(d?.error ?? "Could not send the portal link"); return }
-              alert(`Portal link emailed to ${d.sentTo} (valid 180 days).`)
+              alert(`Portal link emailed to ${d.sentTo} (valid 30 days).`)
             } catch { alert("Could not send the portal link") }
           }}
           className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5 mr-1"

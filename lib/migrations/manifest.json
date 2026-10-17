@@ -155,6 +155,7 @@
     "2026-10-16p-telegram-personal-bots.sql",
     "2026-10-16q-metering-m3.sql",
     "2026-10-17-smoke-runs.sql",
+    "2026-10-17b-lp-onboarding.sql",
     "2026_06_02_email_oauth_accounts.sql"
   ]
 }
