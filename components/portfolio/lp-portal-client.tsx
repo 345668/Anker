@@ -13,6 +13,7 @@
 import { useState } from "react"
 import { LpOnboardingCard } from "./lp-onboarding-card"
 import { LpSubscriptionCard, type SubscriptionView } from "./lp-subscription-card"
+import { LpVerificationCard, type VerificationViewData } from "./lp-verification-card"
 import {
   FileText, Download, Send, Loader2, X, Sparkles, ExternalLink,
 } from "lucide-react"
@@ -27,7 +28,7 @@ interface PortalData {
 
 const usd = (n: number | null) => (n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 }))
 
-export function LpPortalClient({ token, data, onboarding, subscription }: { token: string; data: PortalData; subscription?: SubscriptionView | null; onboarding?: Parameters<typeof LpOnboardingCard>[0]["view"] | null }) {
+export function LpPortalClient({ token, data, onboarding, subscription, verification }: { token: string; data: PortalData; subscription?: SubscriptionView | null; verification?: VerificationViewData | null; onboarding?: Parameters<typeof LpOnboardingCard>[0]["view"] | null }) {
   const [letter, setLetter] = useState<{ title: string; html: string } | null>(null)
   const [loadingLetter, setLoadingLetter] = useState<string | null>(null)
   const [q, setQ] = useState("")
@@ -77,6 +78,7 @@ export function LpPortalClient({ token, data, onboarding, subscription }: { toke
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-10">
         {onboarding && <LpOnboardingCard token={token} view={onboarding} defaultName={data.lp.name} />}
+        {verification?.unlocked && <LpVerificationCard token={token} view={verification} />}
         {subscription && <LpSubscriptionCard token={token} view={subscription} />}
         {/* Capital summary */}
         <section>

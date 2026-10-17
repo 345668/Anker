@@ -17,6 +17,8 @@ vi.mock("@/lib/portfolio/lp-onboarding", async () => {
   }
 })
 vi.mock("@/lib/portfolio/lp-subscription", () => ({ returnSigned: async () => {}, lpSubscriptionView: async () => ({ status: "returned" }), fileForLp: async () => ({ filename: "a.pdf", contentType: "application/pdf", bytes: Buffer.from("%PDF-") }) }))
+vi.mock("@/lib/portfolio/lp-verification", () => ({ uploadDocument: async () => {}, declare: async () => {}, submit: async () => {}, verificationView: async () => ({ ready: false }) }))
+import { POST as verPost } from "./[token]/verification/route"
 import { POST as subPost } from "./[token]/subscription/route"
 import { GET as subGet } from "./[token]/subscription/[id]/route"
 import { POST as code } from "./[token]/code/route"
@@ -45,6 +47,12 @@ describe("the portal needs the emailed code", () => {
     const r = await subGet(req(undefined, "S"), ctx({ id: "11111111-1111-1111-1111-111111111111" }))
     expect(r.status).toBe(200); expect(r.headers.get("content-disposition")).toContain("attachment"); expect(r.headers.get("x-content-type-options")).toBe("nosniff"); expect(r.headers.get("cache-control")).toContain("no-store")
     expect((await subGet(req(undefined, "S"), ctx({ id: "not-a-uuid" }))).status).toBe(404)
+  })
+  it("identity documents are accepted only with the session, and an unknown action is refused", async () => {
+    const file = () => { const f = new FormData(); f.set("docType", "id_document"); f.set("file", new File([Buffer.from("%PDF-1.4")], "id.pdf")); return new Request("https://x.test/p", { method: "POST", body: f }) as any }
+    expect((await verPost(file(), ctx())).status).toBe(401); expect((await verPost(req({ action: "submit" }), ctx())).status).toBe(401)
+    st.session = true
+    expect((await verPost(file(), ctx())).status).toBe(200); expect((await verPost(req({ action: "declare", category: "unsure" }, "S"), ctx())).status).toBe(200); expect((await verPost(req({ action: "wipe" }, "S"), ctx())).status).toBe(400)
   })
   it("with a session the onboarding step and the letter answer", async () => {
     st.session = true

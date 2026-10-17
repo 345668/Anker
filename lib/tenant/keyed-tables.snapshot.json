@@ -164,6 +164,7 @@
     "journal_entries",
     "journal_lines",
     "kyc_cases",
+    "kyc_document_files",
     "kyc_documents",
     "kyc_screening_hits",
     "kyc_watchlist",
@@ -211,6 +212,7 @@
     "lp_subscription_files",
     "lp_subscriptions",
     "lp_terms_acceptances",
+    "lp_verification",
     "market_signals",
     "match_outcome_events",
     "match_pipeline_actions",
@@ -530,6 +532,9 @@
     "kyc_cases": [
       "fund_id"
     ],
+    "kyc_document_files": [
+      "fund_id"
+    ],
     "legal_documents": [
       "fund_id"
     ],
@@ -573,6 +578,9 @@
       "fund_id"
     ],
     "lp_subscriptions": [
+      "fund_id"
+    ],
+    "lp_verification": [
       "fund_id"
     ],
     "mc_actuals": [

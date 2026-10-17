@@ -84,3 +84,28 @@ export function maskSecret(plaintext: string | null | undefined): string {
   if (plaintext.length <= 8) return "•".repeat(plaintext.length)
   return plaintext.slice(0, 7) + "…" + plaintext.slice(-4)
 }
+
+
+// ── files ──────────────────────────────────────────────────────────────
+/**
+ * Encrypts a file's bytes (AES-256-GCM, same key as the text secrets). Layout: version byte 1, 12-byte IV, 16-byte tag, ciphertext.
+ * Unlike the text helpers this NEVER falls back to plaintext: identity documents are not stored without a key.
+ */
+export function encryptBytes(plain: Buffer): Buffer {
+  const key = getKey()
+  if (!key) throw new Error("SECRET_KEY is not set: files cannot be stored encrypted")
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv)
+  const data = Buffer.concat([cipher.update(plain), cipher.final()])
+  return Buffer.concat([Buffer.from([1]), iv, cipher.getAuthTag(), data])
+}
+
+export function decryptBytes(stored: Buffer): Buffer | null {
+  const key = getKey()
+  if (!key || stored.length < 30 || stored[0] !== 1) return null
+  try {
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, stored.subarray(1, 13))
+    decipher.setAuthTag(stored.subarray(13, 29))
+    return Buffer.concat([decipher.update(stored.subarray(29)), decipher.final()])
+  } catch { return null }
+}

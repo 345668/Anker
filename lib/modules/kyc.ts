@@ -271,7 +271,7 @@ export async function recomputeCase(caseId: string): Promise<void> {
   let status: KycCase["status"]
   if (confirmed) status = "escalated"
   else if (active.length > 0) status = "in_progress"
-  else if (docsComplete) status = "cleared"
+  else if (docsComplete && c.screened_at) status = "cleared"      // documents alone never clear a case: it must also have been screened (docs/architecture/60 section 6)
   else if (c.screened_at || (await hasAnyDoc(caseId))) status = "in_progress"
   else status = "not_started"
 

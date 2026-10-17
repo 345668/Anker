@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react"
 
-interface Row { id: string; name: string; type: string | null; state: string; email: string | null; contactName: string | null; invitedAt: string | null; openedAt: string | null; waitingDays: number | null; differs: boolean; detailsToReview: boolean; submitted: { legalName: string; entityType: string; country: string | null; taxResidence: string | null; taxIdLast4: string | null } | null; subscription: Sub | null }
+interface Row { id: string; name: string; type: string | null; state: string; email: string | null; contactName: string | null; invitedAt: string | null; openedAt: string | null; waitingDays: number | null; differs: boolean; detailsToReview: boolean; submitted: { legalName: string; entityType: string; country: string | null; taxResidence: string | null; taxIdLast4: string | null } | null; subscription: Sub | null; verification: Ver | null }
+interface Ver { caseId: string | null; caseStatus: string | null; submittedAt: string | null; category: string | null; ownersProvided: boolean; docs: Array<{ docId: string; type: string; label: string; status: string; fileId: string | null; filename: string | null; sizeBytes: number | null; sha256: string | null; receivedAt: string | null; note: string | null }> }
 interface Sub { status: string; commitment: number; shareClass: string | null; sentAt: string; returnedAt: string | null; ackName: string | null; rejectionReason: string | null; signedCopy: { id: string; filename: string; sizeBytes: number; sha256: string; scanned: boolean } | null }
 const READY = new Set(["terms_accepted", "verification_submitted", "subscription_returned", "countersigned"])
 const LABEL: Record<string, string> = { not_invited: "Not invited", invited: "Invited", opened: "Opened the portal", details_confirmed: "Details confirmed", terms_accepted: "Terms accepted", verification_submitted: "Verification sent", subscription_returned: "Subscription returned", countersigned: "Countersigned" }
@@ -42,6 +43,15 @@ export function LpOnboardingPanel({ fundId }: { fundId: string }) {
     setMsg(r.ok ? (action === "send" ? `Subscription documents sent to ${lp.name}.` : action === "accept" ? `${lp.name} is countersigned.` : "Sent back with your reason.") : (await r.json().catch(() => ({}))).error ?? "That did not work.")
     setBusy(null); await load()
   }
+  async function verification(lp: Row, action: "verify" | "reject", docType: string) {
+    let note: string | null = null
+    if (action === "reject") { note = prompt("What is wrong with this document? The investor will see this."); if (!note) return }
+    setBusy(lp.id); setMsg(null)
+    const r = await fetch(`/api/portfolio/lps/${lp.id}/verification`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, docType, note }) })
+    setMsg(r.ok ? (action === "verify" ? "Marked as checked." : "Sent back to the investor.") : (await r.json().catch(() => ({}))).error ?? "That did not work.")
+    setBusy(null); await load()
+  }
+  async function owners(lp: Row) { const r = await fetch(`/api/portfolio/lps/${lp.id}/verification`, { cache: "no-store" }); const j = await r.json().catch(() => ({})); alert(j.owners ? `Who owns and controls ${lp.name}, as the investor stated it:\n\n${j.owners}` : "Nothing was provided.") }
   async function reviewed(lp: Row) { setBusy(lp.id); await fetch(`/api/portfolio/lps/${lp.id}/review`, { method: "POST" }); setBusy(null); await load() }
 
   const missing = rows.filter((r) => !r.email).length
@@ -88,6 +98,20 @@ export function LpOnboardingPanel({ fundId }: { fundId: string }) {
                       <button className={small} disabled={busy === lp.id}>Send back</button>
                     </form>
                   </div>)}
+              </div>)}
+            {lp.verification && (
+              <div className="mt-2 rounded-md border border-foreground/10 p-2 text-xs">
+                <span className="font-medium">Verification:</span> {lp.verification.submittedAt ? `sent ${lp.verification.submittedAt}` : "in progress"}{lp.verification.category ? `, says: ${lp.verification.category.replace("_", "-")} investor` : ""}{lp.verification.caseStatus ? ` · case ${lp.verification.caseStatus.replace("_", " ")}` : ""}. {lp.verification.ownersProvided && <button className="underline" onClick={() => owners(lp)}>Show who owns the entity</button>}
+                <ul className="mt-1 space-y-1">
+                  {lp.verification.docs.map((d) => (
+                    <li key={d.docId} className="flex flex-wrap items-center gap-2">
+                      <span>{d.label}: <strong>{d.status}</strong></span>
+                      {d.fileId && <a className="underline" href={`/api/portfolio/kyc-files/${d.fileId}`}>Open ({Math.round((d.sizeBytes ?? 0) / 1024)} KB, fingerprint {d.sha256?.slice(0, 10)})</a>}
+                      {d.status === "received" && <><button className={small} disabled={busy === lp.id} onClick={() => verification(lp, "verify", d.type)}>Mark checked</button><button className={small} disabled={busy === lp.id} onClick={() => verification(lp, "reject", d.type)}>Send back</button></>}
+                      {d.status === "rejected" && d.note && <span className="text-amber-700">sent back: {d.note}</span>}
+                    </li>))}
+                </ul>
+                {lp.verification.caseId && <a className="mt-1 inline-block underline" href={`/dashboard/kyc-aml/${lp.verification.caseId}`}>Open the compliance case (screening and decision)</a>}
               </div>)}
             {lp.submitted && (
               <p className="mt-1 text-xs">Submitted by the LP: <strong>{lp.submitted.legalName}</strong> ({lp.submitted.entityType.replace("_", " ")}){lp.submitted.country ? `, ${lp.submitted.country}` : ""}{lp.submitted.taxIdLast4 ? `, tax number ending ${lp.submitted.taxIdLast4}` : ""}.
