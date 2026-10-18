@@ -11,7 +11,7 @@ Kept by hand at the end of a piece of work. **Verified live** means it was run a
 | Verified live | The crons run (`telegram-sweep` every minute, `telegram-notify`, 0 failures); migrations applied |
 | **Built, not tried live** | **Everything that touches Telegram:** webhook delivery, linking, answers, buttons, voice transcription and spoken replies, file reading, `/forget`, notifications, own-bot connection. **No bot exists yet** (`telegram_bots` 0 rows, `telegram_links` 0 rows, flag `telegram_channel` off) |
 | Gaps by design | Save a file to the data room and save a voice note as a CRM note as proposals (CRM activities are append-only); agent-result messages; several workspaces per phone; investors on Telegram; WhatsApp. Allowance warnings (doc 58) do not reach Telegram. No member-removal screen exists in the app (the cleanup runs from the sweep) |
-| Open founder steps | Connect a bot (in the app: Connected channels), assign feature `channel_telegram`, turn on flag `telegram_channel`; optional shared bot token `TELEGRAM_PRODUCT_BOT_TOKEN`; counsel on the LGPL MP3 library and on Telegram as a processor; revoke and replace the exposed operator bot token |
+| Open founder steps | **Run `docs/runbooks/telegram-first-run.md`** (the page is `/dashboard/channels`, now in the sidebar). Connect a bot (in the app: Connected channels), assign feature `channel_telegram`, turn on flag `telegram_channel`; optional shared bot token `TELEGRAM_PRODUCT_BOT_TOKEN`; counsel on the LGPL MP3 library and on Telegram as a processor; revoke and replace the exposed operator bot token |
 
 ## 2. Metering (doc 58)
 | | State |

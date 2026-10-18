@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import type { User } from "@supabase/supabase-js"
-import { PanelLeftClose, PanelLeftOpen, Settings, HelpCircle, LogOut } from "lucide-react"
+import { PanelLeftClose, PanelLeftOpen, Settings, HelpCircle, LogOut, Send, Gauge } from "lucide-react"
 import { AnkerLogo } from "@/components/brand/anker-logo"
 import { WorkspaceSections } from "@/components/shell/workspace-sections"
 import { useNavPersona } from "@/components/shell/nav-persona"
@@ -38,6 +38,8 @@ export function DashboardSidebar({ user, isAdmin = false }: { user: User; isAdmi
     <div className="border-t border-border p-2 space-y-1">
       {!compact && entitled.length > 1 && <label className="grid gap-2 px-3 py-2 text-xs text-muted-foreground">Navigation preview<select value={active} onChange={e => setActive(e.target.value as Persona)} className="border border-input bg-background p-2 rounded"><option value="founder">Founder</option><option value="vc">Fund manager</option><option value="lp">LP</option></select><span>Menu only. Data follows the selected workspace.</span></label>}
       {!compact && <p className="px-3 py-2 text-xs text-muted-foreground truncate" title={user.email}>{user.email}</p>}
+      <Link href="/dashboard/channels" aria-label="Connected channels" className="min-h-11 px-3 flex items-center gap-3 text-sm text-muted-foreground"><Send size={16} />{!compact && "Connected channels"}</Link>
+      <Link href="/dashboard/usage" aria-label="Usage" className="min-h-11 px-3 flex items-center gap-3 text-sm text-muted-foreground"><Gauge size={16} />{!compact && "Usage"}</Link>
       <Link href="/dashboard/settings" aria-label="Settings" className="min-h-11 px-3 flex items-center gap-3 text-sm text-muted-foreground"><Settings size={16} />{!compact && "Settings"}</Link>
       <Link href="/dashboard/help" aria-label="Help" className="min-h-11 px-3 flex items-center gap-3 text-sm text-muted-foreground"><HelpCircle size={16} />{!compact && "Help"}</Link>
       <button onClick={signOut} aria-label="Sign out" className="min-h-11 px-3 flex items-center gap-3 text-sm text-muted-foreground"><LogOut size={16} />{!compact && "Sign out"}</button>

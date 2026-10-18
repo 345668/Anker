@@ -11,6 +11,7 @@ import {
   LogOut,
   Settings,
   Shield,
+  Send as SendIcon, Gauge as GaugeIcon,
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
@@ -155,6 +156,8 @@ export function AppMobileNav({
         </div>
 
         <div className="border-t border-foreground/10 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0 flex flex-col gap-1">
+          <Link href="/dashboard/channels" onClick={() => setSheet(false)} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-muted-foreground"><SendIcon className="w-4 h-4" /> Connected channels</Link>
+          <Link href="/dashboard/usage" onClick={() => setSheet(false)} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-muted-foreground"><GaugeIcon className="w-4 h-4" /> Usage</Link>
           <Link
             href="/dashboard/settings"
             onClick={() => setSheet(false)}
