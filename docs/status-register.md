@@ -10,7 +10,7 @@ Kept by hand at the end of a piece of work. **Verified live** means it was run a
 | Built | T1 to T4 (link, read and write modes, proposals with buttons, voice notes up to 45 minutes, files, spoken replies, files out, `/forget`, daily brief, sensitive-class summaries); a workspace's own bot connected in the app (§19); a member's personal bot (§20); a leaver loses phones and bot; configurable daily limits |
 | Verified live | The crons run (`telegram-sweep` every minute, `telegram-notify`, 0 failures); migrations applied |
 | **Built, not tried live** | **Everything that touches Telegram:** webhook delivery, linking, answers, buttons, voice transcription and spoken replies, file reading, `/forget`, notifications, own-bot connection. **No bot exists yet** (`telegram_bots` 0 rows, `telegram_links` 0 rows, flag `telegram_channel` off) |
-| Gaps by design | Save a file to the data room and save a voice note as a CRM note as proposals (CRM activities are append-only); agent-result messages; several workspaces per phone; investors on Telegram; WhatsApp. Allowance warnings (doc 58) do not reach Telegram. No member-removal screen exists in the app (the cleanup runs from the sweep) |
+| Gaps by design | Save a file to the data room as a proposal; (call notes through Telegram are **scrapped**, doc 62);  several workspaces per phone; investors on Telegram; WhatsApp. Allowance warnings (doc 58) do not reach Telegram. No member-removal screen exists in the app (the cleanup runs from the sweep) |
 | Open founder steps | **Run `docs/runbooks/telegram-first-run.md`** (the page is `/dashboard/channels`, now in the sidebar). Connect a bot (in the app: Connected channels), assign feature `channel_telegram`, turn on flag `telegram_channel`; optional shared bot token `TELEGRAM_PRODUCT_BOT_TOKEN`; counsel on the LGPL MP3 library and on Telegram as a processor; revoke and replace the exposed operator bot token |
 
 ## 2. Metering (doc 58)
@@ -44,6 +44,9 @@ Counsel review of the privacy notice and the legitimate-interest assessment (doc
 | **Built, not tried live** | The optional account (creates a sign-in with a password); a fund that belongs to a workspace, where a request becomes a proposal in the Actions inbox; the fund manager's screens in a browser (the panels are behind a sign-in); the 8 existing investors (demo records without addresses) |
 | Gaps | 4 MB file limit; no virus scanner; no retention timer; no separate compliance role (owner or admin); no wire details after countersign; the weekly brief does not mention stuck investors; the assistant's request detection is keyword-based; rejecting a request does not email the investor |
 | Open | Add real addresses and run one fund's first real investor end to end |
+
+## 4a. Halyard (doc 62)
+Spec only. The desktop app (`~/Call-Intelligence`) is built and has never synced a call to Anker: `investor_calls` has 0 rows and `call_sync_devices` 0 rows. The Telegram note-taker (doc 57 T3) is built, never run, and **scrapped by decision of 2026-10-18**; removal is slice H0.
 
 ## 5. Investor profiles and relationships (doc 61)
 Spec only. Nothing built.
