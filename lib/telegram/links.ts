@@ -37,6 +37,7 @@ export async function consumeLinkCode(code: string, tg: { userId: number; chatId
   if (!claimed) return { ok: false, reason: "used" }                    // someone else used it a moment ago
   const id = randomUUID()
   const [row] = (await sql`INSERT INTO telegram_links (id, user_id, org_id, bot_id, telegram_user_id, chat_id, telegram_username, mode, status) VALUES (${id}, ${c.user_id}, ${c.org_id}, ${botId}, ${tg.userId}, ${tg.chatId}, ${tg.username ?? null}, ${mode}, 'pending') RETURNING *`) as any[]
+  await sql`UPDATE ai_subprocessors SET active = true WHERE slug = 'telegram' AND active = false`.catch(() => {})
   return { ok: true, link: row }
 }
 

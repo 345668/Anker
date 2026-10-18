@@ -3,11 +3,12 @@ import { PGlite } from "@electric-sql/pglite"
 import { readFileSync } from "node:fs"
 import { beforeAll, afterAll, beforeEach, describe, it, expect, vi } from "vitest"
 vi.mock("server-only", () => ({}))
-const st = vi.hoisted(() => ({ q: null as any, afterFns: [] as Array<() => unknown> }))
+const st = vi.hoisted(() => ({ q: null as any, afterFns: [] as Array<() => unknown>, notes: [] as any[] }))
 vi.mock("@/lib/db", () => { const f: any = (s: TemplateStringsArray, ...v: unknown[]) => st.q(s.reduce((q, t, i) => q + (i ? `$${i}` : "") + t, ""), v); f.unsafe = (t: string, v: unknown[] = []) => st.q(t, v); return { sql: f } })
+vi.mock("@/lib/notifications/store", () => ({ createNotification: async (n: any) => { st.notes.push(n); return { created: true } } }))
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => { st.afterFns.push(fn) } }))
 process.env.SECRET_KEY = "own-bot-test-secret"; process.env.TELEGRAM_PRODUCT_BOT_TOKEN = "8615616511:AAFX1VFIA4eoTmIKAr7Y5Evap_FZncGSjak"
-import { connectBot, disconnectBot, loadBot, botForUser, ownBotOf, personalBotOf, botsOfOrg, BotError, webhookUrlFor } from "./bots"
+import { connectBot, disconnectBot, loadBot, botForUser, ownBotOf, personalBotOf, botsOfOrg, listConnections, devicesOnBot, operatorDisconnect, operatorRevokeLink, markTelegramInUse, BotError, webhookUrlFor } from "./bots"
 import { createLinkCode, consumeLinkCode, linkByTelegramUser } from "./links"
 import { enqueue } from "./runtime"
 import { receive } from "./webhook"
@@ -193,5 +194,51 @@ describe("a member who leaves (docs/architecture/57 section 20)", () => {
     const { purgeFormerMembers, forgetMember, isMember } = await import("./membership")
     expect(await purgeFormerMembers()).toMatchObject({ members: 0 }); expect(await isMember("o1", "rick")).toBe(true); expect(await isMember("o2", "rick")).toBe(false)
     expect(await forgetMember("o1", "rick")).toEqual({ links: 1, bot: true }); expect(await purgeFormerMembers()).toMatchObject({ members: 0 })
+  })
+})
+
+describe("the operator's supervision (docs/architecture/57 section 22)", () => {
+  beforeAll(async () => { await db.exec("CREATE TABLE IF NOT EXISTS profiles (id text PRIMARY KEY, email text); CREATE TABLE IF NOT EXISTS memberships (id serial PRIMARY KEY, user_id text, org_id text, org_role text); INSERT INTO organizations VALUES ('o1','Acme Fund') ON CONFLICT DO NOTHING; INSERT INTO profiles VALUES ('rick','rick@acme.test'), ('boss','boss@acme.test') ON CONFLICT DO NOTHING") })
+  beforeEach(async () => { st.notes.length = 0; await db.exec("DELETE FROM memberships; INSERT INTO memberships (user_id, org_id, org_role) VALUES ('boss','o1','workspace_owner'), ('rick','o1','member'); UPDATE ai_subprocessors SET active = false") ; vi.stubGlobal("fetch", fake()) })
+  afterAll(() => { vi.unstubAllGlobals() })
+  const tg = { userId: 11, chatId: 11 }
+  const link = async (user: string, bot: string, tgId: number, confirm = true) => { const r = await consumeLinkCode((await createLinkCode(user, "o1", bot)).code, { userId: tgId, chatId: tgId, username: `u${tgId}` }, "read", bot); expect(r.ok).toBe(true); if (confirm && r.ok) await db.query("UPDATE telegram_links SET status = 'active', last_seen_at = now() WHERE id = $1", [r.link.id]) }
+
+  it("lists every workspace and personal bot with owner, device counts and recent failures, and nothing secret", async () => {
+    const ws = await connectBot("o1", "boss", TOKEN_A, fake()); const mine = await connectBot("o1", "rick", TOKEN_B, fake(), "personal")
+    await link("boss", ws.id, 1); await link("boss", ws.id, 2, false); await link("rick", mine.id, 3)
+    await db.query("INSERT INTO telegram_updates (bot_id, update_id, status, finished_at, payload_enc) VALUES ($1, 1, 'failed', now(), NULL)", [ws.id])
+    const list = await listConnections(); const w = list.find((c) => c.botId === ws.id)!, p = list.find((c) => c.botId === mine.id)!
+    expect(w).toMatchObject({ scope: "workspace", orgName: "Acme Fund", ownerEmail: null, username: "bot_1111", devices: { active: 1, pending: 1, suspended: 0 }, failed24h: 1 }); expect(p).toMatchObject({ scope: "personal", ownerEmail: "rick@acme.test", devices: { active: 1 } })
+    const raw = JSON.stringify(list); for (const secret of [TOKEN_A, TOKEN_B, "token_enc", "chat_id"]) expect(raw).not.toContain(secret)
+    const devs = await devicesOnBot(ws.id); expect(devs).toHaveLength(2); expect(devs[0]).toMatchObject({ orgName: "Acme Fund" }); expect(JSON.stringify(devs)).not.toMatch(/chat_id|chatId/)
+  })
+  it("removing a connection tells every phone, removes the webhook, disconnects the devices, deletes the token and tells the owners with the reason", async () => {
+    const mine = await connectBot("o1", "rick", TOKEN_A, fake(), "personal"); await link("rick", mine.id, 11); await link("rick", mine.id, 12)
+    calls.length = 0
+    expect(await operatorDisconnect(mine.id, "Misuse reported by a customer", "ops@an-ker.de", fake())).toEqual({ devices: 2 })
+    expect(calls.filter((c) => c.method === "sendMessage")).toHaveLength(2); expect(calls.find((c) => c.method === "sendMessage")!.body.text).toContain("platform operator removed")
+    const order = calls.map((c) => c.method); expect(order.indexOf("sendMessage")).toBeLessThan(order.indexOf("deleteWebhook"))      // told before the token goes
+    expect(order).toContain("deleteWebhook"); expect(await personalBotOf("o1", "rick")).toBeNull(); expect((await rows("SELECT status FROM telegram_links WHERE bot_id = $1", [mine.id])).every((l) => l.status === "revoked")).toBe(true)
+    expect(st.notes.map((n) => n.userId)).toEqual(["rick"]); expect(st.notes[0]).toMatchObject({ kind: "telegram_removed", href: "/dashboard/channels" }); expect(st.notes[0].body).toContain("Misuse reported by a customer")
+    expect(await operatorDisconnect(mine.id, "again please", "ops", fake())).toBeNull()
+  })
+  it("removing the workspace bot tells the workspace's owners and admins, not every member", async () => {
+    const ws = await connectBot("o1", "boss", TOKEN_B, fake()); await link("boss", ws.id, 21)
+    await operatorDisconnect(ws.id, "Customer asked support to remove it", "ops", fake()); expect(st.notes.map((n) => n.userId)).toEqual(["boss"])
+  })
+  it("the operator can disconnect one phone; it is told, queued work is dropped, the owner of the device is notified, and a repeat does nothing", async () => {
+    const ws = await connectBot("o1", "boss", TOKEN_A, fake()); await link("boss", ws.id, 31)
+    const id = (await rows("SELECT id FROM telegram_links WHERE bot_id = $1", [ws.id]))[0].id
+    await db.query("INSERT INTO telegram_updates (bot_id, update_id, link_id, status, payload_enc) VALUES ($1, 77, $2, 'queued', 'x')", [ws.id, id]); calls.length = 0
+    expect(await operatorRevokeLink(id, "Lost phone reported", "ops", fake())).toBe(true)
+    expect((await rows("SELECT status, revoked_by FROM telegram_links WHERE id = $1", [id]))[0]).toMatchObject({ status: "revoked", revoked_by: "operator:ops" }); expect((await rows("SELECT status, payload_enc FROM telegram_updates WHERE update_id = 77"))[0]).toMatchObject({ status: "dropped", payload_enc: null })
+    expect(calls.some((c) => c.method === "sendMessage")).toBe(true); expect(st.notes[0]).toMatchObject({ userId: "boss", kind: "telegram_removed" }); expect(await operatorRevokeLink(id, "again please", "ops", fake())).toBe(false)
+  })
+  it("the public list marks Telegram in use by itself when a bot is connected or a phone linked, and never switches it off", async () => {
+    await db.exec("INSERT INTO ai_subprocessors (slug, role, purpose, active, public) VALUES ('telegram', 'messaging', 'x', false, true) ON CONFLICT (slug) DO UPDATE SET active = false")
+    await connectBot("o1", "boss", TOKEN_A, fake()); expect((await rows("SELECT active FROM ai_subprocessors WHERE slug = 'telegram'"))[0].active).toBe(true)
+    await db.exec("UPDATE ai_subprocessors SET active = false WHERE slug = 'telegram'"); await link("boss", "platform", 41, false); expect((await rows("SELECT active FROM ai_subprocessors WHERE slug = 'telegram'"))[0].active).toBe(true)
+    await markTelegramInUse(); expect((await rows("SELECT active FROM ai_subprocessors WHERE slug = 'telegram'"))[0].active).toBe(true)
   })
 })

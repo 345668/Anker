@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto"
 import { sql } from "@/lib/db"
 import { decryptSecret, encryptSecret } from "@/lib/db/secrets"
 import * as bot from "./api"
+import { createNotification } from "@/lib/notifications/store"
 
 /**
  * A workspace's own Telegram bot (docs/architecture/57 section 19). The token is saved encrypted under the workspace; the webhook is registered by the app itself.
@@ -84,6 +85,7 @@ export async function connectBot(orgId: string, userId: string, rawToken: string
     await sql`DELETE FROM telegram_bots WHERE id = ${id}`.catch(() => {})
     throw new BotError(`Telegram would not accept the webhook: ${String((e as Error)?.message ?? "unknown error").replace(token, "[token]").slice(0, 160)}`, 502)
   }
+  await markTelegramInUse()
   const [r] = (await sql`SELECT id, org_id, user_id, bot_user_id, username, created_at FROM telegram_bots WHERE id = ${id}`) as any[]
   return view(r)
 }
@@ -109,4 +111,72 @@ export async function botStatus(own: OwnBot | null): Promise<{ bot: OwnBot; webh
     const h = await bot.getWebhookInfo(l.bot)
     return { bot: own, webhookOk: h.url === webhookUrlFor(own.id), pending: h.pending_update_count, lastError: h.last_error_message ?? null }
   } catch { return { bot: own, webhookOk: false, pending: 0, lastError: "Telegram could not be reached." } }
+}
+
+/**
+ * The public list of services that see customer data says whether Telegram is in use. It becomes true by itself the first time anyone connects a bot or links a phone, so
+ * nobody has to remember to switch it (docs/architecture/57 section 22). It is never switched off automatically: an operator decides that.
+ */
+export async function markTelegramInUse(): Promise<void> {
+  await sql`UPDATE ai_subprocessors SET active = true WHERE slug = 'telegram' AND active = false`.catch(() => {})
+}
+
+// ───────────── the operator's view (SAIL): supervise and remove, never read ─────────────
+export interface ConnectionView {
+  botId: string; orgId: string; orgName: string | null; scope: "workspace" | "personal"; ownerEmail: string | null; username: string; connectedAt: string
+  devices: { active: number; pending: number; suspended: number }; lastActivity: string | null; failed24h: number
+}
+/** Every workspace and personal bot, with counts only. No token, no message, no chat id. */
+export async function listConnections(): Promise<ConnectionView[]> {
+  const bots = (await sql`SELECT b.id, b.org_id, b.user_id, b.username, b.created_at, o.name AS org_name, p.email AS owner_email FROM telegram_bots b
+    LEFT JOIN organizations o ON o.id::text = b.org_id LEFT JOIN profiles p ON p.id::text = b.user_id ORDER BY b.created_at DESC`) as any[]
+  if (!bots.length) return []
+  const ids = bots.map((b) => String(b.id))
+  const devs = (await sql`SELECT bot_id, status, count(*)::int AS n, max(last_seen_at) AS seen FROM telegram_links WHERE bot_id = ANY(${ids}::text[]) AND status <> 'revoked' GROUP BY bot_id, status`) as any[]
+  const fails = (await sql`SELECT bot_id, count(*)::int AS n FROM telegram_updates WHERE bot_id = ANY(${ids}::text[]) AND status = 'failed' AND finished_at > now() - interval '24 hours' GROUP BY bot_id`) as any[]
+  return bots.map((b) => {
+    const mine = devs.filter((d) => d.bot_id === b.id), n = (st: string) => Number(mine.find((d) => d.status === st)?.n ?? 0)
+    const seen = mine.map((d) => d.seen).filter(Boolean).map((x) => new Date(x).getTime())
+    return { botId: String(b.id), orgId: String(b.org_id), orgName: b.org_name ?? null, scope: b.user_id ? "personal" as const : "workspace" as const, ownerEmail: b.owner_email ?? null, username: String(b.username), connectedAt: new Date(b.created_at).toISOString(),
+      devices: { active: n("active"), pending: n("pending"), suspended: n("suspended") }, lastActivity: seen.length ? new Date(Math.max(...seen)).toISOString() : null, failed24h: Number(fails.find((f) => f.bot_id === b.id)?.n ?? 0) }
+  })
+}
+
+export interface OperatorDevice { id: string; orgId: string; orgName: string | null; userEmail: string | null; telegramUsername: string | null; status: string; mode: string; linkedAt: string; lastSeenAt: string | null }
+/** The devices on one bot, or on the shared bot ('platform'). Who they belong to, never what they said. */
+export async function devicesOnBot(botId: string): Promise<OperatorDevice[]> {
+  const rows = (await sql`SELECT l.id, l.org_id, o.name AS org_name, p.email, l.telegram_username, l.status, l.mode, l.linked_at, l.last_seen_at FROM telegram_links l
+    LEFT JOIN organizations o ON o.id::text = l.org_id LEFT JOIN profiles p ON p.id::text = l.user_id WHERE l.bot_id = ${botId} AND l.status <> 'revoked' ORDER BY l.linked_at DESC LIMIT 200`) as any[]
+  return rows.map((r) => ({ id: String(r.id), orgId: String(r.org_id), orgName: r.org_name ?? null, userEmail: r.email ?? null, telegramUsername: r.telegram_username ?? null, status: r.status, mode: r.mode, linkedAt: new Date(r.linked_at).toISOString(), lastSeenAt: r.last_seen_at ? new Date(r.last_seen_at).toISOString() : null }))
+}
+
+const owners = async (orgId: string, userId: string | null): Promise<string[]> =>
+  userId ? [userId] : ((await sql`SELECT user_id FROM memberships WHERE org_id::text = ${orgId} AND org_role IN ('workspace_owner', 'admin')`) as any[]).map((r) => String(r.user_id))
+
+/**
+ * The operator removes a connection: every phone on it is told, the webhook goes, the devices are disconnected, the token is deleted, and the workspace's owners are told in the app.
+ * A reason is required and is shown to the owners. Nothing the customer said is read.
+ */
+export async function operatorDisconnect(botId: string, reason: string, by: string, f?: typeof fetch): Promise<{ devices: number } | null> {
+  const [b] = (await sql`SELECT id, org_id, user_id, username FROM telegram_bots WHERE id = ${botId}`) as any[]
+  if (!b) return null
+  const devices = (await sql`SELECT chat_id FROM telegram_links WHERE bot_id = ${botId} AND status <> 'revoked'`) as any[]
+  const loaded = await loadBot(botId)
+  if (loaded) for (const d of devices) await bot.sendMessage(loaded.bot, Number(d.chat_id), "The platform operator removed this Telegram connection. This chat is no longer connected to Anker.", null, f).catch(() => {})
+  await disconnectBot(String(b.org_id), by, { botId }, f)
+  for (const uid of await owners(String(b.org_id), b.user_id ?? null)) {
+    await createNotification({ userId: uid, orgId: String(b.org_id), kind: "telegram_removed", severity: "warning", title: "Your Telegram connection was removed by the platform", body: `The connection through @${b.username} was removed. Reason: ${reason}. You can connect again under Connected channels.`, href: "/dashboard/channels", dedupeKey: `tg-removed:${botId}` }).catch(() => {})
+  }
+  return { devices: devices.length }
+}
+
+/** The operator disconnects one phone (on any bot, including the shared one). */
+export async function operatorRevokeLink(linkId: string, reason: string, by: string, f?: typeof fetch): Promise<boolean> {
+  const [l] = (await sql`UPDATE telegram_links SET status = 'revoked', revoked_at = now(), revoked_by = ${`operator:${by}`.slice(0, 80)} WHERE id = ${linkId} AND status <> 'revoked' RETURNING id, org_id, user_id, bot_id, chat_id`) as any[]
+  if (!l) return false
+  await sql`UPDATE telegram_updates SET status = 'dropped', payload_enc = NULL, finished_at = now() WHERE link_id = ${linkId} AND status IN ('queued', 'running')`
+  const loaded = await loadBot(String(l.bot_id))
+  if (loaded) await bot.sendMessage(loaded.bot, Number(l.chat_id), "The platform operator disconnected this device from Anker.", null, f).catch(() => {})
+  await createNotification({ userId: String(l.user_id), orgId: String(l.org_id), kind: "telegram_removed", severity: "info", title: "A Telegram device was disconnected by the platform", body: `Reason: ${reason}. You can connect it again under Connected channels.`, href: "/dashboard/channels" }).catch(() => {})
+  return true
 }

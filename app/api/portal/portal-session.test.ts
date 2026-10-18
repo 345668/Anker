@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { NextRequest } from "next/server"
 const st = vi.hoisted(() => ({ requests: [] as any[], tokenOk: true, session: false, verifyThrows: null as null | { message: string; status: number; code: string } }))
 vi.mock("@/lib/db", () => ({ sql: async () => [] }))
 vi.mock("@/lib/ai/provider", () => ({ generate: async () => "x" }))
@@ -37,7 +38,7 @@ import { POST as ask } from "./[token]/ask/route"
 import { GET as doc } from "./[token]/documents/[id]/route"
 
 const ctx = (extra: Record<string, string> = {}) => ({ params: Promise.resolve({ token: "lp_abc", id: "x", ...extra }) })
-const req = (body?: unknown, cookie?: string) => new Request("https://x.test/p", { method: body === undefined ? "GET" : "POST", headers: { "content-type": "application/json", ...(cookie ? { cookie: `lp_s_test=${cookie}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }) as any
+const req = (body?: unknown, cookie?: string) => new NextRequest("https://x.test/p", { method: body === undefined ? "GET" : "POST", headers: { "content-type": "application/json", ...(cookie ? { cookie: `lp_s_test=${cookie}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }) as any
 beforeEach(() => { st.requests.length = 0; st.tokenOk = true; st.session = false; st.verifyThrows = null })
 
 describe("the portal needs the emailed code", () => {
@@ -48,7 +49,7 @@ describe("the portal needs the emailed code", () => {
     expect((await doc(req(), ctx({ id: "d1" }))).status).toBe(401)
   })
   it("returning signed documents and opening subscription files need the session too; with it, a file downloads as an attachment that browsers must not sniff", async () => {
-    const form = () => { const f = new FormData(); f.set("file", new File([Buffer.from("%PDF-1.4")], "s.pdf", { type: "application/pdf" })); f.set("ackName", "Anna Berg"); f.set("agree", "true"); return new Request("https://x.test/p", { method: "POST", body: f }) as any }
+    const form = () => { const f = new FormData(); f.set("file", new File([Buffer.from("%PDF-1.4")], "s.pdf", { type: "application/pdf" })); f.set("ackName", "Anna Berg"); f.set("agree", "true"); return new NextRequest("https://x.test/p", { method: "POST", body: f }) as any }
     expect((await subPost(form(), ctx())).status).toBe(401)
     expect((await subGet(req(), ctx({ id: "11111111-1111-1111-1111-111111111111" }))).status).toBe(401)
     st.session = true
@@ -58,7 +59,7 @@ describe("the portal needs the emailed code", () => {
     expect((await subGet(req(undefined, "S"), ctx({ id: "not-a-uuid" }))).status).toBe(404)
   })
   it("identity documents are accepted only with the session, and an unknown action is refused", async () => {
-    const file = () => { const f = new FormData(); f.set("docType", "id_document"); f.set("file", new File([Buffer.from("%PDF-1.4")], "id.pdf")); return new Request("https://x.test/p", { method: "POST", body: f }) as any }
+    const file = () => { const f = new FormData(); f.set("docType", "id_document"); f.set("file", new File([Buffer.from("%PDF-1.4")], "id.pdf")); return new NextRequest("https://x.test/p", { method: "POST", body: f }) as any }
     expect((await verPost(file(), ctx())).status).toBe(401); expect((await verPost(req({ action: "submit" }), ctx())).status).toBe(401)
     st.session = true
     expect((await verPost(file(), ctx())).status).toBe(200); expect((await verPost(req({ action: "declare", category: "unsure" }, "S"), ctx())).status).toBe(200); expect((await verPost(req({ action: "wipe" }, "S"), ctx())).status).toBe(400)
