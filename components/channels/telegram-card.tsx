@@ -72,6 +72,12 @@ function BotPanel({ onChange }: { onChange: () => void }) {
     await fetch("/api/telegram/bot", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ botId: id }) }); changed()
   }
   if (!st) return null
+  // When the channel is off for this workspace there is nothing to set up yet: say why once, instead of showing forms that would only fail.
+  if (st.gate) return (
+    <div className="mt-4 rounded-md border p-4 text-sm" role="status">
+      <p>{st.gate}</p>
+      {st.gate.includes("not switched on") && <p className="mt-2 text-xs text-muted-foreground">This is a platform-wide switch, kept by whoever runs the platform: Feature flags, <code>telegram_channel</code>. Once it is on, the setup appears here.</p>}
+    </div>)
   return (
     <div className="mt-4 space-y-3">
       <BotSlot scope="personal" title="Your own bot" blurb="Only you can connect a phone through it. Use it if you want a bot that belongs to you, not to the workspace." bot={st.personal} canEdit onChange={changed} />
@@ -112,7 +118,7 @@ export function TelegramCard() {
   return (
     <section className="rounded-xl border p-5" aria-labelledby="tg-h">
       <h2 id="tg-h" className="text-lg font-semibold">Telegram</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Ask Anker AI about this workspace from your phone. Messages pass through Telegram, which is a separate company and does not encrypt bot chats end to end. By default the bot only answers. If you switch on \"Allow changes\" for a device, it can propose changes to your records, and nothing is changed until you tap Approve. It never sends email or messages to other people from the chat.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Ask Anker AI about this workspace from your phone. Messages pass through Telegram, which is a separate company and does not encrypt bot chats end to end. By default the bot only answers. If you switch on "Allow changes" for a device, it can propose changes to your records, and nothing is changed until you tap Approve. It never sends email or messages to other people from the chat.</p>
       {s.botKind && s.bot && <p className="mt-2 text-sm">Your phone uses {s.botKind === "personal" ? "your own bot" : s.botKind === "workspace" ? "the workspace's bot" : "Anker's shared bot"}: <strong>@{s.bot}</strong>.</p>}
       <BotPanel onChange={load} />
       {!s.available ? <p className="mt-3 text-sm" role="status">{s.reason ?? "Telegram is not available for this workspace."}</p> : (
