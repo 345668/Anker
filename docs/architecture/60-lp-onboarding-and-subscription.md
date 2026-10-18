@@ -1,5 +1,7 @@
 # 60. Spec: the LP leg (invite, onboard, subscribe, watch)
 
+> The investor-initiated side (own profile, asking to join a fund, talks, several funds and entities) is specified in [61](61-lp-profiles-and-fund-relationships.md). This document starts when a fund has the investor on its list.
+
 Status: **spec. Nothing is built.** Implements doc 37 gap G18 ("LP persona is 3 pages with no onboarding") and section 6.3 (the LP leg: onboarding, subscription, capital-account view, self-serve documents). Builds on 41 (entitlements), 43 (action layer: LP requests become proposals), 54 (privacy), 56 (alerts) and 58 (metering: LPs cost nothing to the fund beyond what they use). Raised on 2026-10-17 because the thesis is founder, GP and LP on one platform, and the LP leg cannot currently be entered by an actual LP.
 
 ## 1. What is true today (measured 2026-10-17)
