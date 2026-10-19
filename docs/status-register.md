@@ -51,5 +51,9 @@ Spec only. The desktop app (`~/Call-Intelligence`) is built and has never synced
 ## 5. Investor profiles and relationships (doc 61)
 Spec only. Nothing built.
 
+## 5a. LP matchmaking (doc 63)
+
+Spec written 2026-10-19, nothing built. Measured: the page uses the v2 engine, the assistant tool `matchmake_lps` still uses v1 and saves nothing; the v2 LP engine applies no CRM, suppression or directory-use-gate exclusions; sessions are owned by user not workspace; 3 runs exist, 0 matches ever moved stage, and no LP outcome events exist, so match quality has never been measured. Start with M0 (parity) and M1 (exclusions and workspace sessions).
+
 ## 6. How a live test is done (so it can be repeated)
 A throwaway fund and investor with an obvious name are created in production, addressed to the founder's own mailbox; the portal is driven over HTTP; fund-side steps run through the library from a script (TypeScript run with `tsx`, `DATABASE_URL` pointed at the Neon database because `.env.local` points it at a dead local address, a temporary stub for `server-only`); everything is deleted in a `finally` block and the row counts are checked. Things that create a real account or password, or read the founder's inbox, are left to the founder.
