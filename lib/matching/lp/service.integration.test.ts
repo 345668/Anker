@@ -36,6 +36,9 @@ beforeAll(async () => {
   const c = readFileSync("scripts/migrations/2026-10-19c-lp-match-explain-feedback.sql", "utf8")
   await db.exec(c); await db.exec(c)
   await db.exec(readFileSync("scripts/migrations/2026-10-19d-lp-match-run-options.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-19e-lp-match-jobs.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-19f-lp-match-status-check.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-19g-lp-match-one-open-run.sql", "utf8"))
   await db.exec(`
     CREATE TABLE crm_entries(id serial PRIMARY KEY, org_id text, firm_id text, investor_id text, stage text);
     CREATE TABLE founder_match_exclusions(org_id text, entity_key text, reason text, created_by text);
@@ -89,7 +92,7 @@ describe("the shared LP service", () => {
     expect(rules.firm({ id: "z", name: "Elsewhere", source: null, norm_country: null })).toBeNull() // another fund's investors
     expect(rules.person({ id: "p", email: "NOPE@x.com", source: null, restricted_at: null, norm_country: null, firm_id: null, name: "A" })).toBe("suppressed")
     expect(rules.person({ id: "p", email: "global@x.com", source: null, restricted_at: null, norm_country: null, firm_id: null, name: "A" })).toBe("suppressed")
-    expect(save).toHaveBeenCalledWith(expect.anything(), "alice", { orgId: "org-a", source: "assistant", filters: expect.objectContaining({ classes: ["family_office"] }), parentSessionId: null, options: expect.objectContaining({ includeKnown: false }) })
+    expect(save).toHaveBeenCalledWith(expect.anything(), "alice", expect.objectContaining({ orgId: "org-a", source: "assistant", filters: expect.objectContaining({ classes: ["family_office"] }), parentSessionId: null, options: expect.objectContaining({ includeKnown: false }) }))
   })
   it("applies the fund's own rules: allowed classes narrow the mandate, excluded countries reach the rules", async () => {
     await profile("44444444-4444-4444-4444-444444444444", "org-a", `'["family_office","fund_of_funds"]','["de","FR"]'`)

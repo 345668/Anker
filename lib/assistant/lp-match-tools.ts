@@ -5,7 +5,7 @@
  */
 import { latestSession, resolveNames, getMatch, sessionInWorkspace, type MatchKind } from "@/lib/matching/lp/matches"
 import { recordFeedback, FeedbackError, VERDICTS, REASONS, type Verdict } from "@/lib/matching/lp/feedback"
-import { refineLpMatch, LpMatchError, type RefineChanges } from "@/lib/matching/lp/service"
+import { refineWithHandoff, sessionStatus, activeSession, LpMatchError, type RefineChanges } from "@/lib/matching/lp/service"
 import { draftIntros, MatchActionError } from "@/lib/matching/lp/actions"
 import { describeFilters, hasFilters } from "@/lib/matching/filters"
 import { describeExclusions } from "@/lib/matching/lp/rules"
@@ -73,7 +73,11 @@ export async function lpMatchRefine(inp: any, p: AiPrincipal | undefined): Promi
   for (const k of ["countries", "regions", "classes", "excludeClasses", "sectors"] as const) if (raw[k] !== undefined) (changes as any)[k] = (mandate.filters as any)[k]
   if (!Object.keys(changes).length && !inp?.reset) return { observation: "Say what to change in the mandate (countries, regions, classes, excludeClasses, sectors), or reset it." }
   try {
-    const out = await refineLpMatch({ orgId: p!.orgId!, userId: p!.userId, source: "assistant" }, { sessionId: inp?.sessionId ?? null, changes: inp?.reset ? { countries: [], regions: [], classes: [], excludeClasses: [], sectors: [], ...changes } : changes, includeKnown: !!inp?.includeKnown, options: { enableAi: false } })
+    const out = await refineWithHandoff({ orgId: p!.orgId!, userId: p!.userId, source: p!.channel === "telegram" ? "telegram" : "assistant", channel: p!.channel }, { sessionId: inp?.sessionId ?? null, changes: inp?.reset ? { countries: [], regions: [], classes: [], excludeClasses: [], sectors: [], ...changes } : changes, includeKnown: !!inp?.includeKnown, options: { enableAi: false } }, 25_000)
+    if (out.kind === "running") {
+      const where = out.progress ? `${out.progress.pct}% done: ${out.progress.label}` : "started"
+      return { report: `The refined run is still going (${where}). When it finishes you get a notification in Anker${p!.channel === "telegram" ? " and a message here" : ""}; the result appears on the Matchmaking page.`, observation: "The refined run continues in the background. A verified status line is appended; tell the user it will be announced when done, and do not start it again." }
+    }
     const t = out.result.totals
     const names = (xs: string[]) => xs.slice(0, 10).join(", ") + (xs.length > 10 ? `, and ${xs.length - 10} more` : "")
     const report =
@@ -107,4 +111,19 @@ export async function lpMatchDraft(inp: any, p: AiPrincipal | undefined): Promis
     if (e instanceof MatchActionError || (e as any)?.name === "WaveError" || (e as any)?.status) return { observation: `${(e as Error).message} Say so to the user.` }
     throw e
   }
+}
+
+export async function lpMatchStatus(inp: any, p: AiPrincipal | undefined): Promise<ToolResult> {
+  const bad = needFund(p); if (bad) return { observation: bad }
+  const given = inp?.sessionId ? await sessionStatus(p!.orgId!, String(inp.sessionId)) : null
+  const live = given ?? (await activeSession(p!.orgId!))
+  if (inp?.sessionId && !given) return { observation: "That run is not in this workspace." }
+  if (live && (live.status === "queued" || live.status === "running")) {
+    const pr = (live as any).progress
+    return { observation: `A run for ${live.fundName} is ${live.status === "queued" ? "waiting to start" : "running"}${pr ? `: ${pr.pct}% done, ${pr.label}` : ""}. It carries on in the background; the person is told when it finishes.` }
+  }
+  if (live && live.status === "failed") return { observation: `The run for ${live.fundName} did not finish${(live as any).error ? ` (${(live as any).error})` : ""}. It can be started again.` }
+  const s = await runFor(p!.orgId!, inp?.sessionId)
+  if (!s) return { observation: "There is no run in this workspace yet. Run matchmake_lps first." }
+  return { observation: `The latest run, for ${s.fund_name}, finished with ${Number(s.qualified_firms ?? 0).toLocaleString("en-US")} firms and ${Number(s.qualified_contacts ?? 0).toLocaleString("en-US")} people qualified (run ${String(s.id).slice(0, 8)}). Use lp_match_explain for one of them.` }
 }

@@ -22,7 +22,7 @@ import { fetchPublicText } from "./public-fetch";
 import { currentAiContext } from "./context";
 import { matchInvestors } from "./match-investors";
 import { matchmakeLps } from "./matchmake-lps";
-import { lpMatchExplain, lpMatchFeedback, lpMatchRefine, lpMatchDraft } from "./lp-match-tools";
+import { lpMatchExplain, lpMatchFeedback, lpMatchRefine, lpMatchDraft, lpMatchStatus } from "./lp-match-tools";
 import { ScoredBatches, type ScoredRow } from "./score-merge";
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export";
 import { reconcileSheet, detectHeader } from "@/lib/dataroom/reconcile";
@@ -224,6 +224,13 @@ export const TOOLS: Record<string, ToolDef> = {
     description: "THE platform's LP matching for a fund: ranks family offices, funds of funds and other LPs for the workspace's saved fund profile (the same engine and rules as the Matchmaking page), leaves out LPs already in the CRM, passed, suppressed or already the fund's investors, saves the run to the Matchmaking page and returns one ranked workbook. Use it whenever a GP asks for LPs, a shortlist or a pipeline. The fund comes from the workspace's saved profile; pass the fund fields only when the workspace has none.",
     params: `{ "fundProfileId"?: string, "top"?: number (rows to list, default 10), "filters"?: { "countries"?: string[] (e.g. "US"), "regions"?: string[], "classes"?: string[] (e.g. "family-office"), "excludeClasses"?: string[], "sectors"?: string[] } (ONLY constraints the user stated), "includeKnown"?: boolean (also list LPs already in the CRM), and only when the workspace has no fund profile: "fundName": string, "targetRaiseUsd": number, "sectors": string[], "geographicFocus": string[], "headquarters": string, "thesisKeywords"?: string[] }`,
     async run(inp) { const ctx = currentAiContext(); return matchmakeLps(inp, ctx?.principal); },
+  },
+
+  lp_match_status: {
+    name: "lp_match_status",
+    description: "Where an LP matching run is: waiting, running (how far, in words), failed, or the latest finished run. Use it when the user asks whether a run they started has finished.",
+    params: `{ "sessionId"?: string }`,
+    async run(inp) { const ctx = currentAiContext(); return lpMatchStatus(inp, ctx?.principal); },
   },
 
   lp_match_explain: {

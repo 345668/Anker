@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 vi.mock("server-only", () => ({}))
-const m = vi.hoisted(() => ({ run: vi.fn(), resolve: vi.fn(), query: vi.fn(), save: vi.fn() }))
+const m = vi.hoisted(() => ({ run: vi.fn(), resolve: vi.fn(), query: vi.fn(), save: vi.fn(), load: vi.fn() }))
 vi.mock("@/lib/matching/lp/service", () => {
   class LpMatchError extends Error { constructor(message: string, readonly status = 409, readonly missingFields?: unknown) { super(message) } }
-  return { runLpMatch: m.run, resolveFundProfile: m.resolve, LpMatchError }
+  return { runWithHandoff: m.run, loadOutcome: m.load, resolveFundProfile: m.resolve, LpMatchError }
 })
 vi.mock("@/lib/db", () => ({ sql: Object.assign((s: TemplateStringsArray, ...v: unknown[]) => m.query(s.join("?"), v), { unsafe: m.query }) }))
 vi.mock("./artifact", () => ({ saveArtifact: m.save }))
@@ -23,7 +23,7 @@ const result = (over: any = {}) => ({
   },
   fund: { name: "Fund II" }, filters: {}, filterSummary: "US — Family office", exclusionSummary: "2 already in your CRM; 1 passed or declined",
 })
-beforeEach(() => { m.run.mockReset(); m.resolve.mockReset(); m.query.mockReset(); m.save.mockReset(); m.save.mockResolvedValue({ name: "LP_Pipeline_Fund_II.xlsx", url: "/api/artifacts/1", kind: "xlsx" }) })
+beforeEach(() => { m.load.mockReset(); m.run.mockReset(); m.resolve.mockReset(); m.query.mockReset(); m.save.mockReset(); m.save.mockResolvedValue({ name: "LP_Pipeline_Fund_II.xlsx", url: "/api/artifacts/1", kind: "xlsx" }) })
 
 describe("matchmake_lps", () => {
   it("needs a fund workspace and a member who can write", async () => {
@@ -33,9 +33,9 @@ describe("matchmake_lps", () => {
     expect(m.run).not.toHaveBeenCalled()
   })
   it("runs the shared service on the workspace's saved profile and reports only what the saved run holds", async () => {
-    m.resolve.mockResolvedValue(row); m.run.mockResolvedValue(result())
+    m.resolve.mockResolvedValue(row); m.run.mockResolvedValue({ kind: "done", sessionId: "abcdef12-0000-0000-0000-000000000000", outcome: result() })
     const out = await matchmakeLps({ filters: { classes: ["family-office"], countries: ["US"] }, top: 2 }, vc)
-    expect(m.run).toHaveBeenCalledWith({ orgId: "org-1", userId: "u1", source: "assistant" }, expect.objectContaining({ fundProfileId: "fp1", options: { enableAi: false }, mandate: expect.objectContaining({ countries: ["US"] }) }))
+    expect(m.run).toHaveBeenCalledWith(expect.objectContaining({ orgId: "org-1", userId: "u1", source: "assistant" }), expect.objectContaining({ fundProfileId: "fp1", options: { enableAi: false }, mandate: expect.objectContaining({ countries: ["US"] }) }), expect.objectContaining({ waitMs: expect.any(Number) }))
     expect(out.report).toContain("2 firms and 1 people qualified")
     expect(out.report).toContain("Left out before scoring: 2 already in your CRM; 1 passed or declined.")
     expect(out.report).toContain("1. Alpha FO — 81 (champion)")
@@ -44,7 +44,7 @@ describe("matchmake_lps", () => {
     expect(out.artifact?.name).toBe("LP_Pipeline_Fund_II.xlsx")
   })
   it("says so when nothing was left out, and when the request differs from the saved profile it keeps the profile", async () => {
-    m.resolve.mockResolvedValue(row); m.run.mockResolvedValue(result({ exclusions: { total: 0 } }))
+    m.resolve.mockResolvedValue(row); m.run.mockResolvedValue({ kind: "done", sessionId: "x", outcome: result({ exclusions: { total: 0 } }) })
     const out = await matchmakeLps({ fundName: "Fund III", targetRaiseUsd: 100_000_000 }, vc)
     expect(out.report).toContain("Nothing was left out by your rules.")
     expect(out.observation).toMatch(/saved fund profile "Fund II" was used/)
@@ -60,11 +60,30 @@ describe("matchmake_lps", () => {
   it("creates a profile from words when the five required fields are given, then runs", async () => {
     m.resolve.mockResolvedValue(null)
     m.query.mockResolvedValue([{ ...row, id: "new1", name: "New Fund" }])
-    m.run.mockResolvedValue(result())
+    m.run.mockResolvedValue({ kind: "done", sessionId: "abcdef12-0000-0000-0000-000000000000", outcome: result() })
     const out = await matchmakeLps({ fundName: "New Fund", targetRaiseUsd: 40_000_000, sectors: ["climate"], geographicFocus: ["united states"], headquarters: "Berlin" }, vc)
     expect(m.query).toHaveBeenCalledTimes(1)
     expect(out.observation).toMatch(/profile "New Fund" was created from what the user said/)
-    expect(m.run).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ fundProfileId: "new1" }))
+    expect(m.run).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ fundProfileId: "new1" }), expect.anything())
+  })
+  it("a run that outlasts the wait is announced as still going, with where it is, and is not started again", async () => {
+    m.resolve.mockResolvedValue(row)
+    m.run.mockResolvedValue({ kind: "running", sessionId: "abcdef12-0000-0000-0000-000000000000", progress: { phase: "scoring", label: "Scoring people (1,000 of 50,000)", pct: 42 } })
+    const out = await matchmakeLps({}, { ...vc, channel: "telegram" })
+    expect(out.report).toContain("still running (42% done: Scoring people (1,000 of 50,000))")
+    expect(out.report).toContain("a message here")
+    expect(out.report).toContain("run abcdef12")
+    expect(out.observation).toMatch(/do not wait, poll or start it again/)
+    expect(out.artifact).toBeUndefined()
+    expect(m.run).toHaveBeenCalledWith(expect.objectContaining({ source: "telegram", channel: "telegram" }), expect.anything(), expect.anything())
+  })
+  it("reads a run that finished elsewhere back from the database", async () => {
+    m.resolve.mockResolvedValue(row)
+    m.run.mockResolvedValue({ kind: "done", sessionId: "abcdef12-0000-0000-0000-000000000000", outcome: null })
+    m.load.mockResolvedValue(result())
+    const out = await matchmakeLps({}, vc)
+    expect(m.load).toHaveBeenCalledWith("org-1", "abcdef12-0000-0000-0000-000000000000")
+    expect(out.report).toContain("2 firms and 1 people qualified")
   })
   it("passes a service refusal on to the user instead of running", async () => {
     m.resolve.mockResolvedValue(row)

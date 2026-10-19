@@ -2,6 +2,7 @@ import { matchingContext, MatchingError } from "@/lib/matching/access"
 import { serializeFundProfile } from "@/lib/matching/fund-profile"
 import { sql } from "@/lib/db"
 import { listSessions } from "@/lib/matching/lp/matches"
+import { activeSession } from "@/lib/matching/lp/service"
 import { MatchmakingContent } from "@/components/tesseract/matchmaking-content"
 
 export const dynamic = "force-dynamic"
@@ -11,6 +12,7 @@ export default async function MatchmakingPage() {
   let fundProfiles: any[] = []
   let recentSessions: any[] = []
   let loadError: string | null = null
+  let activeRun: Awaited<ReturnType<typeof activeSession>> = null
   try {
     const context = await matchingContext("vc")
     fundProfiles = await sql`
@@ -21,6 +23,7 @@ export default async function MatchmakingPage() {
       LIMIT 50
     `
     recentSessions = await listSessions(context.orgId, { limit: 20 })
+    activeRun = await activeSession(context.orgId).catch(() => null)
   } catch (error) {
     loadError = error instanceof MatchingError ? error.message : "Matching profiles could not be loaded. Check the matching migration and try again."
   }
@@ -38,6 +41,7 @@ export default async function MatchmakingPage() {
         primarySectors: parseJsonField(f.primary_sectors),
       }))}
       recentSessions={recentSessions}
+      activeRun={activeRun}
     />
   )
 }

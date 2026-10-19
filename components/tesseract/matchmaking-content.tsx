@@ -41,6 +41,7 @@ import { LpResultsPanel } from "@/components/matching/lp-results-panel"
 import { LpMandatePanel } from "@/components/matching/lp-mandate-panel"
 import { LpRunSummary, type RunExclusions, type SincePrevious } from "@/components/matching/lp-run-summary"
 import { LpHistory, type HistoryRun } from "@/components/matching/lp-history"
+import { LpRunProgress, useFollowRun, type Followed } from "@/components/matching/lp-run-progress"
 import { fundReadiness, responseError } from "@/lib/matching/profile-readiness"
 import { MatchingReadiness } from "./matching-readiness"
 import { FundDeckUploader } from "@/components/tesseract/fund-deck-uploader"
@@ -106,11 +107,14 @@ const SEGMENT_LABELS: Record<string, string> = {
 export function MatchmakingContent({
   fundProfiles,
   recentSessions,
+  activeRun,
   loadError,
 }: {
   loadError?: string | null
   fundProfiles: FundProfileLite[]
   recentSessions: HistoryRun[]
+  /** A run of this workspace that is still going when the page loads (started here, by Anker AI or on Telegram). */
+  activeRun?: { id: string; status: string; fundName: string; source: string } | null
 }) {
   const [isPending, startTransition] = useTransition()
   // Local copy of the profile list — server-rendered initial value, kept in
@@ -134,6 +138,7 @@ export function MatchmakingContent({
   const [elapsed, setElapsed] = useState(0)
   const [profileOpen, setProfileOpen] = useState<boolean | null>(null)
   const [history, setHistory] = useState<HistoryRun[]>(recentSessions)
+  const [following, setFollowing] = useState<Followed | null>(activeRun ? { id: activeRun.id, fundName: activeRun.fundName, source: activeRun.source } : null)
   const resultsRef = useRef<HTMLDivElement | null>(null)
   const openRef = useRef<HTMLDivElement | null>(null)
   const [openSessionId, setOpenSessionId] = useState<string | null>(null)
@@ -161,10 +166,31 @@ export function MatchmakingContent({
   }, [isPending])
   const profileSectionOpen = profileOpen ?? (!selectedFund || missing.length > 0)
 
+  const afterRun = (summary: RunSummary) => {
+    setLatest(summary)
+    setOpenSessionId(null)
+    // The new run joins the history without a reload.
+    fetch("/api/lp/matching/sessions?limit=20").then((r) => (r.ok ? r.json() : null)).then((j) => j?.sessions && setHistory(j.sessions)).catch(() => {})
+    requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }))
+  }
+  const runProgress = useFollowRun(
+    following,
+    async (id) => {
+      try {
+        const r = await fetch(`/api/lp/matching/sessions/${id}/summary`, { cache: "no-store" })
+        if (!r.ok) throw new Error("summary")
+        afterRun((await r.json()) as RunSummary)
+      } catch { setError("The run finished, but its result could not be loaded. Open it under Runs.") }
+      setFollowing(null)
+    },
+    (_id, reason) => { setError(reason); setFollowing(null) },
+  )
+
   interface RunCfg { fundId: string; minScore: number; enableAi: boolean; regions: Region[]; classes: InvestorClass[]; countries: string[]; includeKnown: boolean; maxFirms: number | ""; maxContacts: number | "" }
   const currentCfg = (): RunCfg => ({ fundId: selectedFundId, minScore, enableAi, regions, classes, countries, includeKnown, maxFirms, maxContacts })
 
   const runWith = (cfg: RunCfg) => {
+    if (following) { setError("A run is already in progress. It will appear here when it finishes."); return }
     if (missing.length || editorDirty || extractingDeck || isPending) { setError("Complete and save the required profile fields before matching."); return }
     if (!cfg.fundId) {
       setError("Pick a fund profile first — create one with the editor below or upload a deck.")
@@ -189,12 +215,13 @@ export function MatchmakingContent({
         if (!res.ok) {
           throw new Error(await responseError(res, "Matching failed"))
         }
-        const summary = (await res.json()) as RunSummary
-        setLatest(summary)
-        setOpenSessionId(null)
-        // The new run joins the history without a reload.
-        fetch("/api/lp/matching/sessions?limit=20").then((r) => (r.ok ? r.json() : null)).then((j) => j?.sessions && setHistory(j.sessions)).catch(() => {})
-        requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }))
+        // 202: the run is taking longer than a few seconds and carries on in the background; follow it by its id.
+        if (res.status === 202) {
+          const j = await res.json()
+          setFollowing({ id: j.sessionId, fundName: profiles.find((f) => f.id === cfg.fundId)?.name })
+          return
+        }
+        afterRun((await res.json()) as RunSummary)
       } catch (e: any) {
         setError(e?.message ?? "Run failed")
       }
@@ -458,7 +485,7 @@ export function MatchmakingContent({
               size="lg"
               className="w-full h-12 rounded-full bg-foreground text-background hover:bg-foreground/90 group"
               onClick={runMatching}
-              disabled={isPending || !selectedFundId || !!loadError || editorDirty || extractingDeck || missing.length > 0}
+              disabled={isPending || !!following || !selectedFundId || !!loadError || editorDirty || extractingDeck || missing.length > 0}
             >
               {isPending ? (
                 <>
@@ -487,7 +514,7 @@ export function MatchmakingContent({
           </div>
 
           <LpHistory runs={history} openId={openSessionId ?? latest?.sessionId ?? null} onOpen={(id) => { setOpenSessionId(id); requestAnimationFrame(() => openRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })) }}
-            onRerun={rerun} canRerun={(r) => profiles.some((f) => f.id === r.fundProfileId)} busy={isPending} />
+            onRerun={rerun} canRerun={(r) => profiles.some((f) => f.id === r.fundProfileId)} busy={isPending || !!following} />
         </div>
 
         {/* Right: results */}
@@ -534,6 +561,8 @@ export function MatchmakingContent({
           />
             </div>
           </section>
+
+          {following ? <LpRunProgress fundName={following.fundName} progress={runProgress} startedElsewhere={!!following.source && following.source !== "page"} /> : null}
 
           {openSessionId && openSessionId !== latest?.sessionId ? <div ref={openRef} className="scroll-mt-6"><LpResultsPanel key={openSessionId} sessionId={openSessionId} /></div> : null}
 

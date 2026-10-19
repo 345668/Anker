@@ -38,6 +38,7 @@ export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
     fundName: str(), targetRaiseUsd: num(), sectors: arr(str()), geographicFocus: arr(str()),
     headquarters: str(), thesisKeywords: arr(str()),
   }),
+  lp_match_status: obj({ sessionId: str() }),
   lp_match_explain: obj({ name: str(), kind: str({ enum: ["firm", "contact"] }), sessionId: str() }, ["name"]),
   lp_match_feedback: obj({
     names: arr(str()), verdict: str({ enum: ["fit", "not_a_fit", "already_known", "wrong_data"] }),

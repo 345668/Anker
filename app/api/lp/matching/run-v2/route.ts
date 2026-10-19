@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { matchingContext, matchingFailure } from "@/lib/matching/access"
-import { LpMatchError, runLpMatch } from "@/lib/matching/lp/service"
-import { compareSessions, previousSessionId, sessionInWorkspace } from "@/lib/matching/lp/matches"
+import { LpMatchError, runWithHandoff } from "@/lib/matching/lp/service"
+import { sessionInWorkspace } from "@/lib/matching/lp/matches"
+import { summaryOfSession } from "@/lib/matching/lp/summary"
 
 export const runtime = "nodejs"
-export const maxDuration = 300 // 5 min — large datasets + AI enrichment
+export const maxDuration = 300 // a run that outlasts the wait below keeps going in the background, within this limit
+
+/** How long the request waits for a run before telling the page it is still going (the page then follows it by its id). */
+const WAIT_MS = 8_000
 
 interface RunBody {
   fundProfileId: string
@@ -16,6 +20,10 @@ interface RunBody {
   includeKnown?: boolean
 }
 
+/**
+ * Start a run (docs/architecture/63 section 4.1). 200 with the summary when it finishes within a few seconds, which is the usual case; otherwise 202 with the run's id and where it
+ * is, and the page follows it at .../sessions/[id]/status. The run is saved either way and appears in the workspace's history.
+ */
 export async function POST(req: NextRequest) {
   try {
     const context = await matchingContext("vc")
@@ -25,8 +33,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "fundProfileId is required" }, { status: 400 })
     }
 
-    // The same service Anker AI and Telegram use (docs/architecture/63): one engine, one set of rules, one saved run for the workspace.
-    const { result, filters, filterSummary, exclusionSummary } = await runLpMatch(
+    const h = await runWithHandoff(
       { orgId: context.orgId, userId: context.userId, source: "page" },
       {
         fundProfileId: body.fundProfileId,
@@ -34,35 +41,13 @@ export async function POST(req: NextRequest) {
         mandate: body.filters,
         includeKnown: body.includeKnown,
       },
+      { waitMs: WAIT_MS },
     )
+    if (h.kind === "running") return NextResponse.json({ sessionId: h.sessionId, status: "running", progress: h.progress }, { status: 202 })
 
-    // What changed since the run before this one for the same fund (a failure here never fails the run).
-    let sincePrevious: unknown = null
-    try {
-      const me = await sessionInWorkspace(context.orgId, result.sessionId)
-      const prev = me ? await previousSessionId(context.orgId, me) : null
-      const cmp = prev ? await compareSessions(context.orgId, result.sessionId, prev, 8) : null
-      if (cmp) sincePrevious = { previousSessionId: prev, previousAt: cmp.older.createdAt, newCount: cmp.newCount, droppedCount: cmp.droppedCount, newFirms: cmp.newFirms, droppedFirms: cmp.droppedFirms, firmsDelta: cmp.firmsDelta, contactsDelta: cmp.contactsDelta }
-    } catch { /* comparison is a convenience */ }
-
-    // Return summary only (full lists can be fetched via session endpoint)
-    return NextResponse.json({
-      sessionId: result.sessionId,
-      fundProfileId: result.fundProfileId,
-      fundName: result.fundName,
-      ranAt: result.ranAt,
-      durationMs: result.durationMs,
-      filters,
-      filterSummary,
-      exclusions: result.exclusions ?? null,
-      confidenceCounts: result.confidenceCounts ?? null,
-      sincePrevious,
-      exclusionSummary,
-      totals: result.totals,
-      tierCounts: result.tierCounts,
-      segmentCounts: result.segmentCounts,
-      funnel: result.funnel,
-    })
+    const s = await sessionInWorkspace(context.orgId, h.sessionId)
+    if (!s) return NextResponse.json({ error: "The run finished but could not be read back." }, { status: 500 })
+    return NextResponse.json(await summaryOfSession(context.orgId, s))
   } catch (error: any) {
     if (error instanceof LpMatchError) {
       return NextResponse.json({ error: error.message, ...(error.missingFields ? { missingFields: error.missingFields } : {}) }, { status: error.status })

@@ -31,6 +31,8 @@ export interface SessionContext {
   filters?: unknown
   /** The run this one refines, so a change of mandate can be compared with what it replaced. */
   parentSessionId?: string | null
+  /** The id of the run when it was created before it started; the results are saved into that row. */
+  sessionId?: string
   /** The options the run was started with (minimum score, caps, AI, whether known LPs were shown), for "run again with these settings". */
   options?: Record<string, unknown> | null
 }
@@ -67,7 +69,13 @@ export async function saveSessionV2(
       ${result.confidenceCounts ? JSON.stringify(result.confidenceCounts) : null}::jsonb, ${context.parentSessionId ?? null},
       ${context.options ? JSON.stringify(context.options) : null}::jsonb
     )
-    ON CONFLICT (id) DO NOTHING
+    ON CONFLICT (id) DO UPDATE SET
+      fund_name = EXCLUDED.fund_name, total_firms_scored = EXCLUDED.total_firms_scored, total_contacts_scored = EXCLUDED.total_contacts_scored,
+      qualified_firms = EXCLUDED.qualified_firms, qualified_contacts = EXCLUDED.qualified_contacts, contacts_with_email = EXCLUDED.contacts_with_email,
+      anchor_candidates = EXCLUDED.anchor_candidates, tier_counts = EXCLUDED.tier_counts, duration_ms = EXCLUDED.duration_ms, funnel_data = EXCLUDED.funnel_data,
+      segment_counts = EXCLUDED.segment_counts, ai_enrichments_applied = EXCLUDED.ai_enrichments_applied, duplicates_merged = EXCLUDED.duplicates_merged,
+      engine_version = EXCLUDED.engine_version, exclusion_counts = EXCLUDED.exclusion_counts, total_firms_matched = EXCLUDED.total_firms_matched,
+      total_contacts_matched = EXCLUDED.total_contacts_matched, confidence_counts = EXCLUDED.confidence_counts
   `
 
   // 2) Firms — batched
@@ -81,7 +89,7 @@ export async function saveSessionV2(
     const batch = result.contacts.slice(i, i + CHUNK)
     await insertContactBatch(batch, result.sessionId, result.fundProfileId)
   }
-  await sql`UPDATE lp_match_sessions SET status='completed' WHERE id=${result.sessionId}`
+  await sql`UPDATE lp_match_sessions SET status='completed', finished_at=now() WHERE id=${result.sessionId}`
   } catch (error) {
     await sql`UPDATE lp_match_sessions SET status='failed' WHERE id=${result.sessionId}`.catch(() => {})
     throw error

@@ -62,7 +62,7 @@ export async function gate(link: Pick<LinkRow, "org_id"> & { user_id?: string })
 }
 
 export async function ask(link: LinkRow, text: string, history: Array<{ role: "user" | "assistant"; content: string }>, att?: Attachments): Promise<{ answer: string; runId: string | null; artifacts: OutFile[]; sensitive: boolean }> {
-  const principal = await resolveAiPrincipal(link.user_id, { orgId: link.org_id, readonly: link.mode !== "write" })
+  const principal = { ...(await resolveAiPrincipal(link.user_id, { orgId: link.org_id, readonly: link.mode !== "write" })), channel: "telegram" as const }
   const chatId = await ensureChat(link)
   const ctx = history.length ? `Conversation so far (for context only):\n${history.map((h) => `${h.role === "user" ? "Person" : "Anker"}: ${h.content}`).join("\n")}\n\n` : ""
   // A document or a photo is something a stranger wrote: its text goes in as data, the run is marked untrusted (so nothing it proposes can commit by itself), and images are read by vision.
@@ -77,7 +77,8 @@ export async function ask(link: LinkRow, text: string, history: Array<{ role: "u
   const sensitive = (result.steps ?? []).some((st) => typeof st.tool === "string" && SENSITIVE_TOOL.test(st.tool))
   return { answer: result.answer, runId, artifacts: (result.artifacts ?? []).map((a) => ({ name: a.name, url: a.url, kind: a.kind })), sensitive }
 }
-export const SENSITIVE_TOOL = /^(dataroom_|lp_|kyc)/
+import { SENSITIVE_TOOL } from "./sensitive"
+export { SENSITIVE_TOOL }
 
 const plain = (m: string) => Object.assign(new Error(m), { plain: true })
 const COLS = "id, capability, summary, diff, evidence, risk_class, source_trust, status, applied_at, undo"

@@ -55,6 +55,8 @@ interface RunOptions {
   filters?: MatchFilters
   /** The workspace's hard rules (docs/architecture/63 4.2): rows they refuse are counted and never scored. */
   rules?: LpRules
+  /** The run's id when it was created before it started (docs/architecture/63 M2); otherwise one is made. */
+  sessionId?: string
   onProgress?: (event: ProgressEvent) => void
 }
 
@@ -178,6 +180,8 @@ export async function runLpMatchingV2(
     } as ScoredFirmV2)
 
     if (processed % 500 === 0) {
+      // Scoring is a long synchronous loop; letting the event loop turn here is what lets a progress report and the run's heartbeat reach the database while it works.
+      await new Promise<void>((r) => setImmediate(r))
       onProgress({
         phase: "scoring",
         total: allFirms.length,
@@ -246,6 +250,7 @@ export async function runLpMatchingV2(
     })
 
     if (processed % 1000 === 0) {
+      await new Promise<void>((r) => setImmediate(r))
       onProgress({
         phase: "scoring",
         total: allInvestors.length,
@@ -409,7 +414,7 @@ export async function runLpMatchingV2(
   }
 
   // uuid: lp_match_sessions.id is a uuid column other tables reference (doc 18 §1).
-  const sessionId = crypto.randomUUID()
+  const sessionId = options.sessionId ?? crypto.randomUUID()
   const durationMs = Date.now() - startTime
 
   const result: MatchingResultV2 = {

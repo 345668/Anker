@@ -15,6 +15,8 @@ export interface AiPrincipal {
   canWrite: boolean
   readonly: boolean
   allowedTools: string[] | null
+  /** Where the request came from when it is not the app itself (set by the channel's own server code, never by a client). */
+  channel?: "telegram"
 }
 /**
  * The run-scoped budget (doc 33).

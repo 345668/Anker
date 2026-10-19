@@ -116,6 +116,10 @@
     {
       "path": "/api/cron/ai-media",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/lp-match-sweep",
+      "schedule": "* * * * *"
     }
   ]
 }

@@ -56,7 +56,7 @@ const EXAMPLES = [
 const TOOL_GROUPS: Array<{ label: string; icon: any; tools: string[] }> = [
   { label: "Platform", icon: Waypoints, tools: ["crm_overview", "crm_search", "crm_update_stage", "crm_add_task", "deal_pipeline", "network_intro_paths", "outreach_inbox", "fund_performance"] },
   { label: "Research", icon: Globe, tools: ["web_search", "web_crawl", "build_investor_profile"] },
-  { label: "Investor data", icon: Database, tools: ["query_investors", "matchmake_lps", "lp_match_explain", "lp_match_refine", "lp_match_feedback", "lp_match_to_crm", "lp_match_draft", "score_investors", "enrich_firms", "draft_outreach_batch"] },
+  { label: "Investor data", icon: Database, tools: ["query_investors", "matchmake_lps", "lp_match_status", "lp_match_explain", "lp_match_refine", "lp_match_feedback", "lp_match_to_crm", "lp_match_draft", "score_investors", "enrich_firms", "draft_outreach_batch"] },
   { label: "Documents & decks", icon: Presentation, tools: ["generate_spreadsheet", "generate_document", "create_pitch_deck", "improve_pitch_deck"] },
   { label: "Media & language", icon: ImageIcon, tools: ["analyze_image", "ocr_image", "generate_image", "translate_text"] },
   { label: "FO batch pipelines", icon: FileSpreadsheet, tools: ["enrich_db_from_xlsx", "db_gap_analysis", "generate_event_outreach_drafts", "apply_template_to_outreach_drafts", "enrich_xlsx_with_llm"] },

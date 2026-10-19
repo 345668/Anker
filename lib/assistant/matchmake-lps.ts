@@ -7,7 +7,7 @@
  */
 import { randomUUID } from "node:crypto"
 import { sql } from "@/lib/db"
-import { runLpMatch, resolveFundProfile, LpMatchError } from "@/lib/matching/lp/service"
+import { runWithHandoff, loadOutcome, resolveFundProfile, LpMatchError } from "@/lib/matching/lp/service"
 import { fundReadiness } from "@/lib/matching/profile-readiness"
 import { toFundProfile } from "@/lib/matching/fund-profile"
 import { buildPipelineWorkbook, workbookToBuffer } from "@/lib/matching/v2/xlsx-builder"
@@ -15,6 +15,8 @@ import { normalizeMandate } from "./match-investors"
 import { saveArtifact, type ToolResult } from "./artifact"
 import type { AiPrincipal } from "./context"
 
+/** How long the tool waits for a run before it hands it off. The usual run takes 4 to 13 seconds. */
+const WAIT_MS = 25_000
 const SHOWN_DEFAULT = 10
 const SHOWN_MAX = 25
 const money = (n: number | null | undefined) => (n == null ? "n/a" : n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${Math.round(n / 1e6)}M` : `$${Math.round(n / 1e3)}K`)
@@ -67,10 +69,22 @@ export async function matchmakeLps(inp: any, principal: AiPrincipal | undefined)
   // 2. The mandate: only what the user stated.
   const mandate = normalizeMandate(inp?.filters)
 
-  // 3. The shared service: exclusions, the fund's rules, the saved run.
+  // 3. The shared service: exclusions, the fund's rules, the saved run. A run that outlasts the wait carries on in the background and the person is told when it finishes.
   let out
   try {
-    out = await runLpMatch({ ...scope, source: "assistant" }, { fundProfileId: row.id, mandate: mandate.filters, includeKnown: !!inp?.includeKnown, options: { enableAi: false } })
+    const h = await runWithHandoff(
+      { ...scope, source: principal.channel === "telegram" ? "telegram" : "assistant", channel: principal.channel },
+      { fundProfileId: row.id, mandate: mandate.filters, includeKnown: !!inp?.includeKnown, options: { enableAi: false } },
+      { waitMs: WAIT_MS },
+    )
+    if (h.kind === "running") {
+      const where = h.progress ? `${h.progress.pct}% done: ${h.progress.label}` : "started"
+      return {
+        report: `LP matching for ${row.name} is still running (${where}). It carries on without you; when it finishes you get a notification in Anker${principal.channel === "telegram" ? " and a message here" : ""}, and the result appears on the Matchmaking page (run ${h.sessionId.slice(0, 8)}).`,
+        observation: `The run is taking longer than usual and continues in the background (${where}). A verified status line is appended to your answer. Tell the user it will be announced when done; do not wait, poll or start it again.`,
+      }
+    }
+    out = h.outcome ?? (await loadOutcome(scope.orgId, h.sessionId))
   } catch (e) {
     if (e instanceof LpMatchError) {
       const miss = Array.isArray(e.missingFields) && e.missingFields.length ? ` Missing: ${e.missingFields.map((m: any) => m.label ?? m.field).join("; ")}.` : ""
