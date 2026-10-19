@@ -98,7 +98,7 @@ export function classifyFailure(input: { status?: number | null; error?: string 
   if (status === 401 || status === 403 || /invalid api key|incorrect api key|invalid_api_key|unauthori[sz]ed|authentication|forbidden|access denied/.test(e)) {
     // A 403 that is really "this key is not entitled to that model" is a model
     // problem, not a credential one. The provider's wording is the only signal.
-    if (/model/.test(e) && /(not (found|exist|support|entitled|allowed)|no access|unavailable)/.test(e)) return "model_unavailable"
+    if (/model/.test(e) && /(not (found|exist|support|entitled|allowed|eligible|activated)|no access|unavailable|denied)|eligible for using/.test(e)) return "model_unavailable"
     return "credentials_invalid"
   }
   if (status === 404 || /model/.test(e) && /(not found|does not exist|not exist|not supported|unavailable|invalid model|deprecated|decommission)/.test(e)) {

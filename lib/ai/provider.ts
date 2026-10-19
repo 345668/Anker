@@ -17,7 +17,7 @@ import { costOf } from "./model-catalog"
 import Anthropic from "@anthropic-ai/sdk"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
-import { modelForTask, dashscopeModelChain, type TaskTag } from "./model-router"
+import { modelForTask, dashscopeModelChain, TASK_TIER, TIER_CHAINS, TIER_SPILL, tierSpillOn, type TaskTag } from "./model-router"
 import { recordAiCall, type AiResolution } from "./usage"
 import { priceCall } from "./pricing"
 import { generateText, tool, jsonSchema, type ModelMessage } from "ai"
@@ -26,7 +26,7 @@ import { buildFailure, type AiFailure } from "./failure"
 import { resolveQwenEndpoint, qwenRegionHint } from "./qwen-endpoint"
 import {
   qwenLanes, laneModels, lanesConfigured, isQwenExhausted, markQwenExhausted,
-  isFreeAllowanceExhausted, isLaneFailure, type QwenLane,
+  isFreeAllowanceExhausted, isLaneFailure, classifyQwenFault, qwenWalk, type QwenLane,
 } from "./qwen-lanes"
 import {
   readRouterConfig, readRouterConfigSync, isTaskEnabled, invalidateRouterConfig, modelOverrideFor,
@@ -168,6 +168,13 @@ function qwenFirstTarget(cfg: AiRouterConfig | null, opts: { model?: string; tas
   }
   return fallback
 }
+/** Every (lane, model) worth trying for this request, in order, leaving out the ones known to be spent or not available to the key. The tool-calling path walks this list. */
+function qwenTargets(cfg: AiRouterConfig | null, opts: { model?: string; task?: TaskTag }): Array<{ lane: QwenLane; model: string }> {
+  const chain = qwenModelChain(cfg, opts)
+  const out: Array<{ lane: QwenLane; model: string }> = []
+  for (const lane of qwenLanesOf(cfg)) for (const model of laneModels(lane, chain, opts)) if (!isQwenExhausted(lane.id, model)) out.push({ lane, model })
+  return out
+}
 /** Local Ollama is OFF unless explicitly enabled in Data Ops (config.localEnabled)
  *  or via env (AI_PROVIDER=ollama | LOCAL_AI_ENABLED=true). */
 function localEnabledOf(cfg: AiRouterConfig | null): boolean {
@@ -212,7 +219,9 @@ export function qwenModelChain(
   if (perTask) lead.push(perTask)
   else if (cfg?.qwenModel) lead.push(cfg.qwenModel)
   const tail = opts.task ? dashscopeModelChain(opts.task) : [qwenModelOf(cfg)]
-  return [...new Set([...lead, ...tail])]
+  // Behind the task's own models, the neighbouring tiers' models: used only when everything ahead of them is spent or closed to the key.
+  const spill = opts.task && tierSpillOn() ? (TIER_SPILL[TASK_TIER[opts.task] ?? "fast"] ?? []).flatMap((t) => TIER_CHAINS.qwen[t]) : []
+  return [...new Set([...lead, ...tail, ...spill])]
 }
 
 /**
@@ -712,24 +721,27 @@ async function runProvider(
     // backup on a model/availability error. An explicit opts.model is a 1-model chain.
     const chain = qwenModelChain(cfg, opts)
     let last: GenerateResult = { text: "", error: "no qwen model resolved", provider: "qwen", model: null }
+    const walk = qwenWalk()
     // Lanes in order: free allowance first, then the plan (doc 35). A single-lane
     // setup is one lane with the whole chain, exactly as before.
     for (const lane of qwenLanesOf(cfg)) {
       for (const m of laneModels(lane, chain, opts)) {
         if (isQwenExhausted(lane.id, m)) continue
         const res = await runOpenAICompatible("qwen", lane.baseUrl, lane.apiKey, m, prompt, opts, max, temp)
-        if (res.text) return res
+        if (res.text) { walk.answered(); return res }
         last = res
-        // A spent free allowance is per model: remember it and try the next model.
-        if (isFreeAllowanceExhausted(res.status, res.error)) {
-          markQwenExhausted(lane.id, m)
-          console.warn(`[ai/qwen] ${lane.id} lane: allowance exhausted for ${m}; moving on`)
+        // What the failure says decides what happens next (doc 35): a spent allowance or a model this key may not call is about THAT model, so remember it and try the next one;
+        // a key-wide fault gives up the lane; anything transient just moves on to the next model for this request.
+        const fault = classifyQwenFault(res.status, res.error)
+        if (fault === "allowance" || fault === "model_denied") {
+          if (fault === "allowance") markQwenExhausted(lane.id, m, Date.now(), "allowance"); else walk.refused(lane.id, m)
+          console.warn(`[ai/qwen] ${lane.id} lane: ${fault === "allowance" ? "allowance exhausted" : "model not available to this key"} for ${m}; moving on`)
           continue
         }
         // A missing/invalid key fails identically for every model in the lane, so
         // leave the lane (the next lane has its own key, then the outer provider
         // chain). A 401 is also what a key issued in another region looks like.
-        if (res.error && (isLaneFailure(res.error) || /forbidden|\b403\b/i.test(res.error))) {
+        if (fault === "lane") {
           last = { ...res, error: `${res.error} — ${lane.id} lane: ${qwenRegionHint(resolveQwenEndpoint({ region: cfg?.qwenRegion ?? null, workspaceId: qwenWorkspaceOf(cfg) }))}`.slice(0, 400) }
           break
         }
@@ -1187,7 +1199,7 @@ export interface AiSdkModelConfig {
  * the code can actually keep.
  */
 export async function getAiSdkModel(
-  opts: { surface?: SurfaceName; provider?: AiProvider; model?: string } = {},
+  opts: { surface?: SurfaceName; provider?: AiProvider; model?: string; qwenTarget?: { lane: QwenLane; model: string } } = {},
 ): Promise<AiSdkModelConfig> {
   const cfg = await activeConfig()
   // An explicit provider is how generateWithTools walks the failover chain: that
@@ -1243,7 +1255,7 @@ export async function getAiSdkModel(
       return { model: mistralProvider.chatModel(modelName), provider, modelName }
     }
     case "qwen": {
-      const target = qwenFirstTarget(cfg, { model: opts.model, task: (opts as { task?: TaskTag }).task })
+      const target = opts.qwenTarget ?? qwenFirstTarget(cfg, { model: opts.model, task: (opts as { task?: TaskTag }).task })
       const modelName = target?.model ?? qwenModelOf(cfg, opts.model)
       const apiKey = target?.lane.apiKey ?? qwenKeyOf(cfg)
       if (!apiKey) throw new Error("Qwen API key not configured")
@@ -1391,10 +1403,18 @@ export async function generateWithTools(
   let lastErr = "no AI provider active"
   let lastStatus: number | undefined
   for (const [attempt, p] of chain.entries()) {
+   // Qwen is walked model by model (doc 35): a model whose allowance is spent, or that this key may not call, is remembered and the next Qwen model is tried before any other
+   // provider is. Every other provider is one attempt, as before.
+   const qTargets = p === "qwen" ? qwenTargets(cfg, { model: opts.model, task: (opts as { task?: TaskTag }).task }) : []
+   const targets: Array<{ lane: QwenLane; model: string } | null> = qTargets.length ? qTargets : [null]
+   const skippedLanes = new Set<string>()
+   const walk = qwenWalk()
+   for (const target of targets) {
+    if (target && skippedLanes.has(target.lane.id)) continue
     const startedAt = Date.now()
     let model: string | null = null
     try {
-      const sdk = await getAiSdkModel({ surface: opts.surface, provider: p, model: opts.model })
+      const sdk = await getAiSdkModel({ surface: opts.surface, provider: p, model: opts.model, qwenTarget: target ?? undefined })
       model = sdk.modelName
       const res = await generateText({
         model: sdk.model, messages, tools: toolSet,
@@ -1422,6 +1442,7 @@ export async function generateWithTools(
       })
       chargeAiBudget(priceCall({ model, provider: p, ok: true, promptTokens: usage?.promptTokens, outputTokens: usage?.outputTokens, promptChars: JSON.stringify(messages).length, outputChars: text.length }).costUsd)
       if (text || toolCalls.length) {
+        walk.answered()
         return { text, error: null, provider: p, model, usage, toolCalls,
                  finishReason: res.finishReason ?? null }
       }
@@ -1431,6 +1452,13 @@ export async function generateWithTools(
       if (e?.name === "AbortError" || currentAiContext()?.signal?.aborted) throw e
       lastErr = String(e?.message ?? e ?? "error").slice(0, 300)
       lastStatus = e?.statusCode ?? e?.status
+      if (target) {
+        const fault = classifyQwenFault(lastStatus, `${e?.message ?? ""} ${e?.responseBody ?? ""}`)
+        if (fault === "allowance" || fault === "model_denied") {
+          if (fault === "allowance") markQwenExhausted(target.lane.id, target.model, Date.now(), "allowance"); else walk.refused(target.lane.id, target.model)
+          console.warn(`[ai/qwen] ${target.lane.id} lane: ${fault === "allowance" ? "allowance exhausted" : "model not available to this key"} for ${target.model}; moving on`)
+        } else if (fault === "lane") skippedLanes.add(target.lane.id)
+      }
       const who = currentAiContext()?.principal
       void recordAiCall({
         task: opts.task ?? null, provider: p, model, attempt, ok: false, error: lastErr,
@@ -1438,8 +1466,9 @@ export async function generateWithTools(
         workspaceId: who?.orgId ?? null, actorId: who?.userId ?? null, persona: who?.persona ?? null,
         resolution, requestedModel: opts.requestedModel ?? null,
       })
-      // Fall through to the next provider, exactly as generateDetailed does.
+      // Fall through to the next Qwen model, then the next provider, exactly as generateDetailed does.
     }
+   }
   }
   return withFailure({ text: "", error: lastErr, status: lastStatus, provider: chain[chain.length - 1] ?? "none",
            model: null, toolCalls: [] })
@@ -1552,6 +1581,12 @@ export async function* generateStream(
     const t = await generate(prompt, opts); if (t) yield t; return
   }
   if (!res.ok || !res.body) {
+    // A refused stream says which model is dead; remember it so the next request starts on a live one (the blocking fallback below walks the chain).
+    if (provider === "qwen") {
+      const fault = classifyQwenFault(res.status, (await res.text().catch(() => "")).slice(0, 500))
+      const t = qwenFirstTarget(cfg, opts)
+      if (t && (fault === "allowance" || fault === "model_denied")) markQwenExhausted(t.lane.id, t.model, Date.now(), fault === "allowance" ? "allowance" : "provisional")
+    }
     record(false, model, `upstream ${res.status}`, res.status)
     const t = await generate(prompt, opts); if (t) yield t; return
   }

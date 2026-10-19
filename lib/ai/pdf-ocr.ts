@@ -17,7 +17,7 @@
 import { meter } from "@/lib/metering"
 import { standardQwen } from "./qwen-standard"
 import { loadPdfjs } from "./pdfjs"
-import { isFreeAllowanceExhausted, isQwenExhausted, markQwenExhausted } from "./qwen-lanes"
+import { classifyQwenFault, isFreeAllowanceExhausted, isQwenExhausted, markQwenExhausted } from "./qwen-lanes"
 
 export interface OcrPageResult {
   page: number
@@ -187,7 +187,8 @@ async function ocrPdfBufferUnmetered(buf: Buffer, opts: OcrOpts = {}): Promise<O
       if (isQwenExhausted("free", `ocr:${model}`)) continue
       r = await ocrPagePng(pngs[i], apiKey, baseUrl, model, opts.deadlineAt)
       if (r.ok) break
-      if (!r.ok && isFreeAllowanceExhausted(undefined, r.error)) { markQwenExhausted("free", `ocr:${model}`); continue }
+      // A spent allowance, or a model this key may not call, moves on to the next OCR model.
+      if (!r.ok) { const f = classifyQwenFault(undefined, r.error); if (f === "allowance" || f === "model_denied") { markQwenExhausted("free", `ocr:${model}`, Date.now(), f === "allowance" ? "allowance" : "provisional"); continue } }
       break
     }
     const ms = Date.now() - start

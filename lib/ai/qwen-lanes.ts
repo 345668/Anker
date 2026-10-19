@@ -29,7 +29,7 @@
  */
 import { MODEL_CATALOG } from "./model-catalog"
 import type { TaskTag, ModelTier } from "./model-router"
-import { TASK_TIER } from "./model-router"
+import { TASK_TIER, TIER_SPILL, tierSpillOn } from "./model-router"
 import { resolveQwenEndpoint } from "./qwen-endpoint"
 
 export type QwenLaneId = "default" | "free" | "plan"
@@ -124,7 +124,9 @@ export function laneModels(
   const tierList = csv(env[`QWEN_PLAN_MODEL_${tier.toUpperCase()}`]) ?? PLAN_TIER_DEFAULTS[tier]
   // A saved per-task model that the plan serves still leads, as it does elsewhere.
   const lead = chain.find((m) => allowed.has(m) && !tierList.includes(m) && chain.indexOf(m) === 0)
-  return [...new Set([...(lead ? [lead] : []), ...tierList])]
+  // After the plan's own models for the tier, the neighbouring tiers' plan models (see TIER_SPILL).
+  const spill = tierSpillOn(env) ? (TIER_SPILL[tier] ?? []).flatMap((t) => csv(env[`QWEN_PLAN_MODEL_${t.toUpperCase()}`]) ?? PLAN_TIER_DEFAULTS[t]) : []
+  return [...new Set([...(lead ? [lead] : []), ...tierList, ...spill])]
 }
 
 // ─── exhausted-model memory ───────────────────────────────────────────────
@@ -132,16 +134,33 @@ export function laneModels(
 // cost of not sharing is one cheap 403 per model per cold instance. The TTL is
 // short because an allowance can be topped up or renewed without any signal here.
 const EXHAUSTED_TTL_MS = Number(process.env.QWEN_EXHAUSTED_TTL_MS ?? 30 * 60_000)
-const exhausted = new Map<string, number>()
+/** A model this key is not allowed to call stays that way for much longer than a spent allowance, which renews. */
+const DENIED_TTL_MS = Number(process.env.QWEN_DENIED_TTL_MS ?? 2 * 60 * 60_000)
+/** Until it is known that the key works for some other model, a refusal is held for this long only: if every model is refused it is the key (or the endpoint) that is wrong, and that is fixed in minutes, not hours. */
+const PROVISIONAL_TTL_MS = Number(process.env.QWEN_PROVISIONAL_TTL_MS ?? 60_000)
+type Reason = "allowance" | "model_denied" | "provisional"
+const exhausted = new Map<string, { until: number; reason: Reason }>()
 const keyOf = (lane: QwenLaneId, model: string) => `${lane}:${model}`
 
-export function markQwenExhausted(lane: QwenLaneId, model: string, now = Date.now()): void {
-  exhausted.set(keyOf(lane, model), now + EXHAUSTED_TTL_MS)
+export function markQwenExhausted(lane: QwenLaneId, model: string, now = Date.now(), reason: Reason = "allowance"): void {
+  exhausted.set(keyOf(lane, model), { until: now + (reason === "model_denied" ? DENIED_TTL_MS : reason === "provisional" ? PROVISIONAL_TTL_MS : EXHAUSTED_TTL_MS), reason })
+}
+
+/**
+ * One request's walk down the models. A refused model is held briefly at once (so the walk and the next request skip it), and held for hours only when some later model in the
+ * same request answered, which proves the key works and the refusal was about that model.
+ */
+export function qwenWalk() {
+  const refused: Array<[QwenLaneId, string]> = []
+  return {
+    refused(lane: QwenLaneId, model: string, now = Date.now()) { markQwenExhausted(lane, model, now, "provisional"); refused.push([lane, model]) },
+    answered(now = Date.now()) { for (const [l, m] of refused) markQwenExhausted(l, m, now, "model_denied"); refused.length = 0 },
+  }
 }
 export function isQwenExhausted(lane: QwenLaneId, model: string, now = Date.now()): boolean {
-  const until = exhausted.get(keyOf(lane, model))
-  if (until === undefined) return false
-  if (until <= now) { exhausted.delete(keyOf(lane, model)); return false }
+  const e = exhausted.get(keyOf(lane, model))
+  if (e === undefined) return false
+  if (e.until <= now) { exhausted.delete(keyOf(lane, model)); return false }
   return true
 }
 export function clearQwenExhausted(): void { exhausted.clear() }
@@ -154,8 +173,8 @@ export function qwenLaneStatus(cfg: LaneConfig | null, env: Env = process.env, n
       id: l.id,
       baseUrl: l.baseUrl,
       exhausted: [...exhausted.entries()]
-        .filter(([k, until]) => k.startsWith(`${l.id}:`) && until > now)
-        .map(([k, until]) => ({ model: k.slice(l.id.length + 1), retryAt: new Date(until).toISOString() })),
+        .filter(([k, e]) => k.startsWith(`${l.id}:`) && e.until > now)
+        .map(([k, e]) => ({ model: k.slice(l.id.length + 1), reason: e.reason, retryAt: new Date(e.until).toISOString() })),
     })),
   }
 }
@@ -180,4 +199,26 @@ export function isFreeAllowanceExhausted(status: number | undefined, error: stri
  *  arrears), so the rest of this lane's models would fail identically. */
 export function isLaneFailure(error: string | null | undefined): boolean {
   return /api key|unauthoriz|\b401\b|invalid.?api|arrearage|good standing/i.test(error ?? "")
+}
+
+/** What a failed Qwen call says about what to try next. */
+export type QwenFault =
+  | "allowance"     // this model's free allowance is spent: remember it, try the next model
+  | "model_denied"  // this key may not call this model (not enabled, not eligible): remember it, try the next model
+  | "lane"          // the whole key is unusable: leave the lane
+  | "transient"     // a rate limit, an outage, a timeout: the model is fine; try the next one for this request only
+
+/** The wording DashScope uses when a key may not call one model (a model that is not activated, or whose free use is not open to the account). */
+const MODEL_DENIED = /access to model denied|eligible for using|not eligible|no access to (the )?model|(model|model_?id)[^.]{0,60}(not (found|exist|support|entitled|allowed|activated|available|authori[sz]ed|open)|unavailable|denied)|invalid.?model|model.?not.?found|has not been (activated|opened|authori[sz]ed)|please (activate|enable|open) the model/i
+
+/**
+ * Decide what a failed Qwen call means. The order matters: a spent allowance is checked before a "forbidden", because DashScope sends both as 403; a refusal that names the
+ * model is about the model, not the key; only a 401, a bad-key message or a 403 that says nothing about a model gives up the lane.
+ */
+export function classifyQwenFault(status: number | undefined, error: string | null | undefined): QwenFault {
+  const e = error ?? ""
+  if (isFreeAllowanceExhausted(status, e)) return "allowance"
+  if (MODEL_DENIED.test(e) || (status === 404 && /model/i.test(e))) return "model_denied"
+  if (isLaneFailure(e) || status === 401 || status === 403 || /forbidden/i.test(e)) return "lane"
+  return "transient"
 }

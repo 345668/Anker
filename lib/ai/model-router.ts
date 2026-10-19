@@ -185,6 +185,16 @@ export const TIER_CHAINS: Record<string, Record<ModelTier, string[]>> = {
   mistral:  { fast: ["mistral-small-latest"], balanced: ["mistral-small-latest"], deep: ["mistral-small-latest"], reason: ["mistral-small-latest"] },
 }
 
+/**
+ * When a tier's own models are all spent or closed to the key, the next-nearest tier's models are tried before the request gives up on Qwen (doc 35). A cheap task
+ * then costs more than usual rather than failing; every call is still recorded and priced, and the run's cost ceiling and the workspace's monthly allowance apply.
+ * Order: the neighbour in capability first. Turn off with QWEN_TIER_SPILL=off.
+ */
+export const TIER_SPILL: Record<ModelTier, ModelTier[]> = {
+  fast: ["balanced", "deep"], balanced: ["deep", "fast"], deep: ["balanced", "fast"], reason: ["deep", "balanced"],
+}
+export const tierSpillOn = (env: Record<string, string | undefined> = process.env) => (env.QWEN_TIER_SPILL ?? "on").toLowerCase() !== "off"
+
 /** Retained as the DashScope view of TIER_CHAINS, so the existing readers below
  *  keep their exact behaviour. */
 const DASHSCOPE_TIER_CHAINS: Record<ModelTier, string[]> = TIER_CHAINS.qwen

@@ -96,6 +96,51 @@ it("offers exactly the allowlisted tools, and executes none of them", async () =
   }
 })
 
+it("with tool calling, a Qwen model that is spent or closed to the key is skipped and the next Qwen model is used, before any other provider", async () => {
+  const { clearQwenExhausted } = await import("@/lib/ai/qwen-lanes")
+  const { qwenModelChain } = await import("@/lib/ai/provider")
+  clearQwenExhausted()
+  const chain = qwenModelChain(state.config, { task: "ai_rationale" })
+  const used = () => state.generateText.mock.calls.map((c) => (c[0].model as any).modelId)
+  state.generateText.mockRejectedValueOnce(Object.assign(new Error("Access to model denied. Please make sure you are eligible for using the model."), { statusCode: 403 }))
+  state.generateText.mockResolvedValueOnce({ text: "from the next model", toolCalls: [], usage: { inputTokens: 5, outputTokens: 3 }, finishReason: "stop" })
+  const { generateWithTools } = await import("@/lib/ai/provider")
+  const r = await generateWithTools([{ role: "user", content: "hi" }], [], { provider: "qwen", task: "ai_rationale" })
+  expect(r.text).toBe("from the next model")
+  expect(r.provider).toBe("qwen")
+  expect(used()[0]).toBe(chain[0])
+  expect(used()[1]).toBe(chain[1])
+  // The dead model is remembered: the next request starts on the live one.
+  state.generateText.mockClear()
+  state.generateText.mockResolvedValueOnce({ text: "again", toolCalls: [], usage: { inputTokens: 5, outputTokens: 3 }, finishReason: "stop" })
+  const r2 = await generateWithTools([{ role: "user", content: "again" }], [], { provider: "qwen", task: "ai_rationale" })
+  expect(r2.text).toBe("again")
+  expect(used()).toEqual([chain[1]])
+  // A spent allowance behaves the same way; a rate limit moves on for this request only.
+  clearQwenExhausted(); state.generateText.mockClear()
+  state.generateText.mockRejectedValueOnce(Object.assign(new Error("AllocationQuota.FreeTierOnly: The free tier of the model has been exhausted"), { statusCode: 403 }))
+  state.generateText.mockRejectedValueOnce(Object.assign(new Error("Requests rate limit exceeded"), { statusCode: 429 }))
+  state.generateText.mockResolvedValueOnce({ text: "third", toolCalls: [], usage: { inputTokens: 5, outputTokens: 3 }, finishReason: "stop" })
+  const r3 = await generateWithTools([{ role: "user", content: "x" }], [], { provider: "qwen", task: "ai_rationale" })
+  expect(r3.text).toBe("third")
+  expect(used()).toEqual([chain[0], chain[1], chain[2]])
+  const { isQwenExhausted } = await import("@/lib/ai/qwen-lanes")
+  expect(isQwenExhausted("default", chain[0])).toBe(true)
+  expect(isQwenExhausted("default", chain[1])).toBe(false)   // a rate limit does not close a model
+  clearQwenExhausted()
+})
+
+it("a key-wide fault (a bad key) gives up Qwen at once instead of asking every model", async () => {
+  const { clearQwenExhausted } = await import("@/lib/ai/qwen-lanes")
+  clearQwenExhausted()
+  state.generateText.mockRejectedValue(Object.assign(new Error("Incorrect API key provided"), { statusCode: 401 }))
+  const { generateWithTools } = await import("@/lib/ai/provider")
+  const r = await generateWithTools([{ role: "user", content: "hi" }], [], { provider: "qwen", task: "ai_rationale" })
+  expect(r.text).toBe("")
+  expect(state.generateText).toHaveBeenCalledTimes(1)
+  state.generateText.mockReset()
+})
+
 it("returns tool calls for the agent to run, rather than running them", async () => {
   state.generateText.mockResolvedValueOnce({
     text: "", finishReason: "tool-calls",

@@ -72,6 +72,7 @@ describe("classifyFailure", () => {
   it.each([
     [{ status: 429, error: "HTTP 429: Rate limit exceeded" }, "rate_limited"],
     [{ status: 429, error: "HTTP 429: Allocated quota exceeded" }, "quota_exhausted"],
+    [{ status: 403, error: "HTTP 403: Access to model denied. Please make sure you are eligible for using the model." }, "model_unavailable"],
     [{ status: 401, error: "HTTP 401: Incorrect API key provided" }, "credentials_invalid"],
     [{ status: 403, error: "HTTP 403: model qwen-max is not entitled for this account" }, "model_unavailable"],
     [{ status: 404, error: "HTTP 404: the model does not exist" }, "model_unavailable"],
@@ -160,11 +161,18 @@ describe("provider order", () => {
 // ─── #3 saved models are the models sent ───────────────────────────────────
 describe("qwenModelChain", () => {
   it("falls to the tier chain with no saved setting", () => {
-    expect(qwenModelChain(cfg(), { task: "deep_research" })).toEqual(["glm-5.2", "glm-5.2-fast-preview", "qwq-plus", "qwen3-max"])
+    const chain = qwenModelChain(cfg(), { task: "deep_research" })
+    expect(chain.slice(0, 4)).toEqual(["glm-5.2", "glm-5.2-fast-preview", "qwq-plus", "qwen3-max"])   // the tier's own models first
+    // Behind them, the neighbouring tiers: used only when every model ahead is spent or closed to the key.
+    expect(chain.slice(4)).toEqual(["qwen-plus", "qwen3.7-plus", "qwen3.6-plus", "qwen3.5-plus", "qwen-flash", "qwen3.7-flash", "qwen3.6-flash", "qwen3.5-flash"])
+  })
+  it("can be told not to fall back across tiers", () => {
+    process.env.QWEN_TIER_SPILL = "off"
+    try { expect(qwenModelChain(cfg(), { task: "deep_research" })).toEqual(["glm-5.2", "glm-5.2-fast-preview", "qwq-plus", "qwen3-max"]) } finally { delete process.env.QWEN_TIER_SPILL }
   })
   it("leads with the saved per-task model and keeps the tier chain behind it", () => {
     const c = cfg({ modelOverride: { deep_research: "qwen3-max" } })
-    expect(qwenModelChain(c, { task: "deep_research" })).toEqual(["qwen3-max", "glm-5.2", "glm-5.2-fast-preview", "qwq-plus"])
+    expect(qwenModelChain(c, { task: "deep_research" }).slice(0, 4)).toEqual(["qwen3-max", "glm-5.2", "glm-5.2-fast-preview", "qwq-plus"])
   })
   it("lets the per-task model beat the provider-wide Qwen model", () => {
     const c = cfg({ qwenModel: "qwen-plus", modelOverride: { deep_research: "qwen3-max" } })
@@ -382,6 +390,54 @@ describe("Qwen lanes: free allowance first, then the plan", () => {
     await generateDetailed("again", { retries: 0 })
     expect(calls.filter((c) => !c.url.includes("coding-intl")).length).toBeLessThan(before + 1)
     delete process.env.QWEN_FREE_API_KEY; delete process.env.QWEN_PLAN_API_KEY; delete process.env.QWEN_PLAN_MODEL_BALANCED
+    clearQwenExhausted()
+  })
+})
+
+describe("Qwen: a model that cannot be used is skipped and the next Qwen model answers", () => {
+  it("when every model of the task's own tier is closed, the next tier's model answers", async () => {
+    const { clearQwenExhausted } = await import("./qwen-lanes")
+    clearQwenExhausted()
+    process.env.QWEN_FREE_API_KEY = "free-key"
+    const fast = new Set(["qwen-flash", "qwen3.7-flash", "qwen3.6-flash", "qwen3.5-flash"])
+    const calls: string[] = []
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: any) => {
+      const model = JSON.parse(init.body).model
+      calls.push(model)
+      if (fast.has(model)) return new Response(JSON.stringify({ error: { message: "AllocationQuota.FreeTierOnly: The free tier of the model has been exhausted" } }), { status: 403 })
+      return new Response(JSON.stringify({ choices: [{ message: { content: `answered by ${model}` }, finish_reason: "stop" }] }), { status: 200 })
+    }))
+    resetProvider()
+    const r = await generateDetailed("hi", { retries: 0, task: "ai_rationale" })
+    expect(r.text).toBe("answered by qwen-plus")
+    expect(calls).toEqual(["qwen-flash", "qwen3.7-flash", "qwen3.6-flash", "qwen3.5-flash", "qwen-plus"])
+    delete process.env.QWEN_FREE_API_KEY
+    clearQwenExhausted()
+  })
+  it("moves to the next model on 'access denied', remembers the dead one, and does not ask it again", async () => {
+    const { clearQwenExhausted } = await import("./qwen-lanes")
+    clearQwenExhausted()
+    process.env.QWEN_FREE_API_KEY = "free-key"
+    const chain = qwenModelChain(null, { task: "ai_rationale" })
+    const calls: string[] = []
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: any) => {
+      const model = JSON.parse(init.body).model
+      calls.push(model)
+      if (model === chain[0]) return new Response(JSON.stringify({ error: { message: "Access to model denied. Please make sure you are eligible for using the model." } }), { status: 403 })
+      return new Response(JSON.stringify({ choices: [{ message: { content: `answered by ${model}` }, finish_reason: "stop" }] }), { status: 200 })
+    }))
+    resetProvider()
+    const first = await generateDetailed("hi", { retries: 0, task: "ai_rationale" })
+    expect(first.text).toBe(`answered by ${calls[1]}`)
+    expect(calls[0]).toBe(chain[0])
+    expect(calls[1]).not.toBe(chain[0])
+    expect(first.provider).toBe("qwen")
+    calls.length = 0
+    const second = await generateDetailed("again", { retries: 0, task: "ai_rationale" })
+    expect(second.text).toMatch(/^answered by /)
+    expect(calls).not.toContain(chain[0])      // the closed model is not asked again
+    expect(calls).toHaveLength(1)
+    delete process.env.QWEN_FREE_API_KEY
     clearQwenExhausted()
   })
 })
