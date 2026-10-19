@@ -19,6 +19,7 @@ import { dedupContacts, dedupFirms, normalizeFirmName } from "./dedup"
 import { computeContactScore, computeFirmScore, MIN_QUALIFICATION_SCORE } from "./scoring"
 import { raiseBand, scoreCapacity, type Capacity } from "./lp-capacity"
 import { checkPerson } from "./lp-person"
+import { countExclusion, emptyExclusionCounts, type LpRules } from "@/lib/matching/lp/rules"
 import { classifyContactSegments, classifyFirmSegments } from "./segmentation"
 import {
   enrichContactsWithRationales,
@@ -51,6 +52,8 @@ interface RunOptions {
    * Applied in SQL, so a filtered-out LP is never loaded or scored.
    */
   filters?: MatchFilters
+  /** The workspace's hard rules (docs/architecture/63 4.2): rows they refuse are counted and never scored. */
+  rules?: LpRules
   onProgress?: (event: ProgressEvent) => void
 }
 
@@ -74,11 +77,11 @@ export async function runLpMatchingV2(
   // User-specified constraints, in SQL (doc 26 §3). Also the first thing that has
   // ever bounded this read: unfiltered it is every row in both tables.
   const f = filterParams(filters)
-  const allFirms = await sql`
+  const rawFirms = await sql`
     SELECT id, name, COALESCE(firm_classification, type) AS type,
            description, aum, sectors,
            COALESCE(hq_location, location) AS location,
-           website, linkedin_url
+           website, linkedin_url, source, norm_country
     FROM investment_firms
     WHERE (${f.classes}::text[] IS NULL OR norm_class = ANY(${f.classes}))
       AND (${f.excludeClasses}::text[] IS NULL OR norm_class IS NULL OR norm_class <> ALL(${f.excludeClasses}))
@@ -86,17 +89,35 @@ export async function runLpMatchingV2(
       AND (${f.countries}::text[] IS NULL OR norm_country = ANY(${f.countries}))
   `
   onProgress({ phase: "loading", message: "Loading investors from database…" })
-  const allInvestors = await sql`
+  const rawInvestors = await sql`
     SELECT id, first_name, last_name, investor_type AS type,
            bio, sectors, location, email,
            COALESCE(linkedin_url, person_linkedin_url) AS linkedin,
-           title, firm_id
+           title, firm_id, source, restricted_at, norm_country
     FROM investors
     WHERE (${f.classes}::text[] IS NULL OR norm_class = ANY(${f.classes}))
       AND (${f.excludeClasses}::text[] IS NULL OR norm_class IS NULL OR norm_class <> ALL(${f.excludeClasses}))
       AND (${f.regions}::text[] IS NULL OR norm_region = ANY(${f.regions}))
       AND (${f.countries}::text[] IS NULL OR norm_country = ANY(${f.countries}))
   `
+
+  // The workspace's hard rules come first: a refused row is counted by reason and never scored (doc 63 4.2).
+  const exclusions = emptyExclusionCounts()
+  const rules = options.rules
+  const allFirms = rules ? rawFirms.filter((r: any) => {
+    const why = rules.firm({ id: String(r.id), name: r.name ?? null, source: r.source ?? null, norm_country: r.norm_country ?? null })
+    if (why) countExclusion(exclusions, why)
+    return !why
+  }) : rawFirms
+  const allInvestors = rules ? rawInvestors.filter((r: any) => {
+    const why = rules.person({
+      id: String(r.id), email: r.email ?? null, source: r.source ?? null, restricted_at: r.restricted_at ?? null,
+      norm_country: r.norm_country ?? null, firm_id: r.firm_id ? String(r.firm_id) : null,
+      name: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim(),
+    })
+    if (why) countExclusion(exclusions, why)
+    return !why
+  }) : rawInvestors
 
   // A person at a known LP firm inherits that firm's capacity (doc 19 §4).
   const capacityByFirm = new Map<string, Capacity>()
@@ -299,29 +320,30 @@ export async function runLpMatchingV2(
 
   const funnel: MatchingFunnel = {
     firms: [
-      { label: "Raw database", count: allFirms.length, pct: 100 },
+      { label: "Raw database", count: rawFirms.length, pct: 100 },
+      ...(rules ? [{ label: "Left out by your rules", count: rawFirms.length - allFirms.length, pct: pct(rawFirms.length - allFirms.length, rawFirms.length), notes: "already in the CRM, passed, excluded, already your investors, jurisdictions, sources not cleared" }] : []),
       {
         label: "Pre-dedup qualified",
         count: beforeFirmsCount,
-        pct: pct(beforeFirmsCount, allFirms.length),
+        pct: pct(beforeFirmsCount, rawFirms.length),
       },
       {
         label: `Qualified (score ≥ ${minScore})`,
         count: firmsAccepted.length,
-        pct: pct(firmsAccepted.length, allFirms.length),
+        pct: pct(firmsAccepted.length, rawFirms.length),
         notes: duplicatesMerged > 0 ? `${dedupedFirms.mergedCount} duplicates merged` : undefined,
       },
       {
         label: "Could anchor this fund",
         count: anchorCandidates,
-        pct: pct(anchorCandidates, allFirms.length),
+        pct: pct(anchorCandidates, rawFirms.length),
       },
       {
         label: "University/research focus",
         count: firmsAccepted.filter((f) => f.tags.includes("UNI")).length,
         pct: pct(
           firmsAccepted.filter((f) => f.tags.includes("UNI")).length,
-          allFirms.length,
+          rawFirms.length,
         ),
       },
       {
@@ -329,7 +351,7 @@ export async function runLpMatchingV2(
         count: firmsAccepted.filter((f) => f.tags.includes("EM")).length,
         pct: pct(
           firmsAccepted.filter((f) => f.tags.includes("EM")).length,
-          allFirms.length,
+          rawFirms.length,
         ),
       },
       {
@@ -337,28 +359,29 @@ export async function runLpMatchingV2(
         count: firmsAccepted.filter((f) => f.segments.includes("local")).length,
         pct: pct(
           firmsAccepted.filter((f) => f.segments.includes("local")).length,
-          allFirms.length,
+          rawFirms.length,
         ),
       },
     ],
     contacts: [
-      { label: "Raw database", count: allInvestors.length, pct: 100 },
+      { label: "Raw database", count: rawInvestors.length, pct: 100 },
+      ...(rules ? [{ label: "Left out by your rules", count: rawInvestors.length - allInvestors.length, pct: pct(rawInvestors.length - allInvestors.length, rawInvestors.length), notes: "also suppressed addresses and people who asked us to restrict their data" }] : []),
       {
         // Organisations held in the people table — counted, never silently
         // dropped, and already present in the firm list (doc 19 §5).
         label: "Organisations removed from people",
         count: notAPerson,
-        pct: pct(notAPerson, allInvestors.length),
+        pct: pct(notAPerson, rawInvestors.length),
       },
       {
         label: "Pre-dedup qualified",
         count: beforeContactsCount,
-        pct: pct(beforeContactsCount, allInvestors.length),
+        pct: pct(beforeContactsCount, rawInvestors.length),
       },
       {
         label: `Qualified (score ≥ ${minScore})`,
         count: contactsAccepted.length,
-        pct: pct(contactsAccepted.length, allInvestors.length),
+        pct: pct(contactsAccepted.length, rawInvestors.length),
         notes:
           dedupedContacts.mergedCount > 0
             ? `${dedupedContacts.mergedCount} duplicates merged`
@@ -367,14 +390,14 @@ export async function runLpMatchingV2(
       {
         label: "With verified email",
         count: contactsWithEmail,
-        pct: pct(contactsWithEmail, allInvestors.length),
+        pct: pct(contactsWithEmail, rawInvestors.length),
       },
       {
         label: "HNW angels (2+ signals)",
         count: contactsAccepted.filter((c) => c.isHnwAngel).length,
         pct: pct(
           contactsAccepted.filter((c) => c.isHnwAngel).length,
-          allInvestors.length,
+          rawInvestors.length,
         ),
       },
     ],
@@ -392,8 +415,8 @@ export async function runLpMatchingV2(
     durationMs,
     funnel,
     totals: {
-      rawFirms: allFirms.length,
-      rawContacts: allInvestors.length,
+      rawFirms: rawFirms.length,
+      rawContacts: rawInvestors.length,
       qualifiedFirms: firmsAccepted.length,
       qualifiedContacts: contactsAccepted.length,
       contactsWithEmail,
@@ -405,6 +428,7 @@ export async function runLpMatchingV2(
     segmentCounts,
     firms: firmsAccepted,
     contacts: contactsAccepted,
+    ...(rules ? { exclusions } : {}),
   }
   onProgress({ phase: "done", result })
   return result

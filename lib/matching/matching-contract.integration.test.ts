@@ -11,7 +11,9 @@ const state = vi.hoisted(() => ({ user: "alice" as string | null, org: "fund-a",
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser: async () => ({ data: { user: state.user ? { id: state.user } : null } }) } }) }))
 vi.mock("@/lib/org/active", () => ({ resolveActiveMembership: async () => ({ active: { orgId: state.org, persona: "vc" } }) }))
 vi.mock("@/lib/db", () => ({ sql: Object.assign((strings: TemplateStringsArray, ...values: unknown[]) => state.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values), { unsafe: (q: string, values: unknown[]) => state.query(q, values) }) }))
-vi.mock("@/lib/matching/v2", () => ({ runLpMatchingV2: state.run, saveSessionV2: state.persist }))
+vi.mock("server-only", () => ({}))
+vi.mock("@/lib/matching/v2/engine", () => ({ runLpMatchingV2: state.run }))
+vi.mock("@/lib/matching/v2/persistence", () => ({ saveSessionV2: state.persist }))
 let db: PGlite
 const migration = readFileSync("scripts/migrations/2026-09-11-matching-profile-contract.sql", "utf8")
 // The founder runs/results tables from matching v3 (docs/architecture/14 §6).
@@ -27,6 +29,7 @@ beforeAll(async () => {
   await db.exec("INSERT INTO organizations VALUES ('fund-a','fund'),('fund-b','fund'); INSERT INTO memberships VALUES ('alice','fund-a','vc'),('bob','fund-b','vc');")
   await db.exec(migration)
   await db.exec(migration) // Migration must be safely repeatable.
+  await db.exec(readFileSync("scripts/migrations/2026-10-19-lp-match-workspace.sql", "utf8"))
   await db.exec(founderRuns)
   await db.exec(founderRuns)
 })
@@ -55,7 +58,7 @@ it("roundtrips all matching inputs and passes the saved canonical profile to the
   state.run.mockResolvedValue({ sessionId: "result", totals: {}, tierCounts: {}, segmentCounts: {}, funnel: {} })
   expect((await match(request({ fundProfileId: profile.id, enableAi: false }))).status).toBe(200)
   expect(state.run.mock.calls[0][0]).toMatchObject({ headquartersLocation: "Berlin", geographicFocus: ["Germany"], thesisKeywords: ["energy"], sectors: ["climate"], averageTicket: 1000000, fundNumber: 2 })
-  expect(state.persist).toHaveBeenCalledWith(expect.anything(), "alice")
+  expect(state.persist).toHaveBeenCalledWith(expect.anything(), "alice", { orgId: "fund-a", source: "page", filters: expect.anything() })
   state.org = "fund-b"
   expect((await match(request({ fundProfileId: profile.id }))).status).toBe(404)
   expect((await save(request({ ...profile, name: "Wrong workspace" }))).status).toBe(404)

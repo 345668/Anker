@@ -13,6 +13,7 @@ export function toFundProfile(row: any): FundProfileV2 {
     geographicFocus: list("geographic_focus", "target_geographies"), headquartersLocation: row.headquarters_location ?? null,
     thesisKeywords: stringList(row.thesis_keywords), scoringMode: "svs_absolute",
     fundIPriorLpFirmIds: stringList(row.fund_i_prior_lp_firm_ids), fundIPriorContactEmails: stringList(row.fund_i_prior_contact_emails),
+    allowedLpClasses: stringList(row.allowed_lp_classes), excludedJurisdictions: stringList(row.excluded_jurisdictions),
   }
 }
 
@@ -38,6 +39,8 @@ export function serializeFundProfile(r: any) {
     geographicFocus: parseJsonField(r.geographic_focus),
     headquartersLocation: r.headquarters_location ?? null,
     targetLpTypes: parseJsonField(r.target_lp_types),
+    allowedLpClasses: parseJsonField(r.allowed_lp_classes),
+    excludedJurisdictions: parseJsonField(r.excluded_jurisdictions),
     thesisKeywords: parseJsonField(r.thesis_keywords),
     thesisDescription: r.thesis_description ?? null,
     valueProposition: r.value_proposition ?? null,

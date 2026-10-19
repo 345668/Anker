@@ -86,6 +86,8 @@ interface RunSummary {
   tierCounts: { firms: Record<string, number>; contacts: Record<string, number> }
   segmentCounts: { firms: Record<string, number>; contacts: Record<string, number> }
   funnel: { firms: any[]; contacts: any[] }
+  /** What the workspace's rules left out before scoring, in words (docs/architecture/63). */
+  exclusionSummary?: string
 }
 
 const TIERS = [
@@ -132,6 +134,7 @@ export function MatchmakingContent({
   const toggle = <T,>(list: T[], v: T): T[] => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v])
   const [maxContacts, setMaxContacts] = useState<number | "">("")
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [includeKnown, setIncludeKnown] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [latest, setLatest] = useState<RunSummary | null>(null)
   // Seed for the inline editor.  Populated by the FundDeckUploader's
@@ -147,7 +150,7 @@ export function MatchmakingContent({
 
   const missing = fundReadiness({ ...selectedFund, headquartersLocation: selectedFund?.headquarters })
   const editorInitial = useMemo(() => selectedFund ? toEditorValue(selectedFund) : undefined, [selectedFund])
-  useEffect(() => { setLatest(null) }, [selectedFundId, minScore, enableAi, editorDirty, regions, classes])
+  useEffect(() => { setLatest(null) }, [selectedFundId, minScore, enableAi, editorDirty, regions, classes, includeKnown])
 
   const runMatching = () => {
     if (missing.length || editorDirty || extractingDeck || isPending) { setError("Complete and save the required profile fields before matching."); return }
@@ -167,6 +170,7 @@ export function MatchmakingContent({
             minScore,
             enableAi,
             filters: { regions, classes },
+            includeKnown,
             maxFirms: maxFirms === "" ? undefined : maxFirms,
             maxContacts: maxContacts === "" ? undefined : maxContacts,
           }),
@@ -420,6 +424,15 @@ export function MatchmakingContent({
               </button>
               {showAdvanced && (
                 <div className="mt-3 space-y-3">
+                  <label className="flex items-start gap-2 text-sm">
+                    <input type="checkbox" checked={includeKnown} onChange={(e) => setIncludeKnown(e.target.checked)} className="mt-1" />
+                    <span>
+                      Also show LPs already in my CRM
+                      <span className="block text-[10px] font-mono text-muted-foreground">
+                        By default, LPs you have already contacted, who passed, whom you excluded, or who already invest in your fund are left out.
+                      </span>
+                    </span>
+                  </label>
                   <div>
                     <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                       Max firms (cap pipeline)
@@ -691,6 +704,12 @@ export function MatchmakingContent({
                   </table>
                 </div>
               </div>
+
+              {latest.exclusionSummary ? (
+                <p className="text-sm text-muted-foreground">
+                  Left out before scoring: {latest.exclusionSummary}.
+                </p>
+              ) : null}
 
               {/* Funnel */}
               <div className="grid md:grid-cols-2 gap-6">

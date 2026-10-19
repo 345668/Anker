@@ -53,7 +53,12 @@ Spec only. Nothing built.
 
 ## 5a. LP matchmaking (doc 63)
 
-Spec written 2026-10-19, nothing built. Measured: the page uses the v2 engine, the assistant tool `matchmake_lps` still uses v1 and saves nothing; the v2 LP engine applies no CRM, suppression or directory-use-gate exclusions; sessions are owned by user not workspace; 3 runs exist, 0 matches ever moved stage, and no LP outcome events exist, so match quality has never been measured. Start with M0 (parity) and M1 (exclusions and workspace sessions).
+| | |
+|---|---|
+| Built | M0 and M1 (2026-10-19): one service behind the page and Anker AI; the old assistant engine retired; workspace exclusions, the fund's rules, directory-source checks, counts on the page and in chat; workspace-owned runs; raise-path count fault fixed |
+| Verified live | Throwaway workspace on production: 3.9 s filtered and 12.5 s whole-directory runs; each exclusion reason removes the right rows and counts them; the rest keeps its order; "show anyway"; the assistant tool through the real AI context matches the service; cleanup verified |
+| Untested | The page in a browser; a model choosing the tool in chat and Telegram; two humans in one workspace in production; any editor for the fund's own rules (API only); the use gate with its flag on |
+| Open | M2 jobs and progress, M3 explanations and confidence, M4 feedback and actions, M5 page rework, M6 shadow factors and evaluation (needs the founder's labelled set), M7 investor side; counsel items in doc 63 section 11 |
 
 ## 6. How a live test is done (so it can be repeated)
 A throwaway fund and investor with an obvious name are created in production, addressed to the founder's own mailbox; the portal is driven over HTTP; fund-side steps run through the library from a script (TypeScript run with `tsx`, `DATABASE_URL` pointed at the Neon database because `.env.local` points it at a dead local address, a temporary stub for `server-only`); everything is deleted in a `finally` block and the row counts are checked. Things that create a real account or password, or read the founder's inbox, are left to the founder.

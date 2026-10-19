@@ -194,7 +194,8 @@ export const RULES: Rule[] = [
   { scope: M, table: "activity_logs", where: "user_id::text = ANY($3::text[])" },
   { scope: M, table: "match_outcome_events", where: "user_id::text = ANY($3::text[])" },
   { scope: M, table: "match_sessions", where: "user_id::text = ANY($3::text[])" },
-  { scope: M, table: "lp_match_sessions", where: "user_id::text = ANY($3::text[])" },
+  // Workspace-owned since docs/architecture/63 M1: the children (matches, audit) go with their session. Runs started before org_id existed carry their profile's workspace.
+  { scope: O, table: "lp_match_sessions", where: "org_id::text = $1 OR fund_profile_id::text IN (SELECT id::text FROM fund_profiles WHERE org_id::text = $1)" },
   { scope: M, table: "matching_weight_history", where: "user_id::text = ANY($3::text[])" },
   { scope: M, table: "background_jobs", where: "user_id::text = ANY($3::text[])" },
   // ── last: the membership list and the workspace and fund themselves ──

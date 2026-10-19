@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { sql } from "@/lib/db"
-import { runLpMatchingV2, saveSessionV2 } from "@/lib/matching/v2"
-
 import { matchingContext, matchingFailure } from "@/lib/matching/access"
-import { fundReadiness, runOptionsSchema } from "@/lib/matching/profile-readiness"
-import { toFundProfile } from "@/lib/matching/fund-profile"
-import { describeFilters, hasFilters, parseFilters } from "@/lib/matching/filters"
+import { LpMatchError, runLpMatch } from "@/lib/matching/lp/service"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min — large datasets + AI enrichment
@@ -16,6 +11,8 @@ interface RunBody {
   maxFirms?: number
   maxContacts?: number
   enableAi?: boolean
+  filters?: unknown
+  includeKnown?: boolean
 }
 
 export async function POST(req: NextRequest) {
@@ -27,37 +24,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "fundProfileId is required" }, { status: 400 })
     }
 
-    const options = runOptionsSchema.safeParse(body)
-    if (!options.success) return NextResponse.json({ error: "Use a score between 0 and 150 and result limits between 1 and 10,000." }, { status: 422 })
-
-    // Load fund profile
-    const [row] = await sql`
-      SELECT * FROM fund_profiles
-      WHERE id = ${body.fundProfileId} AND is_active = true AND user_id = ${context.userId} AND org_id = ${context.orgId}
-      LIMIT 1
-    `
-    if (!row) {
-      return NextResponse.json({ error: "Fund profile not found" }, { status: 404 })
-    }
-
-    const fund = toFundProfile(row)
-    const missingFields = fundReadiness(fund)
-    if (missingFields.length) return NextResponse.json({ error: "Complete the required fund fields before matching.", missingFields }, { status: 422 })
-
-    console.log(`[LP Matching v2] Starting run for fund: ${fund.name}`)
-
-    const filters = parseFilters((body as any).filters)
-    if (hasFilters(filters)) console.log(`[LP Matching v2] Mandate: ${describeFilters(filters)}`)
-
-    const result = await runLpMatchingV2(fund, {
-      minScore: body.minScore,
-      maxFirms: body.maxFirms,
-      maxContacts: body.maxContacts,
-      enableAi: body.enableAi,
-      filters,
-    })
-
-    await saveSessionV2(result, context.userId)
+    // The same service Anker AI and Telegram use (docs/architecture/63): one engine, one set of rules, one saved run for the workspace.
+    const { result, filters, filterSummary, exclusionSummary } = await runLpMatch(
+      { orgId: context.orgId, userId: context.userId, source: "page" },
+      {
+        fundProfileId: body.fundProfileId,
+        options: { minScore: body.minScore, maxFirms: body.maxFirms, maxContacts: body.maxContacts, enableAi: body.enableAi },
+        mandate: body.filters,
+        includeKnown: body.includeKnown,
+      },
+    )
 
     // Return summary only (full lists can be fetched via session endpoint)
     return NextResponse.json({
@@ -67,13 +43,18 @@ export async function POST(req: NextRequest) {
       ranAt: result.ranAt,
       durationMs: result.durationMs,
       filters,
-      filterSummary: describeFilters(filters),
+      filterSummary,
+      exclusions: result.exclusions ?? null,
+      exclusionSummary,
       totals: result.totals,
       tierCounts: result.tierCounts,
       segmentCounts: result.segmentCounts,
       funnel: result.funnel,
     })
   } catch (error: any) {
+    if (error instanceof LpMatchError) {
+      return NextResponse.json({ error: error.message, ...(error.missingFields ? { missingFields: error.missingFields } : {}) }, { status: error.status })
+    }
     console.error("[LP Matching v2] Error:", error)
     return matchingFailure(error, "Matching could not finish. Please retry; if this continues, check the matching database migrations.")
   }

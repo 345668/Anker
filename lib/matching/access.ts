@@ -25,13 +25,13 @@ export function matchingFailure(error: unknown, fallback: string) {
 export async function authorizedSession(sessionId: string) {
   const context = await matchingContext("vc")
   const [session] = await sql`SELECT s.* FROM lp_match_sessions s JOIN fund_profiles f ON f.id = s.fund_profile_id
-    WHERE s.id = ${sessionId} AND s.user_id = ${context.userId} AND f.org_id = ${context.orgId} AND s.status='completed' LIMIT 1`
+    WHERE s.id = ${sessionId} AND COALESCE(s.org_id, f.org_id) = ${context.orgId} AND s.status='completed' LIMIT 1`
   if (!session) throw new MatchingError("Session not found in this workspace.", 404)
   return session
 }
 export async function authorizedProfile(id: string) {
   const scope = await matchingContext("vc")
-  const [row] = await sql`SELECT * FROM fund_profiles WHERE id=${id} AND user_id=${scope.userId} AND org_id=${scope.orgId}`
+  const [row] = await sql`SELECT * FROM fund_profiles WHERE id=${id} AND org_id=${scope.orgId}`
   if (!row) throw new MatchingError("Profile not found in this workspace.", 404)
   return row
 }
@@ -39,7 +39,7 @@ export async function authorizedMatch(id: string, kind: "firm" | "contact") {
   const table = kind === "firm" ? "lp_firm_matches" : "lp_contact_matches"
   const scope = await matchingContext("vc")
   const [row] = await sql.unsafe(`SELECT m.* FROM ${table} m JOIN fund_profiles f ON f.id=m.fund_profile_id
-    WHERE m.id=$1 AND f.user_id=$2 AND f.org_id=$3 LIMIT 1`, [id, scope.userId, scope.orgId])
+    WHERE m.id=$1 AND f.org_id=$2 LIMIT 1`, [id, scope.orgId])
   if (!row) throw new MatchingError("Match not found in this workspace.", 404)
   return row
 }

@@ -7,7 +7,7 @@ type Context = { params: Promise<{ id: string }> }
 export async function GET(_req: NextRequest, ctx: Context) {
   try {
     const scope = await matchingContext("vc"), { id } = await ctx.params
-    const [row] = await sql`SELECT * FROM fund_profiles WHERE id=${id} AND user_id=${scope.userId} AND org_id=${scope.orgId} AND is_active=true`
+    const [row] = await sql`SELECT * FROM fund_profiles WHERE id=${id} AND org_id=${scope.orgId} AND is_active=true`
     return row ? NextResponse.json(serializeFundProfile(row)) : NextResponse.json({ error: "Profile not found" }, { status: 404 })
   } catch (error) { return matchingFailure(error, "Profile could not be loaded.") }
 }

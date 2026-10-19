@@ -21,9 +21,8 @@ import { extractText } from "@/lib/admin/web-crawler";
 import { fetchPublicText } from "./public-fetch";
 import { currentAiContext } from "./context";
 import { matchInvestors } from "./match-investors";
+import { matchmakeLps } from "./matchmake-lps";
 import { ScoredBatches, type ScoredRow } from "./score-merge";
-import { runLpMatching, type FundProfile } from "@/lib/matching/lp-matchmaking";
-import { generateLpPipelineXlsx } from "@/lib/matching/xlsx-generator";
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export";
 import { reconcileSheet, detectHeader } from "@/lib/dataroom/reconcile";
 import { normalizeLedger, buildStatements, type Addback } from "@/lib/dataroom/statements";
@@ -221,37 +220,9 @@ export const TOOLS: Record<string, ToolDef> = {
 
   matchmake_lps: {
     name: "matchmake_lps",
-    description: "Score the investor database for LP fit against a fund's profile and produce a ranked pipeline + an XLSX. Use for fundraising / finding family offices, funds-of-funds, and other LPs.",
-    params: `{ "fundName": string, "targetRaiseUsd"?: number, "sectors"?: string[], "geographicFocus"?: string[], "headquarters"?: string, "thesisKeywords"?: string[], "preferLesserKnown"?: boolean, "rightSizeToTarget"?: boolean, "excludeHouseholdNames"?: boolean, "top"?: number }`,
-    async run(inp) {
-      const profile: FundProfile = {
-        id: `assistant_${Date.now()}`,
-        name: String(inp.fundName ?? "Fund"),
-        targetRaise: Number(inp.targetRaiseUsd) || null,
-        sectors: Array.isArray(inp.sectors) ? inp.sectors : [],
-        geographicFocus: Array.isArray(inp.geographicFocus) ? inp.geographicFocus : [],
-        headquartersLocation: inp.headquarters ?? null,
-        thesisKeywords: Array.isArray(inp.thesisKeywords) ? inp.thesisKeywords : [],
-        preferLesserKnown: !!inp.preferLesserKnown,
-        rightSizeToTarget: inp.rightSizeToTarget !== false,
-        excludeHouseholdNames: !!inp.excludeHouseholdNames,
-      };
-      const top = Math.min(Number(inp.top) || 10, 50);
-      const result = await runLpMatching(profile, { maxFirms: 500, maxContacts: 500 });
-      const firms = result.firms.slice(0, top);
-      const contacts = result.contacts.slice(0, top);
-      const xlsx = generateLpPipelineXlsx(result);
-      const artifact = await saveArtifact(xlsx, `LP_Pipeline_${profile.name}`, "xlsx");
-      const fLines = firms.map((f, i) => `${i + 1}. ${f.name} — ${f.score} (${f.tier}) ${f.tags.join(",")} | ${f.location} | ${f.aum}`);
-      const cLines = contacts.map((c, i) => `${i + 1}. ${c.name} (${c.title}) @ ${c.type} — ${c.score} ${c.email ? "✉" : ""}`);
-      return {
-        observation:
-          `Scored ${result.totalFirmsScored} firms + ${result.totalContactsScored} investors for "${profile.name}".\n` +
-          `Qualified: ${result.qualifiedFirms} firms, ${result.qualifiedContacts} contacts; ${result.anchorCandidates} anchors; ${result.contactsWithEmail} with email.\n\n` +
-          `Top firms:\n${fLines.join("\n") || "(none)"}\n\nTop contacts:\n${cLines.join("\n") || "(none)"}`,
-        artifact,
-      };
-    },
+    description: "THE platform's LP matching for a fund: ranks family offices, funds of funds and other LPs for the workspace's saved fund profile (the same engine and rules as the Matchmaking page), leaves out LPs already in the CRM, passed, suppressed or already the fund's investors, saves the run to the Matchmaking page and returns one ranked workbook. Use it whenever a GP asks for LPs, a shortlist or a pipeline. The fund comes from the workspace's saved profile; pass the fund fields only when the workspace has none.",
+    params: `{ "fundProfileId"?: string, "top"?: number (rows to list, default 10), "filters"?: { "countries"?: string[] (e.g. "US"), "regions"?: string[], "classes"?: string[] (e.g. "family-office"), "excludeClasses"?: string[], "sectors"?: string[] } (ONLY constraints the user stated), "includeKnown"?: boolean (also list LPs already in the CRM), and only when the workspace has no fund profile: "fundName": string, "targetRaiseUsd": number, "sectors": string[], "geographicFocus": string[], "headquarters": string, "thesisKeywords"?: string[] }`,
+    async run(inp) { const ctx = currentAiContext(); return matchmakeLps(inp, ctx?.principal); },
   },
 
   match_investors: {

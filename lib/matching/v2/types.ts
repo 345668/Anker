@@ -149,6 +149,9 @@ export interface FundProfileV2 {
   scoringMode?: "svs_absolute" | "weighted_normalized" // default svs_absolute
   fundIPriorLpFirmIds?: string[] // for fund_i_reup tagging
   fundIPriorContactEmails?: string[]
+  /** The fund's own rules: classes it may approach (empty = any) and countries it does not approach. Applied by the service, not the scorer. */
+  allowedLpClasses?: string[]
+  excludedJurisdictions?: string[]
 }
 
 // ─── Scored entity outputs ──────────────────────────────────────────────────
@@ -250,6 +253,8 @@ export interface MatchingResultV2 {
   }
   firms: ScoredFirmV2[]
   contacts: ScoredContactV2[]
+  /** What the workspace's hard rules left out before scoring, by reason (docs/architecture/63 4.2). Absent when no rules were applied. */
+  exclusions?: import("@/lib/matching/lp/rules").LpExclusionCounts
 }
 
 // ─── Progress event for streaming ───────────────────────────────────────────

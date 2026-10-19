@@ -160,6 +160,7 @@ describe("saveSessionV2 against the migrated schema", () => {
     // The tables exactly as production had them before the repair: 8, 16 and
     // 13 columns. This is the shape every LP run failed against.
     await db.exec(`
+      CREATE TABLE fund_profiles (id uuid PRIMARY KEY, org_id text);
       CREATE TABLE lp_match_sessions (
         id uuid PRIMARY KEY, fund_profile_id uuid, algorithm text,
         total_firms_matched int, total_contacts_matched int, filters_applied jsonb,
@@ -185,6 +186,7 @@ describe("saveSessionV2 against the migrated schema", () => {
   it("saves the session, every firm and every contact once migrated", async () => {
     const migration = fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-09-23-lp-matching-repair.sql"), "utf8")
     await db.exec(migration)
+    await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19-lp-match-workspace.sql"), "utf8"))
 
     await saveSessionV2(result(), "u-1")
 
@@ -214,6 +216,7 @@ describe("saveSessionV2 against the migrated schema", () => {
   it("marks a session failed rather than leaving it running", async () => {
     const migration = fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-09-23-lp-matching-repair.sql"), "utf8")
     await db.exec(migration)
+    await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19-lp-match-workspace.sql"), "utf8"))
     const broken = { ...result(), firms: [{ ...firm(1, 95), score: "not a number" as any }] }
     await expect(saveSessionV2(broken as MatchingResultV2, "u-1")).rejects.toThrow()
     const [row] = (await db.query<any>("SELECT status FROM lp_match_sessions")).rows

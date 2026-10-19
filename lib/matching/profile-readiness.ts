@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { matchFiltersSchema } from "@/lib/matching/filters"
+import { matchFiltersSchema, INVESTOR_CLASSES } from "@/lib/matching/filters"
 import { STARTUP_STAGES, ROUND_INSTRUMENTS, LEAD_STATUSES } from "./v2/founder-types"
 
 const text = z.string().trim().min(1)
@@ -55,6 +55,9 @@ export const fundDraftSchema = z.object({
   headquartersLocation: z.string().max(200).nullable().optional(), thesisKeywords: tags.default([]),
   thesisDescription: z.string().max(10000).nullable().optional(), valueProposition: z.string().max(10000).nullable().optional(),
   gpName: z.string().max(1000).nullable().optional(), portfolioCompanies: tags.default([]),
+  // The fund's own rules about who it approaches (docs/architecture/63 4.2). Omitted = unchanged.
+  allowedLpClasses: z.array(z.enum(INVESTOR_CLASSES)).max(INVESTOR_CLASSES.length).optional(),
+  excludedJurisdictions: z.array(z.string().trim().min(2).max(4)).max(80).optional(),
 }).superRefine((p, ctx) => {
   if (p.hardCap != null && p.targetRaise != null && p.hardCap < p.targetRaise)
     ctx.addIssue({ code: "custom", path: ["hardCap"], message: "Hard cap must be at least the target raise" })

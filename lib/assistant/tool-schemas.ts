@@ -33,10 +33,11 @@ export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
   }),
   build_investor_profile: obj({ investorId: str(), firmId: str() }),
   matchmake_lps: obj({
+    fundProfileId: str(), top: num({ minimum: 1, maximum: 25 }), includeKnown: bool(),
+    filters: obj({ countries: arr(str()), regions: arr(str()), classes: arr(str()), excludeClasses: arr(str()), sectors: arr(str()) }),
     fundName: str(), targetRaiseUsd: num(), sectors: arr(str()), geographicFocus: arr(str()),
-    headquarters: str(), thesisKeywords: arr(str()), preferLesserKnown: bool(),
-    rightSizeToTarget: bool(), excludeHouseholdNames: bool(), top: num({ minimum: 1, maximum: 200 }),
-  }, ["fundName"]),
+    headquarters: str(), thesisKeywords: arr(str()),
+  }),
   match_investors: obj({
     startup: obj({
       name: str(), stage: str(), location: str(), sectors: arr(str()), askAmount: num({ minimum: 1 }),

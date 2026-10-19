@@ -15,7 +15,7 @@ export default async function MatchmakingPage() {
     fundProfiles = await sql`
       SELECT *
       FROM fund_profiles
-      WHERE is_active = true AND user_id=${context.userId} AND org_id=${context.orgId}
+      WHERE is_active = true AND org_id=${context.orgId}
       ORDER BY created_at DESC
       LIMIT 50
     `
@@ -24,7 +24,7 @@ export default async function MatchmakingPage() {
              contacts_with_email, anchor_candidates, ai_enrichments_applied,
              duplicates_merged, duration_ms, created_at, engine_version
       FROM lp_match_sessions
-      WHERE status='completed' AND user_id=${context.userId} AND fund_profile_id IN (SELECT id FROM fund_profiles WHERE org_id=${context.orgId})
+      WHERE status='completed' AND fund_profile_id IN (SELECT id FROM fund_profiles WHERE org_id=${context.orgId})
       ORDER BY created_at DESC
       LIMIT 10
     `

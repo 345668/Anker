@@ -18,7 +18,7 @@ export function canUseTool(p: AiPrincipal, name: string) {
   if (PROPOSE.has(name) && (p.readonly || !p.canWrite)) return false
   if (name === "send_outreach" && (p.readonly || !p.canWrite)) return false
   // Saves the startup profile and the run, so a read-only or non-writing member cannot run it.
-  if (name === "match_investors" && (p.readonly || !p.canWrite)) return false
+  if ((name === "match_investors" || name === "matchmake_lps") && (p.readonly || !p.canWrite)) return false
   return true
 }
 /** Validate the same bounded input contract advertised to MCP. */

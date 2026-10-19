@@ -57,7 +57,7 @@ export async function GET() {
     const context = await matchingContext("vc")
     const profiles = await sql`
       SELECT * FROM fund_profiles
-      WHERE is_active = true AND user_id = ${context.userId} AND org_id = ${context.orgId}
+      WHERE is_active = true AND org_id = ${context.orgId}
       ORDER BY created_at DESC
       LIMIT 200
     `
@@ -81,6 +81,9 @@ export async function POST(req: NextRequest) {
     const lpTypesJson = JSON.stringify(data.targetLpTypes ?? [])
     const thesisKeywordsJson = JSON.stringify(data.thesisKeywords ?? [])
     const portfolioJson = JSON.stringify(data.portfolioCompanies ?? [])
+    // null = not sent: the stored rule stays as it was.
+    const allowedClassesJson = data.allowedLpClasses ? JSON.stringify(data.allowedLpClasses) : null
+    const excludedJurisdictionsJson = data.excludedJurisdictions ? JSON.stringify(data.excludedJurisdictions.map((c) => c.toUpperCase())) : null
 
     // UPSERT.  Re-uses ON CONFLICT (id) so the same endpoint handles
     // create + edit + deck-extract auto-fill without the UI having to
@@ -92,7 +95,7 @@ export async function POST(req: NextRequest) {
         investment_stage, avg_check_size, target_companies, investment_period,
         sectors, primary_sectors, geographic_focus, headquarters_location,
         target_lp_types, thesis_description, thesis_keywords, value_proposition,
-        gp_name, portfolio_companies,
+        gp_name, portfolio_companies, allowed_lp_classes, excluded_jurisdictions,
         user_id, org_id, is_active, created_at, updated_at
       ) VALUES (
         ${id}, ${String(data.name).trim()}, ${data.fundNumber ?? null},
@@ -106,7 +109,7 @@ export async function POST(req: NextRequest) {
         ${geoJson}::jsonb, ${data.headquartersLocation ?? null},
         ${lpTypesJson}::jsonb, ${data.thesisDescription ?? null},
         ${thesisKeywordsJson}::jsonb, ${data.valueProposition ?? null},
-        ${data.gpName ?? null}, ${portfolioJson}::jsonb,
+        ${data.gpName ?? null}, ${portfolioJson}::jsonb, COALESCE(${allowedClassesJson}::jsonb, '[]'::jsonb), COALESCE(${excludedJurisdictionsJson}::jsonb, '[]'::jsonb),
         ${context.userId}, ${context.orgId}, true, NOW(), NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -134,6 +137,8 @@ export async function POST(req: NextRequest) {
         value_proposition     = EXCLUDED.value_proposition,
         gp_name               = EXCLUDED.gp_name,
         portfolio_companies   = EXCLUDED.portfolio_companies,
+        allowed_lp_classes    = COALESCE(${allowedClassesJson}::jsonb, fund_profiles.allowed_lp_classes),
+        excluded_jurisdictions = COALESCE(${excludedJurisdictionsJson}::jsonb, fund_profiles.excluded_jurisdictions),
         is_active             = true,
         updated_at            = NOW()
       WHERE fund_profiles.user_id = ${context.userId} AND fund_profiles.org_id = ${context.orgId}

@@ -1,5 +1,5 @@
 {
-  "takenAt": "2026-10-17",
+  "takenAt": "2026-10-19",
   "baseTables": [
     "accelerated_match_jobs",
     "action_proposals",
@@ -567,6 +567,9 @@
     ],
     "lp_information_sharing": [
       "fund_id"
+    ],
+    "lp_match_sessions": [
+      "org_id"
     ],
     "lp_portal_tokens": [
       "fund_id"

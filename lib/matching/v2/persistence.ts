@@ -22,9 +22,19 @@ function id(_prefix: string): string {
   return crypto.randomUUID()
 }
 
+export interface SessionContext {
+  /** The workspace the run belongs to (docs/architecture/63 section 7): every member of it sees the run. */
+  orgId?: string | null
+  /** Where the run was started: the page, the assistant, Telegram, an agent. */
+  source?: string
+  /** The mandate the run applied. */
+  filters?: unknown
+}
+
 export async function saveSessionV2(
   result: MatchingResultV2,
   userId?: string,
+  context: SessionContext = {},
 ): Promise<void> {
   try {
   // 1) Session row
@@ -36,7 +46,9 @@ export async function saveSessionV2(
       contacts_with_email, anchor_candidates,
       tier_counts, duration_ms, user_id, created_at,
       funnel_data, segment_counts, ai_enrichments_applied, duplicates_merged,
-      engine_version, status
+      engine_version, status,
+      org_id, source, exclusion_counts, filters_applied,
+      total_firms_matched, total_contacts_matched
     ) VALUES (
       ${result.sessionId}, ${result.fundProfileId}, ${result.fundName},
       ${result.totals.rawFirms}, ${result.totals.rawContacts},
@@ -45,7 +57,9 @@ export async function saveSessionV2(
       ${JSON.stringify(result.tierCounts)}, ${result.durationMs}, ${userId || null}, NOW(),
       ${JSON.stringify(result.funnel)}, ${JSON.stringify(result.segmentCounts)},
       ${result.totals.aiEnrichmentsApplied}, ${result.totals.duplicatesMerged},
-      'v2', 'running'
+      'v2', 'running',
+      ${context.orgId ?? null}, ${context.source ?? "page"}, ${result.exclusions ? JSON.stringify(result.exclusions) : null}::jsonb, ${context.filters ? JSON.stringify(context.filters) : null}::jsonb,
+      ${result.totals.qualifiedFirms}, ${result.totals.qualifiedContacts}
     )
     ON CONFLICT (id) DO NOTHING
   `
