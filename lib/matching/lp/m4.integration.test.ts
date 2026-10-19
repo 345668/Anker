@@ -117,7 +117,7 @@ describe("verdicts", () => {
   it("a verdict without 'never again' excludes nothing, and 'fit' never excludes", async () => {
     await recordFeedback(A, { kind: "firm", matchId: F1, verdict: "not_a_fit" })
     await recordFeedback(A, { kind: "contact", matchId: C1, verdict: "fit", neverAgain: true })
-    expect((await db.query("SELECT count(*)::int n FROM founder_match_exclusions")).rows[0].n).toBe(0)
+    expect((await db.query<any>("SELECT count(*)::int n FROM founder_match_exclusions")).rows[0].n).toBe(0)
   })
   it("can be lifted, and only inside the workspace", async () => {
     await recordFeedback(A, { kind: "firm", matchId: F2, verdict: "wrong_data", neverAgain: true })
@@ -140,7 +140,7 @@ describe("putting LPs in the CRM", () => {
     const again = await addMatchesToCrm(A, S1, [{ kind: "contact", id: C1 }, { kind: "firm", id: F1 }])
     expect(again.added).toEqual([])
     expect(again.already.map((x) => x.name).sort()).toEqual(["Alpha Family Office", "Pat One"])
-    expect((await db.query("SELECT count(*)::int n FROM crm_entries")).rows[0].n).toBe(3)
+    expect((await db.query<any>("SELECT count(*)::int n FROM crm_entries")).rows[0].n).toBe(3)
   })
   it("refuses a run of another workspace, an empty choice and more than fifty", async () => {
     await expect(addMatchesToCrm({ orgId: "org-b", userId: "bob" }, S1, [{ kind: "firm", id: F1 }])).rejects.toMatchObject({ status: 404 })
