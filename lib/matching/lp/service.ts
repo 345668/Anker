@@ -14,6 +14,7 @@ import { runLpMatchingV2 } from "@/lib/matching/v2/engine"
 import { saveSessionV2 } from "@/lib/matching/v2/persistence"
 import type { FundProfileV2, MatchingResultV2 } from "@/lib/matching/v2/types"
 import { loadLpRuleData } from "./rules-load"
+import { loadFactorSettings, loadShadowContext } from "./shadow-load"
 import { DONE, QUEUED, RULES, SAVING, fromEngineEvent, throttled, type Progress } from "./progress"
 import { buildLpRules, describeExclusions, type LpRuleData, type LpRules } from "./rules"
 
@@ -147,8 +148,9 @@ export async function processLpSession(sessionId: string, deps: LpMatchDeps = de
     const ruleData = await deps.loadRules({ orgId, userId }, { excludedJurisdictions: fund.excludedJurisdictions, includeKnown: !!o.includeKnown })
     const rules: LpRules = buildLpRules(ruleData)
     const w = throttled((p) => writeProgress(sessionId, p))
+    const shadow = { context: await loadShadowContext({ orgId }, fund), settings: await loadFactorSettings() }
     const result = await deps.run(fund, {
-      minScore: o.minScore, maxFirms: o.maxFirms, maxContacts: o.maxContacts, enableAi: o.enableAi, filters, rules, sessionId,
+      minScore: o.minScore, maxFirms: o.maxFirms, maxContacts: o.maxContacts, enableAi: o.enableAi, filters, rules, sessionId, shadow,
       onProgress: (e) => { const p = fromEngineEvent(e); if (p) w.push(p) },
     })
     w.push(SAVING); await w.flush()

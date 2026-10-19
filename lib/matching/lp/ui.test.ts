@@ -171,3 +171,73 @@ describe("following a run in the background", () => {
     expect(el.textContent).toContain("you get a notification in Anker when it finishes")
   })
 })
+
+describe("matching quality (owner)", () => {
+  const factor = (key: string, label: string, status = "shadow") => ({ key, label, description: `${label} description`, status, weight: 6, decidedBy: null, decidedAt: null, note: null, evidence: null })
+  const result = (key: string, verdict: string, reason: string) => ({ key, weight: 6, status: "shadow", coverage: 0.9, auc: 0.7, delta: 0.05, ciLow: 0.01, ciHigh: 0.09, verdict, reason })
+  const report = (blocked: string | null, results: any[]) => ({ n: 60, fit: 30, notFit: 30, bySource: { founder_set: 40, feedback: 20 }, baselineAuc: 0.62, blocked, factors: results, combined: result("all", "keep_shadow", "x") })
+  const state = (evaluation: any) => ({
+    factors: [factor("relationship_proximity", "Relationship proximity"), factor("recent_activity", "Recent investing activity")], guards: { minAucGain: 0.02, minLabelled: 40, minFit: 12 },
+    workspace: { orgId: "o", funds: [{ id: "f1", name: "Fund A" }, { id: "f2", name: "Fund B" }], labels: { founder_set: 3, feedback: 2 }, latestRun: { id: "r", fundName: "Fund A", createdAt: "2026-10-19T10:00:00Z" } }, evaluation,
+  })
+  const route = (get: unknown, posts: any[]) => vi.fn(async (url: string, init?: any) => {
+    if (init?.method === "POST") { posts.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({ ok: true, saved: 2, unresolved: ["Ghost"], ambiguous: [], skipped: [], status: "promoted", overridden: !!JSON.parse(init.body).override }) } }
+    return { ok: true, status: 200, json: async () => get }
+  })
+  const flush = async () => { await act(async () => { await Promise.resolve(); await Promise.resolve() }) }
+  const find = (el: HTMLElement, text: string) => Array.from(el.querySelectorAll("button")).find((b) => b.textContent === text) as HTMLButtonElement
+
+  it("does not let a factor be promoted until the labels recommend it, and records a written reason when it is promoted anyway", async () => {
+    const posts: any[] = []
+    vi.stubGlobal("fetch", route(state({ session: { id: "r", fundName: "Fund A", createdAt: "2026-10-19T10:00:00Z" }, labelled: 60, inRun: 60, withoutFactors: 0, error: null,
+      firms: report(null, [result("relationship_proximity", "keep_shadow", "No measurable gain: +0.005 (interval -0.02 to +0.03) (needs +0.02)."), result("recent_activity", "promote", "It puts fits above not-fits more often: +0.05, and the whole interval is above zero.")]), contacts: null }), posts))
+    const { MatchingQuality } = await import("@/components/admin/matching-quality")
+    const el = mount(h(MatchingQuality))
+    await flush()
+    expect(el.textContent).toContain("Relationship proximity")
+    expect(el.textContent).toContain("On your labelled firms: Keep measuring. No measurable gain")
+    const cards = Array.from(el.querySelectorAll("li"))
+    const prox = cards.find((c) => c.textContent!.includes("Relationship proximity"))!, act2 = cards.find((c) => c.textContent!.includes("Recent investing activity"))!
+    expect((find(prox as HTMLElement, "Promote")).disabled).toBe(true)                  // not recommended
+    expect((find(act2 as HTMLElement, "Promote")).disabled).toBe(false)                 // recommended
+    // promote the recommended one
+    await act(async () => { find(act2 as HTMLElement, "Promote").click() })
+    expect(posts[0]).toMatchObject({ action: "decide", key: "recent_activity", status: "promoted", override: false })
+    // promote the other against the evidence: a reason of ten characters is needed first
+    act(() => find(prox as HTMLElement, "Promote anyway…").click())
+    const box = el.querySelector('textarea[aria-label="Reason"]') as HTMLTextAreaElement
+    const submit = find(el, "Promote, recording the reason")
+    expect(submit.disabled).toBe(true)
+    act(() => { const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!; set.call(box, "Our network is the edge here."); box.dispatchEvent(new Event("input", { bubbles: true })) })
+    expect(find(el, "Promote, recording the reason").disabled).toBe(false)
+    await act(async () => { find(el, "Promote, recording the reason").click() })
+    expect(posts[1]).toMatchObject({ action: "decide", key: "relationship_proximity", status: "promoted", override: true, note: "Our network is the edge here." })
+  })
+
+  it("explains that more labels are needed instead of showing numbers, and saves a pasted list", async () => {
+    const posts: any[] = []
+    vi.stubGlobal("fetch", route(state({ session: { id: "r", fundName: "Fund A", createdAt: "2026-10-19T10:00:00Z" }, labelled: 5, inRun: 5, withoutFactors: 0, error: null,
+      firms: report("Not enough labels to judge any factor yet. It needs 40 labelled LPs in the run (there are 5).", []), contacts: null }), posts))
+    const { MatchingQuality } = await import("@/components/admin/matching-quality")
+    const el = mount(h(MatchingQuality))
+    await flush()
+    expect(el.textContent).toContain("Not enough labels to judge any factor yet. It needs 40 labelled LPs in the run (there are 5).")
+    expect(el.textContent).toContain("3 on your list · 2 verdicts in the app")
+    expect(el.textContent).toContain("never pooled with anyone else")
+    const box = el.querySelector('textarea[aria-label="Labelled LPs"]') as HTMLTextAreaElement
+    act(() => { const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!; set.call(box, "Alpha, fit\nGhost, not fit"); box.dispatchEvent(new Event("input", { bubbles: true })) })
+    await act(async () => { find(el, "Save the list").click() })
+    expect(posts[0]).toEqual({ action: "labels", text: "Alpha, fit\nGhost, not fit" })
+    await flush()
+    expect(el.textContent).toContain("Saved 2. Not found in the run: Ghost.")
+  })
+
+  it("tells the owner to switch workspace when there is none to evaluate", async () => {
+    vi.stubGlobal("fetch", route({ factors: [factor("data_confidence", "Data confidence")], guards: {}, workspace: null, note: "Switch to your fund workspace to evaluate the factors on its labelled LPs." }, []))
+    const { MatchingQuality } = await import("@/components/admin/matching-quality")
+    const el = mount(h(MatchingQuality))
+    await flush()
+    expect(el.textContent).toContain("Switch to your fund workspace")
+    expect(el.querySelector('textarea[aria-label="Labelled LPs"]')).toBeNull()
+  })
+})

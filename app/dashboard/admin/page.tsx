@@ -149,6 +149,13 @@ const GROUPS: { heading: string; blurb: string; tools: Tool[] }[] = [
     blurb: "System health, model routing, and account administration.",
     tools: [
       {
+        href: "/dashboard/admin/matching-quality",
+        title: "Matching quality",
+        description:
+          "Extra LP scoring factors, measured against LPs you have labelled. A factor changes a ranking only after you promote it on the evidence.",
+        icon: Sparkles,
+      },
+      {
         href: "/dashboard/admin/system",
         title: "System health",
         description:

@@ -39,7 +39,7 @@ beforeAll(async () => {
   await db.exec(readFileSync("scripts/create-lp-tables.sql", "utf8"))
   for (const f of ["2026-04-25-matching-v2", "2026-09-11-matching-profile-contract"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
   await db.exec("ALTER TABLE lp_firm_matches ADD COLUMN IF NOT EXISTS expected_ticket_usd float8; ALTER TABLE lp_contact_matches ADD COLUMN IF NOT EXISTS expected_ticket_usd float8, ADD COLUMN IF NOT EXISTS factor_capacity int;")
-  for (const f of ["2026-10-19-lp-match-workspace", "2026-10-19c-lp-match-explain-feedback", "2026-10-19d-lp-match-run-options", "2026-10-19e-lp-match-jobs", "2026-10-19f-lp-match-status-check", "2026-10-19g-lp-match-one-open-run"]) {
+  for (const f of ["2026-10-19-lp-match-workspace", "2026-10-19c-lp-match-explain-feedback", "2026-10-19d-lp-match-run-options", "2026-10-19e-lp-match-jobs", "2026-10-19f-lp-match-status-check", "2026-10-19g-lp-match-one-open-run", "2026-10-19h-lp-shadow-factors"]) {
     if (f === "2026-10-19c-lp-match-explain-feedback") await db.exec("INSERT INTO organizations VALUES ('org-a','fund','fund-1'),('org-b','fund',NULL);")
     await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
   }

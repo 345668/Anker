@@ -185,6 +185,9 @@ export interface ScoredFirmV2 {
   /** Facts the score could not rest on, and how much weight that leaves it (docs/architecture/63 4.4). */
   gaps?: string[]
   confidence?: "high" | "medium" | "low"
+  /** The score before any promoted extra factor was added, and what each extra factor was worth for this match (docs/architecture/63 M6). */
+  baseScore?: number
+  shadow?: Record<string, { value: number | null; weight: number; applied: boolean }>
 }
 
 export interface ScoredContactV2 {
@@ -215,6 +218,8 @@ export interface ScoredContactV2 {
   expectedTicket?: number | null
   gaps?: string[]
   confidence?: "high" | "medium" | "low"
+  baseScore?: number
+  shadow?: Record<string, { value: number | null; weight: number; applied: boolean }>
 }
 
 // ─── Funnel data (matches the methodology funnel table) ────────────────────

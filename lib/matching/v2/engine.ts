@@ -21,6 +21,8 @@ import { raiseBand, scoreCapacity, type Capacity } from "./lp-capacity"
 import { checkPerson } from "./lp-person"
 import { countExclusion, emptyExclusionCounts, type LpRules } from "@/lib/matching/lp/rules"
 import { confidenceCounts, contactFacts, contactSentence, firmFacts, firmSentence } from "@/lib/matching/lp/explain"
+import { adjustment, firmShadow, personShadow, type FactorSettings, type ShadowContext } from "@/lib/matching/lp/shadow"
+import { profileSlug } from "@/lib/compliance/suppression"
 import { classifyContactSegments, classifyFirmSegments } from "./segmentation"
 import {
   enrichContactsWithRationales,
@@ -55,6 +57,8 @@ interface RunOptions {
   filters?: MatchFilters
   /** The workspace's hard rules (docs/architecture/63 4.2): rows they refuse are counted and never scored. */
   rules?: LpRules
+  /** The extra scoring factors (docs/architecture/63 M6): the team's relationships and each factor's status. Every match stores each factor's value; only promoted ones add points. */
+  shadow?: { context: ShadowContext; settings: FactorSettings }
   /** The run's id when it was created before it started (docs/architecture/63 M2); otherwise one is made. */
   sessionId?: string
   onProgress?: (event: ProgressEvent) => void
@@ -84,7 +88,7 @@ export async function runLpMatchingV2(
     SELECT id, name, COALESCE(firm_classification, type) AS type,
            description, aum, sectors,
            COALESCE(hq_location, location) AS location,
-           website, linkedin_url, source, norm_country
+           website, linkedin_url, source, norm_country, last_investment_at
     FROM investment_firms
     WHERE (${f.classes}::text[] IS NULL OR norm_class = ANY(${f.classes}))
       AND (${f.excludeClasses}::text[] IS NULL OR norm_class IS NULL OR norm_class <> ALL(${f.excludeClasses}))
@@ -96,7 +100,7 @@ export async function runLpMatchingV2(
     SELECT id, first_name, last_name, investor_type AS type,
            bio, sectors, location, email,
            COALESCE(linkedin_url, person_linkedin_url) AS linkedin,
-           title, firm_id, source, restricted_at, norm_country
+           title, firm_id, source, restricted_at, norm_country, investment_thesis
     FROM investors
     WHERE (${f.classes}::text[] IS NULL OR norm_class = ANY(${f.classes}))
       AND (${f.excludeClasses}::text[] IS NULL OR norm_class IS NULL OR norm_class <> ALL(${f.excludeClasses}))
@@ -260,6 +264,36 @@ export async function runLpMatchingV2(
     }
   }
 
+  // ─── Facts each match rests on, and the extra factors (docs/architecture/63 M3, M6) ───────
+  // Before the sort, so a promoted factor can move a match; after the minimum-score gate, so a factor can never let in a match the base score kept out.
+  for (const f of firmsAccepted) Object.assign(f, firmFacts(f))
+  for (const c of contactsAccepted) Object.assign(c, contactFacts(c))
+  if (options.shadow) {
+    const { context, settings } = options.shadow
+    const firmById = new Map<string, any>(allFirms.map((r: any) => [String(r.id), r]))
+    const firmInput = (firmId: string | null) => {
+      const r = firmId ? firmById.get(firmId) : null
+      return r ? { firmId: String(r.id), normalizedName: normalizeFirmName(r.name ?? ""), lastInvestmentAt: r.last_investment_at ?? null, text: r.description ?? null } : null
+    }
+    const apply = (item: any, values: ReturnType<typeof firmShadow>) => {
+      const adj = adjustment(values, settings)
+      item.baseScore = item.score
+      item.shadow = adj.detail
+      if (adj.points > 0) {
+        item.score = Math.round((item.score + adj.points) * 10) / 10
+        item.tier = tierFor(item.score)
+        item.reasons = [...item.reasons, `+${adj.points} points from promoted factors: ${Object.entries(adj.detail).filter(([, d]) => d.applied).map(([k]) => k.replace(/_/g, " ")).join(", ")}`]
+      }
+    }
+    for (const f of firmsAccepted) apply(f, firmShadow({ ...(firmInput(String(f.firmId)) ?? { firmId: String(f.firmId), normalizedName: f.normalizedName, lastInvestmentAt: null, text: f.description }), confidence: f.confidence }, context))
+    const personById = new Map<string, any>(allInvestors.map((r: any) => [String(r.id), r]))
+    for (const c of contactsAccepted) {
+      const r = personById.get(String(c.investorId))
+      const firm = r?.firm_id ? firmInput(String(r.firm_id)) : null
+      apply(c, personShadow({ investorId: String(c.investorId), email: c.email, linkedinSlug: profileSlug(c.linkedin), firm, text: `${c.bio ?? ""} ${r?.investment_thesis ?? ""}`.trim() || null, confidence: c.confidence }, context))
+    }
+  }
+
   // ─── Phase 4: dedup ─────────────────────────────────────────────────────
   const beforeFirmsCount = firmsAccepted.length
   const beforeContactsCount = contactsAccepted.length
@@ -284,10 +318,6 @@ export async function runLpMatchingV2(
   contactsAccepted.sort(byEvidence as any)
   firmsAccepted = firmsAccepted.slice(0, maxFirms)
   contactsAccepted = contactsAccepted.slice(0, maxContacts)
-
-  // ─── Facts each match rests on (docs/architecture/63 4.4) ───────────────
-  for (const f of firmsAccepted) Object.assign(f, firmFacts(f))
-  for (const c of contactsAccepted) Object.assign(c, contactFacts(c))
 
   // ─── Phase 5: segmentation ──────────────────────────────────────────────
   for (const f of firmsAccepted) f.segments = classifyFirmSegments(f, fund)

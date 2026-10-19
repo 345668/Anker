@@ -107,7 +107,7 @@ async function insertFirmBatch(batch: ScoredFirmV2[], sessionId: string, fundPro
       firm_location, firm_aum, firm_aum_usd, firm_sectors, firm_website, firm_linkedin,
       score, tier, tags, reasons, why_this_lp,
       factor_lp_type, factor_aum, factor_sector, factor_geo, factor_thesis_signals,
-      segments, stage, expected_ticket_usd, gaps, confidence, created_at
+      segments, stage, expected_ticket_usd, gaps, confidence, base_score, shadow_factors, created_at
     )
     SELECT * FROM UNNEST(
       ${ids}::uuid[],
@@ -137,6 +137,8 @@ async function insertFirmBatch(batch: ScoredFirmV2[], sessionId: string, fundPro
       ${batch.map((f) => f.expectedTicket ?? null)}::float8[],
       ${batch.map((f) => JSON.stringify(f.gaps ?? []))}::jsonb[],
       ${batch.map((f) => f.confidence ?? null)}::text[],
+      ${batch.map((f) => f.baseScore ?? null)}::numeric[],
+      ${batch.map((f) => (f.shadow ? JSON.stringify(f.shadow) : null))}::jsonb[],
       ${batch.map(() => new Date().toISOString())}::timestamptz[]
     )
   `
@@ -151,7 +153,7 @@ async function insertContactBatch(batch: ScoredContactV2[], sessionId: string, f
       contact_type, contact_location, contact_email, contact_linkedin, contact_sectors,
       score, tier, tags, reasons, why_this_lp,
       factor_lp_type, factor_sector, factor_geo, factor_thesis_signals, factor_contact_quality,
-      factor_capacity, segments, hnw_signals, stage, expected_ticket_usd, gaps, confidence, created_at
+      factor_capacity, segments, hnw_signals, stage, expected_ticket_usd, gaps, confidence, base_score, shadow_factors, created_at
     )
     SELECT * FROM UNNEST(
       ${ids}::uuid[],
@@ -182,6 +184,8 @@ async function insertContactBatch(batch: ScoredContactV2[], sessionId: string, f
       ${batch.map((c) => c.expectedTicket ?? null)}::float8[],
       ${batch.map((c) => JSON.stringify(c.gaps ?? []))}::jsonb[],
       ${batch.map((c) => c.confidence ?? null)}::text[],
+      ${batch.map((c) => c.baseScore ?? null)}::numeric[],
+      ${batch.map((c) => (c.shadow ? JSON.stringify(c.shadow) : null))}::jsonb[],
       ${batch.map(() => new Date().toISOString())}::timestamptz[]
     )
   `

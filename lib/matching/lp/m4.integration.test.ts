@@ -37,6 +37,7 @@ beforeAll(async () => {
   await db.exec(readFileSync("scripts/migrations/2026-10-19e-lp-match-jobs.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-19f-lp-match-status-check.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-19g-lp-match-one-open-run.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-19h-lp-shadow-factors.sql", "utf8"))
   await db.exec(`
     CREATE TABLE crm_boards(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id text, user_id text, name text, source_session_id text, position int, archived boolean DEFAULT false);
     CREATE UNIQUE INDEX crm_boards_src ON crm_boards(org_id, source_session_id) WHERE source_session_id IS NOT NULL;

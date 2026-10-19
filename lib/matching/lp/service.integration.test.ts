@@ -17,6 +17,7 @@ import { buildLpRules } from "./rules"
 import { authorizedSession } from "@/lib/matching/access"
 import { EMPTY_FILTERS } from "@/lib/matching/filters"
 import { toFundProfile } from "@/lib/matching/fund-profile"
+import { DEFAULT_SETTINGS, emptyShadowContext, type FactorSettings } from "./shadow"
 
 let db: PGlite
 const run = vi.fn(), save = vi.fn()
@@ -39,6 +40,7 @@ beforeAll(async () => {
   await db.exec(readFileSync("scripts/migrations/2026-10-19e-lp-match-jobs.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-19f-lp-match-status-check.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-19g-lp-match-one-open-run.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-19h-lp-shadow-factors.sql", "utf8"))
   await db.exec(`
     CREATE TABLE crm_entries(id serial PRIMARY KEY, org_id text, firm_id text, investor_id text, stage text);
     CREATE TABLE founder_match_exclusions(org_id text, entity_key text, reason text, created_by text);
@@ -130,8 +132,8 @@ describe("the shared LP service", () => {
 describe("the engine with the workspace's rules (real SQL, small directory)", () => {
   beforeAll(async () => {
     await db.exec(`
-      CREATE TABLE investment_firms(id text PRIMARY KEY, name text, type text, firm_classification text, description text, aum text, sectors jsonb, hq_location text, location text, website text, linkedin_url text, source text, norm_class text, norm_region text, norm_country text);
-      CREATE TABLE investors(id text PRIMARY KEY, first_name text, last_name text, investor_type text, bio text, sectors jsonb, location text, email text, linkedin_url text, person_linkedin_url text, title text, firm_id text, source text, restricted_at timestamptz, norm_class text, norm_region text, norm_country text);
+      CREATE TABLE investment_firms(id text PRIMARY KEY, name text, type text, firm_classification text, description text, aum text, sectors jsonb, hq_location text, location text, website text, linkedin_url text, source text, norm_class text, norm_region text, norm_country text, last_investment_at timestamptz);
+      CREATE TABLE investors(id text PRIMARY KEY, first_name text, last_name text, investor_type text, bio text, sectors jsonb, location text, email text, linkedin_url text, person_linkedin_url text, title text, firm_id text, source text, restricted_at timestamptz, norm_class text, norm_region text, norm_country text, investment_thesis text);
     `)
   })
   beforeEach(async () => {
@@ -181,5 +183,35 @@ describe("the engine with the workspace's rules (real SQL, small directory)", ()
     expect(s).toMatchObject({ org_id: "org-a", source: "assistant", status: "completed" })
     expect(s.total_firms_matched).toBe(s.qualified_firms)
     expect(s.exclusion_counts.total).toBeGreaterThan(0)
+  })
+
+  it("stores what each extra factor was worth for every match, changes nothing while they are in shadow, and adds the points of a promoted one", async () => {
+    await db.exec(`UPDATE investment_firms SET last_investment_at = now() - interval '3 months', description = 'A family office. We back emerging managers and first-time funds.' WHERE id = 'F1';
+      UPDATE investment_firms SET last_investment_at = now() - interval '5 years' WHERE id = 'F3'`)
+    const fund = { ...toFundProfile(await resolveFundProfile({ orgId: "org-a" })), fundNumber: 1 }
+    const ctx = { ...emptyShadowContext(), fundNumber: 1, priorLpFirmIds: new Set(["F5"]) }
+    const rules = buildLpRules(await loadLpRuleData(scope, { includeKnown: true }))
+    const plain = await runLpMatchingV2(fund, { minScore: 0, enableAi: false, rules })
+    const shadow = await runLpMatchingV2(fund, { minScore: 0, enableAi: false, rules, shadow: { context: ctx, settings: DEFAULT_SETTINGS } })
+    const byId = (r: typeof plain, id: string) => r.firms.find((f) => f.firmId === id)!
+    expect(byId(plain, "F1").shadow).toBeUndefined()                                   // a run without factors stores none
+    expect(byId(shadow, "F1").shadow).toMatchObject({ recent_activity: { value: 1, applied: false }, emerging_manager_appetite: { value: 1, applied: false }, relationship_proximity: { value: null } })
+    expect(byId(shadow, "F3").shadow!.recent_activity.value).toBe(0)
+    expect(byId(shadow, "F5").shadow!.relationship_proximity).toMatchObject({ value: 1, weight: 8, applied: false })
+    for (const f of shadow.firms) expect(f.score).toBe(byId(plain, f.firmId).score)     // shadow changes no score and no order
+    expect(shadow.firms.map((f) => f.firmId)).toEqual(plain.firms.map((f) => f.firmId))
+    const promoted: FactorSettings = { ...DEFAULT_SETTINGS, relationship_proximity: { status: "promoted", weight: 8 } }
+    const live = await runLpMatchingV2(fund, { minScore: 0, enableAi: false, rules, shadow: { context: ctx, settings: promoted } })
+    const f5 = byId(live, "F5")
+    expect(f5.baseScore).toBe(byId(plain, "F5").score)
+    expect(f5.score).toBe(Math.round((byId(plain, "F5").score + 8) * 10) / 10)
+    expect(f5.reasons.at(-1)).toMatch(/\+8 points from promoted factors: relationship proximity/)
+    expect(byId(live, "F1").score).toBe(byId(plain, "F1").score)                         // no relationship: unchanged
+    // and it is saved with the match
+    await db.exec("DELETE FROM lp_firm_matches; DELETE FROM lp_contact_matches; DELETE FROM lp_match_sessions")
+    await saveSessionV2(live, "alice", { orgId: "org-a", source: "assistant", filters: EMPTY_FILTERS })
+    const saved = (await db.query<any>("SELECT base_score, shadow_factors, score FROM lp_firm_matches WHERE firm_id = 'F5'")).rows[0]
+    expect(Number(saved.base_score)).toBe(f5.baseScore)
+    expect(saved.shadow_factors.relationship_proximity).toMatchObject({ value: 1, applied: true })
   })
 })

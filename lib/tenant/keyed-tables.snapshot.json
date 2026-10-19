@@ -197,6 +197,7 @@
     "lp_distributions",
     "lp_documents",
     "lp_entities",
+    "lp_eval_labels",
     "lp_firm_matches",
     "lp_information_sharing",
     "lp_match_audit",
@@ -212,6 +213,7 @@
     "lp_quarterly_reports",
     "lp_reports",
     "lp_requests",
+    "lp_scoring_factors",
     "lp_statement_imports",
     "lp_subscription_files",
     "lp_subscriptions",
@@ -565,6 +567,9 @@
     ],
     "lp_documents": [
       "fund_id"
+    ],
+    "lp_eval_labels": [
+      "org_id"
     ],
     "lp_information_sharing": [
       "fund_id"

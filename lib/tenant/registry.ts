@@ -132,6 +132,7 @@ export const RULES: Rule[] = [
   { scope: O, table: "crm_migration_report", where: "org_id::text = $1" },
   { scope: O, table: "founder_match_exclusions", where: "org_id::text = $1" },
   { scope: O, table: "lp_match_feedback", where: "org_id::text = $1" },
+  { scope: O, table: "lp_eval_labels", where: "org_id::text = $1" },
   { scope: O, table: "founder_match_sessions", where: "org_id::text = $1" },
   { scope: O, table: "founder_match_runs", where: "org_id::text = $1" },
   { scope: O, table: "startup_profiles", where: "org_id::text = $1" },

@@ -193,6 +193,7 @@ describe("saveSessionV2 against the migrated schema", () => {
     await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19e-lp-match-jobs.sql"), "utf8"))
     await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19f-lp-match-status-check.sql"), "utf8"))
     await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19g-lp-match-one-open-run.sql"), "utf8"))
+    await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19h-lp-shadow-factors.sql"), "utf8"))
 
     await saveSessionV2(result(), "u-1")
 
