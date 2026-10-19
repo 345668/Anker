@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { matchingContext, matchingFailure } from "@/lib/matching/access"
 import { LpMatchError, runLpMatch } from "@/lib/matching/lp/service"
+import { compareSessions, previousSessionId, sessionInWorkspace } from "@/lib/matching/lp/matches"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min — large datasets + AI enrichment
@@ -35,6 +36,15 @@ export async function POST(req: NextRequest) {
       },
     )
 
+    // What changed since the run before this one for the same fund (a failure here never fails the run).
+    let sincePrevious: unknown = null
+    try {
+      const me = await sessionInWorkspace(context.orgId, result.sessionId)
+      const prev = me ? await previousSessionId(context.orgId, me) : null
+      const cmp = prev ? await compareSessions(context.orgId, result.sessionId, prev, 8) : null
+      if (cmp) sincePrevious = { previousSessionId: prev, previousAt: cmp.older.createdAt, newCount: cmp.newCount, droppedCount: cmp.droppedCount, newFirms: cmp.newFirms, droppedFirms: cmp.droppedFirms, firmsDelta: cmp.firmsDelta, contactsDelta: cmp.contactsDelta }
+    } catch { /* comparison is a convenience */ }
+
     // Return summary only (full lists can be fetched via session endpoint)
     return NextResponse.json({
       sessionId: result.sessionId,
@@ -45,6 +55,8 @@ export async function POST(req: NextRequest) {
       filters,
       filterSummary,
       exclusions: result.exclusions ?? null,
+      confidenceCounts: result.confidenceCounts ?? null,
+      sincePrevious,
       exclusionSummary,
       totals: result.totals,
       tierCounts: result.tierCounts,

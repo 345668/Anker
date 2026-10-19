@@ -79,7 +79,7 @@ export async function runLpMatch(scope: LpMatchScope, input: LpMatchInput = {}, 
   const rules: LpRules = buildLpRules(ruleData)
 
   const result = await deps.run(fund, { ...options.data, filters, rules })
-  await deps.save(result, scope.userId, { orgId: scope.orgId, source: scope.source, filters, parentSessionId: input.parentSessionId ?? null })
+  await deps.save(result, scope.userId, { orgId: scope.orgId, source: scope.source, filters, parentSessionId: input.parentSessionId ?? null, options: { ...options.data, filters: undefined, includeKnown: !!input.includeKnown } })
   return {
     result, fund, filters,
     filterSummary: hasFilters(filters) ? describeFilters(filters) : "",

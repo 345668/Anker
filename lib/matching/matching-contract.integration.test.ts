@@ -30,6 +30,7 @@ beforeAll(async () => {
   await db.exec(migration)
   await db.exec(migration) // Migration must be safely repeatable.
   await db.exec(readFileSync("scripts/migrations/2026-10-19-lp-match-workspace.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-19d-lp-match-run-options.sql", "utf8"))
   await db.exec(founderRuns)
   await db.exec(founderRuns)
 })
@@ -58,7 +59,7 @@ it("roundtrips all matching inputs and passes the saved canonical profile to the
   state.run.mockResolvedValue({ sessionId: "result", totals: {}, tierCounts: {}, segmentCounts: {}, funnel: {} })
   expect((await match(request({ fundProfileId: profile.id, enableAi: false }))).status).toBe(200)
   expect(state.run.mock.calls[0][0]).toMatchObject({ headquartersLocation: "Berlin", geographicFocus: ["Germany"], thesisKeywords: ["energy"], sectors: ["climate"], averageTicket: 1000000, fundNumber: 2 })
-  expect(state.persist).toHaveBeenCalledWith(expect.anything(), "alice", { orgId: "fund-a", source: "page", filters: expect.anything(), parentSessionId: null })
+  expect(state.persist).toHaveBeenCalledWith(expect.anything(), "alice", { orgId: "fund-a", source: "page", filters: expect.anything(), parentSessionId: null, options: expect.anything() })
   state.org = "fund-b"
   expect((await match(request({ fundProfileId: profile.id }))).status).toBe(404)
   expect((await save(request({ ...profile, name: "Wrong workspace" }))).status).toBe(404)

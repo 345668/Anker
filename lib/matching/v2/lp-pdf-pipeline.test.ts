@@ -189,6 +189,7 @@ describe("saveSessionV2 against the migrated schema", () => {
     await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19-lp-match-workspace.sql"), "utf8"))
     await db.exec("CREATE TABLE IF NOT EXISTS organizations (id text PRIMARY KEY)")
     await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19c-lp-match-explain-feedback.sql"), "utf8"))
+    await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19d-lp-match-run-options.sql"), "utf8"))
 
     await saveSessionV2(result(), "u-1")
 

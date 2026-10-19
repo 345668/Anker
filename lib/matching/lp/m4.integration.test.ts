@@ -7,7 +7,7 @@ const state = vi.hoisted(() => ({ query: vi.fn(), wave: vi.fn() }))
 vi.mock("@/lib/db", () => ({ sql: Object.assign((strings: TemplateStringsArray, ...values: unknown[]) => state.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values), { unsafe: (q: string, values: unknown[]) => state.query(q, values) }) }))
 vi.mock("@/lib/vc/lp-wave", () => ({ draftLpWave: state.wave, WAVE_PER_REQUEST: 10 }))
 
-import { listMatches, getMatch, resolveNames, latestSession, sessionInWorkspace } from "./matches"
+import { listMatches, getMatch, resolveNames, latestSession, sessionInWorkspace, listSessions, compareSessions, previousSessionId } from "./matches"
 import { recordFeedback, clearExclusion, FeedbackError } from "./feedback"
 import { addMatchesToCrm, removeAdded, draftIntros, previewAdd, MatchActionError } from "./actions"
 import { refineLpMatch, type LpMatchDeps } from "./service"
@@ -33,6 +33,7 @@ beforeAll(async () => {
   await db.exec(readFileSync("scripts/migrations/2026-10-19-lp-match-workspace.sql", "utf8"))
   await db.exec("INSERT INTO organizations VALUES ('org-a','fund','fund-1'),('org-b','fund',NULL);")
   await db.exec(readFileSync("scripts/migrations/2026-10-19c-lp-match-explain-feedback.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-19d-lp-match-run-options.sql", "utf8"))
   await db.exec(`
     CREATE TABLE crm_boards(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id text, user_id text, name text, source_session_id text, position int, archived boolean DEFAULT false);
     CREATE UNIQUE INDEX crm_boards_src ON crm_boards(org_id, source_session_id) WHERE source_session_id IS NOT NULL;
@@ -98,6 +99,31 @@ describe("reading a run", () => {
     const r = await resolveNames("org-a", S1, ["alpha family office", "Nobody", "Pat One"])
     expect(r.refs.map((x) => [x.kind, x.name])).toEqual([["firm", "Alpha Family Office"], ["contact", "Pat One"]])
     expect(r.unresolved).toEqual(["Nobody"])
+  })
+})
+
+describe("run history", () => {
+  it("lists the workspace's finished runs, newest first, whoever started them, and nothing of another workspace", async () => {
+    await db.exec(`INSERT INTO lp_match_sessions(id,fund_profile_id,fund_name,user_id,org_id,status,source,qualified_firms,created_at,run_options)
+      VALUES ('dddddddd-dddd-dddd-dddd-dddddddddddd','${FP}','Fund A','bob','org-a','completed','assistant',9,now(),'{"minScore":30,"includeKnown":true}'),
+             ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee','${FP}','Fund A','alice','org-a','running','page',1,now(),NULL)`)
+    const runs = await listSessions("org-a")
+    expect(runs.map((r) => [r.id.slice(0, 4), r.source])).toEqual([["dddd", "assistant"], ["aaaa", "page"]]) // the running one is not a run yet
+    expect(runs[0].options).toEqual({ minScore: 30, includeKnown: true })
+    expect((await listSessions("org-b")).map((r) => r.id.slice(0, 4))).toEqual(["bbbb"])
+    expect(await listSessions("org-a", { fundProfileId: FPB })).toEqual([])
+  })
+  it("finds the run before this one for the same fund, and compares two runs by firm", async () => {
+    const S3 = "dddddddd-dddd-dddd-dddd-dddddddddddd", F3 = "f4444444-4444-4444-4444-444444444444"
+    await db.exec(`INSERT INTO lp_match_sessions(id,fund_profile_id,fund_name,user_id,org_id,status,qualified_firms,qualified_contacts,created_at) VALUES ('${S3}','${FP}','Fund A','alice','org-a','completed',2,0,now());
+      INSERT INTO lp_firm_matches(id,session_id,fund_profile_id,firm_id,firm_name,score,tier) VALUES ('${F3}','${S3}','${FP}','FIRM1','Alpha Family Office',80,'champion'),('f5555555-5555-5555-5555-555555555555','${S3}','${FP}','FIRM7','Newcomer FO',60,'priority_a')`)
+    await db.exec(`UPDATE lp_match_sessions SET qualified_firms = 2 WHERE id = '${S1}'`)
+    const s3 = await sessionInWorkspace("org-a", S3)
+    expect(await previousSessionId("org-a", s3)).toBe(S1)
+    expect(await previousSessionId("org-a", await sessionInWorkspace("org-a", S1))).toBeNull()
+    const c = await compareSessions("org-a", S3, S1)
+    expect(c).toMatchObject({ newCount: 1, droppedCount: 1, newFirms: ["Newcomer FO"], droppedFirms: ["Beta Trust"], firmsDelta: 0 })
+    expect(await compareSessions("org-b", S3, S1)).toBeNull()
   })
 })
 

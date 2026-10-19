@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import {
   ArrowRight,
   Sparkles,
@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   Wand2,
   TrendingUp,
+  ChevronDown,
+  Package,
 } from "lucide-react"
 import { AiStatusBadge, type AiProvider } from "./ai-status-badge"
 import { PageHeader } from "@/components/shell/page-header"
@@ -36,6 +38,9 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { ShortlistUploader } from "@/components/tesseract/shortlist-uploader"
 import { LpResultsPanel } from "@/components/matching/lp-results-panel"
+import { LpMandatePanel } from "@/components/matching/lp-mandate-panel"
+import { LpRunSummary, type RunExclusions, type SincePrevious } from "@/components/matching/lp-run-summary"
+import { LpHistory, type HistoryRun } from "@/components/matching/lp-history"
 import { fundReadiness, responseError } from "@/lib/matching/profile-readiness"
 import { MatchingReadiness } from "./matching-readiness"
 import { FundDeckUploader } from "@/components/tesseract/fund-deck-uploader"
@@ -53,21 +58,6 @@ interface FundProfileLite {
   headquarters: string | null
   sectors: string[]
   primarySectors: string[]
-}
-
-interface SessionLite {
-  id: string
-  fundProfileId: string
-  fundName: string
-  qualifiedFirms: number
-  qualifiedContacts: number
-  contactsWithEmail: number
-  anchorCandidates: number
-  aiEnrichmentsApplied: number
-  duplicatesMerged: number
-  durationMs: number
-  createdAt: string
-  engineVersion: string
 }
 
 interface RunSummary {
@@ -89,6 +79,10 @@ interface RunSummary {
   funnel: { firms: any[]; contacts: any[] }
   /** What the workspace's rules left out before scoring, in words (docs/architecture/63). */
   exclusionSummary?: string
+  filterSummary?: string
+  exclusions?: RunExclusions | null
+  confidenceCounts?: { firms: Record<"high" | "medium" | "low", number>; contacts: Record<"high" | "medium" | "low", number> } | null
+  sincePrevious?: SincePrevious | null
 }
 
 const TIERS = [
@@ -116,7 +110,7 @@ export function MatchmakingContent({
 }: {
   loadError?: string | null
   fundProfiles: FundProfileLite[]
-  recentSessions: SessionLite[]
+  recentSessions: HistoryRun[]
 }) {
   const [isPending, startTransition] = useTransition()
   // Local copy of the profile list — server-rendered initial value, kept in
@@ -136,6 +130,12 @@ export function MatchmakingContent({
   const [maxContacts, setMaxContacts] = useState<number | "">("")
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [includeKnown, setIncludeKnown] = useState(false)
+  const [countries, setCountries] = useState<string[]>([])
+  const [elapsed, setElapsed] = useState(0)
+  const [profileOpen, setProfileOpen] = useState<boolean | null>(null)
+  const [history, setHistory] = useState<HistoryRun[]>(recentSessions)
+  const resultsRef = useRef<HTMLDivElement | null>(null)
+  const openRef = useRef<HTMLDivElement | null>(null)
   const [openSessionId, setOpenSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [latest, setLatest] = useState<RunSummary | null>(null)
@@ -152,12 +152,21 @@ export function MatchmakingContent({
 
   const missing = fundReadiness({ ...selectedFund, headquartersLocation: selectedFund?.headquarters })
   const editorInitial = useMemo(() => selectedFund ? toEditorValue(selectedFund) : undefined, [selectedFund])
-  useEffect(() => { setLatest(null) }, [selectedFundId, minScore, enableAi, editorDirty, regions, classes, includeKnown])
+  useEffect(() => { setLatest(null) }, [selectedFundId, minScore, enableAi, editorDirty, regions, classes, includeKnown, countries])
+  // A plain clock while a run is going; the engine reports no stages, so none are invented.
+  useEffect(() => {
+    if (!isPending) { setElapsed(0); return }
+    const t0 = Date.now(), id = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 500)
+    return () => clearInterval(id)
+  }, [isPending])
+  const profileSectionOpen = profileOpen ?? (!selectedFund || missing.length > 0)
 
-  const runMatching = () => {
+  interface RunCfg { fundId: string; minScore: number; enableAi: boolean; regions: Region[]; classes: InvestorClass[]; countries: string[]; includeKnown: boolean; maxFirms: number | ""; maxContacts: number | "" }
+  const currentCfg = (): RunCfg => ({ fundId: selectedFundId, minScore, enableAi, regions, classes, countries, includeKnown, maxFirms, maxContacts })
+
+  const runWith = (cfg: RunCfg) => {
     if (missing.length || editorDirty || extractingDeck || isPending) { setError("Complete and save the required profile fields before matching."); return }
-
-    if (!selectedFundId) {
+    if (!cfg.fundId) {
       setError("Pick a fund profile first — create one with the editor below or upload a deck.")
       return
     }
@@ -168,13 +177,13 @@ export function MatchmakingContent({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            fundProfileId: selectedFundId,
-            minScore,
-            enableAi,
-            filters: { regions, classes },
-            includeKnown,
-            maxFirms: maxFirms === "" ? undefined : maxFirms,
-            maxContacts: maxContacts === "" ? undefined : maxContacts,
+            fundProfileId: cfg.fundId,
+            minScore: cfg.minScore,
+            enableAi: cfg.enableAi,
+            filters: { regions: cfg.regions, classes: cfg.classes, countries: cfg.countries },
+            includeKnown: cfg.includeKnown,
+            maxFirms: cfg.maxFirms === "" ? undefined : cfg.maxFirms,
+            maxContacts: cfg.maxContacts === "" ? undefined : cfg.maxContacts,
           }),
         })
         if (!res.ok) {
@@ -182,10 +191,29 @@ export function MatchmakingContent({
         }
         const summary = (await res.json()) as RunSummary
         setLatest(summary)
+        setOpenSessionId(null)
+        // The new run joins the history without a reload.
+        fetch("/api/lp/matching/sessions?limit=20").then((r) => (r.ok ? r.json() : null)).then((j) => j?.sessions && setHistory(j.sessions)).catch(() => {})
+        requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }))
       } catch (e: any) {
         setError(e?.message ?? "Run failed")
       }
     })
+  }
+  const runMatching = () => runWith(currentCfg())
+
+  // "Run again" from the history: the same fund, mandate and options, applied to the form so what ran is what is shown.
+  const rerun = (r: HistoryRun) => {
+    const f = (r.filters ?? {}) as any, o = (r.options ?? {}) as any
+    const cfg: RunCfg = {
+      fundId: r.fundProfileId, minScore: typeof o.minScore === "number" ? o.minScore : 20, enableAi: !!o.enableAi,
+      regions: Array.isArray(f.regions) ? f.regions : [], classes: Array.isArray(f.classes) ? f.classes : [], countries: Array.isArray(f.countries) ? f.countries : [],
+      includeKnown: !!o.includeKnown, maxFirms: typeof o.maxFirms === "number" ? o.maxFirms : "", maxContacts: typeof o.maxContacts === "number" ? o.maxContacts : "",
+    }
+    setSelectedFundId(cfg.fundId); setMinScore(cfg.minScore); setEnableAi(cfg.enableAi); setRegions(cfg.regions); setClasses(cfg.classes); setCountries(cfg.countries)
+    setIncludeKnown(cfg.includeKnown); setMaxFirms(cfg.maxFirms); setMaxContacts(cfg.maxContacts)
+    // The form changes clear the previous result in an effect; the run starts after that has happened.
+    setTimeout(() => runWith(cfg), 0)
   }
 
   // Fold an extracted fund profile (from the deck uploader) into the
@@ -314,48 +342,13 @@ export function MatchmakingContent({
               </div>
             )}
 
-            {/* Mandate: where, and what kind. Doc 26 §5. */}
-            <fieldset>
-              <legend className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-                Raise from — geography
-              </legend>
-              <div className="flex flex-wrap gap-1.5">
-                {REGIONS.map((r) => {
-                  const on = regions.includes(r)
-                  return (
-                    <button key={r} type="button" aria-pressed={on}
-                      onClick={() => setRegions((v) => toggle(v, r))}
-                      className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-foreground bg-foreground text-background" : "border-foreground/20 hover:bg-foreground/5"}`}>
-                      {REGION_LABELS[r]}
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="text-[10px] font-mono text-muted-foreground mt-2">
-                {regions.length ? "Only these regions are searched." : "All regions."}
-              </p>
-            </fieldset>
-
-            <fieldset>
-              <legend className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-                Raise from — investor type
-              </legend>
-              <div className="flex flex-wrap gap-1.5">
-                {classesForPersona("vc").map((c) => {
-                  const on = classes.includes(c)
-                  return (
-                    <button key={c} type="button" aria-pressed={on}
-                      onClick={() => setClasses((v) => toggle(v, c))}
-                      className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-foreground bg-foreground text-background" : "border-foreground/20 hover:bg-foreground/5"}`}>
-                      {CLASS_LABELS[c]}
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="text-[10px] font-mono text-muted-foreground mt-2">
-                {classes.length ? "Only these types are searched." : "All allocator types."}
-              </p>
-            </fieldset>
+            {/* Mandate: where, and what kind (doc 26 section 5), and the fund's own rules (doc 63 section 4.2). */}
+            <LpMandatePanel
+              regions={regions} setRegions={setRegions} classes={classes} setClasses={setClasses} countries={countries} setCountries={setCountries}
+              includeKnown={includeKnown} setIncludeKnown={setIncludeKnown} disabled={isPending}
+              fund={selectedFund ? { id: selectedFund.id, allowedLpClasses: selectedFund.allowedLpClasses, excludedJurisdictions: selectedFund.excludedJurisdictions } : undefined}
+              onRulesSaved={(patch) => setProfiles((ps) => ps.map((f) => (f.id === selectedFundId ? { ...f, ...patch } : f)))}
+            />
 
             {/* Min score */}
             <div>
@@ -426,15 +419,6 @@ export function MatchmakingContent({
               </button>
               {showAdvanced && (
                 <div className="mt-3 space-y-3">
-                  <label className="flex items-start gap-2 text-sm">
-                    <input type="checkbox" checked={includeKnown} onChange={(e) => setIncludeKnown(e.target.checked)} className="mt-1" />
-                    <span>
-                      Also show LPs already in my CRM
-                      <span className="block text-[10px] font-mono text-muted-foreground">
-                        By default, LPs you have already contacted, who passed, whom you excluded, or who already invest in your fund are left out.
-                      </span>
-                    </span>
-                  </label>
                   <div>
                     <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                       Max firms (cap pipeline)
@@ -479,7 +463,7 @@ export function MatchmakingContent({
               {isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Running…
+                  Running… {elapsed} s
                 </>
               ) : (
                 <>
@@ -494,62 +478,16 @@ export function MatchmakingContent({
               <div role="alert" className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{error}</span>
+                {!missing.length && !editorDirty && selectedFundId ? <button type="button" onClick={runMatching} disabled={isPending} className="ml-auto underline shrink-0">Try again</button> : null}
               </div>
             )}
+            {isPending && <p className="text-[10px] font-mono text-muted-foreground" aria-live="polite">Usually 5 to 15 seconds. Keep this page open until it finishes.</p>}
 
-            <div className="text-[10px] font-mono text-muted-foreground space-y-1">
-              <div>· Pre-filters non-LPs in SQL (cheap)</div>
-              <div>· Dedups by normalized firm name + email</div>
-              <div>· Segments into 8 outreach buckets</div>
-              <div>· Bulk INSERT 200 rows/round-trip</div>
-            </div>
+            <p className="text-[10px] font-mono text-muted-foreground">Leaves out LPs you already handled, merges duplicates, and sorts the rest into outreach groups. Nothing is sent.</p>
           </div>
 
-          {/* Recent sessions */}
-          <div className="border border-foreground/10 rounded-lg p-6">
-            <h2 className="font-display text-xl mb-4">Recent runs</h2>
-            {recentSessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No sessions yet.</p>
-            ) : (
-              <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                {recentSessions.map((s) => (
-                  <div
-                    key={s.id}
-                    className="p-3 border border-foreground/10 rounded-md hover:border-foreground/30 transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium truncate">{s.fundName}</span>
-                      <span
-                        className={cn(
-                          "px-1.5 py-0.5 rounded font-mono text-[9px] uppercase tracking-wider",
-                          s.engineVersion === "v2"
-                            ? "bg-emerald-500/10 text-emerald-700"
-                            : "bg-foreground/5 text-muted-foreground",
-                        )}
-                      >
-                        {s.engineVersion}
-                      </span>
-                    </div>
-                    <div className="font-mono text-[10px] text-muted-foreground mb-2">
-                      {new Date(s.createdAt).toLocaleString()}
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-[10px] font-mono">
-                      <KvSmall k="firms" v={s.qualifiedFirms} />
-                      <KvSmall k="contacts" v={s.qualifiedContacts} />
-                      <KvSmall k="anchors" v={s.anchorCandidates} />
-                    </div>
-                    <div className="flex gap-2 mt-2 flex-wrap">
-                      <ExportLink sessionId={s.id} format="xlsx" label="xlsx" />
-                      <ExportLink sessionId={s.id} format="methodology" label="methodology" />
-                      <ExportLink sessionId={s.id} format="agenda" label="agenda" />
-                      <button type="button" onClick={() => setOpenSessionId(s.id)} className="font-mono text-[10px] underline underline-offset-2">open results</button>
-                      <ShortlistUploader source="lp_matching" sessionId={s.id} compact />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <LpHistory runs={history} openId={openSessionId ?? latest?.sessionId ?? null} onOpen={(id) => { setOpenSessionId(id); requestAnimationFrame(() => openRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })) }}
+            onRerun={rerun} canRerun={(r) => profiles.some((f) => f.id === r.fundProfileId)} busy={isPending} />
         </div>
 
         {/* Right: results */}
@@ -558,7 +496,21 @@ export function MatchmakingContent({
               Lets the GP upload their deck, get the profile auto-extracted, and
               run a 6-dimension LP analyst review with claims-verification.
               The onExtracted callback feeds the inline FundProfileEditor below. */}
-          <div inert={isPending} className="space-y-6">
+          <section className="border border-foreground/10 rounded-lg" aria-label="Fund profile">
+            <button type="button" onClick={() => setProfileOpen(!profileSectionOpen)} aria-expanded={profileSectionOpen}
+              className="w-full flex items-center justify-between gap-3 p-5 text-left">
+              <span>
+                <span className="block font-display text-xl">Fund profile{selectedFund ? `: ${selectedFund.name}` : ""}</span>
+                <span className={cn("block text-sm", missing.length ? "text-destructive" : "text-muted-foreground")}>
+                  {!selectedFund ? "Start with your fund deck or fill in the form. Five fields are needed to rank LPs."
+                    : missing.length ? `${missing.length} required field${missing.length === 1 ? "" : "s"} missing: ${missing.map((m) => m.label).join(", ")}`
+                    : editorDirty ? "Unsaved changes. Save before you run."
+                    : `Ready to rank${history[0] && history[0].fundProfileId === selectedFund.id ? ` · last run ${new Date(history[0].createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : ""}`}
+                </span>
+              </span>
+              <ChevronDown className={cn("w-5 h-5 shrink-0 transition-transform", profileSectionOpen && "rotate-180")} />
+            </button>
+            <div inert={isPending} className={cn("space-y-6 px-5 pb-5", !profileSectionOpen && "hidden")}>
           <Button variant="outline" disabled={isPending || extractingDeck} onClick={() => {
             if (!editorDirty || window.confirm("Discard unsaved profile changes?")) { setSelectedFundId(""); setEditorSeed(null) }
           }}>Create another fund profile</Button>
@@ -580,9 +532,10 @@ export function MatchmakingContent({
             onSaved={onProfileSaved}
             defaultCollapsed={false}
           />
-          </div>
+            </div>
+          </section>
 
-          {openSessionId && openSessionId !== latest?.sessionId ? <LpResultsPanel key={openSessionId} sessionId={openSessionId} /> : null}
+          {openSessionId && openSessionId !== latest?.sessionId ? <div ref={openRef} className="scroll-mt-6"><LpResultsPanel key={openSessionId} sessionId={openSessionId} /></div> : null}
 
           {!latest ? (
             <div className="border border-dashed border-foreground/15 rounded-lg p-16 text-center">
@@ -596,7 +549,9 @@ export function MatchmakingContent({
               </p>
             </div>
           ) : (
-            <>
+            <div ref={resultsRef} className="space-y-8 scroll-mt-6">
+              <LpRunSummary s={latest as any} minScore={minScore} onShowKnown={() => setIncludeKnown(true)} />
+
               {/* Top KPIs */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-foreground/10 rounded-lg overflow-hidden border border-foreground/10">
                 <KPI
@@ -727,7 +682,15 @@ export function MatchmakingContent({
               {/* Deliverables */}
               <div className="border border-foreground/10 rounded-lg p-6">
                 <h2 className="font-display text-xl mb-4">Download deliverables</h2>
-                <div className="grid md:grid-cols-3 gap-4">
+                <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+                  <DeliverableCard
+                    icon={<Package className="w-5 h-5" />}
+                    title="Everything (zip)"
+                    description="The workbook, firms and people as CSV, the methodology note and the meeting agenda, in one download."
+                    sessionId={latest.sessionId}
+                    format="zip"
+                    href={`/api/lp/export/bundle/${latest.sessionId}`}
+                  />
                   <DeliverableCard
                     icon={<FileSpreadsheet className="w-5 h-5" />}
                     title="LP Pipeline (xlsx)"
@@ -754,7 +717,7 @@ export function MatchmakingContent({
 
               {/* Outreach handoff — promote ticked rows from edited xlsx into the CRM */}
               <ShortlistUploader source="lp_matching" sessionId={latest.sessionId} />
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -871,16 +834,18 @@ function DeliverableCard({
   description,
   sessionId,
   format,
+  href,
 }: {
   icon: React.ReactNode
   title: string
   description: string
   sessionId: string
   format: string
+  href?: string
 }) {
   return (
     <a
-      href={`/api/lp/export/deliverables/${sessionId}?format=${format}`}
+      href={href ?? `/api/lp/export/deliverables/${sessionId}?format=${format}`}
       className="block p-5 border border-foreground/10 rounded-lg hover:border-foreground/30 transition-colors group"
     >
       <div className="w-10 h-10 rounded-md bg-foreground/5 flex items-center justify-center mb-3 group-hover:bg-foreground group-hover:text-background transition-colors">

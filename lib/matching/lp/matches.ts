@@ -99,3 +99,54 @@ export async function resolveNames(orgId: string, sessionId: string, names: stri
   }
   return { refs, unresolved, ambiguous }
 }
+
+// ─── Run history and comparison (docs/architecture/63 section 5) ───────────────────────────────────────
+
+export interface RunSummaryRow {
+  id: string; fundProfileId: string; fundName: string; createdAt: string; source: string; parentSessionId: string | null
+  filters: unknown; options: unknown; exclusions: unknown; confidence: unknown
+  qualifiedFirms: number; qualifiedContacts: number; contactsWithEmail: number; anchorCandidates: number; engineVersion: string; durationMs: number
+}
+const iso = (v: any) => (v instanceof Date ? v.toISOString() : String(v))
+export function shapeSession(s: any): RunSummaryRow {
+  return {
+    id: String(s.id), fundProfileId: String(s.fund_profile_id), fundName: String(s.fund_name ?? ""), createdAt: iso(s.created_at), source: s.source ?? "page", parentSessionId: s.parent_session_id ? String(s.parent_session_id) : null,
+    filters: s.filters_applied ?? null, options: s.run_options ?? null, exclusions: s.exclusion_counts ?? null, confidence: s.confidence_counts ?? null,
+    qualifiedFirms: Number(s.qualified_firms ?? 0), qualifiedContacts: Number(s.qualified_contacts ?? 0), contactsWithEmail: Number(s.contacts_with_email ?? 0),
+    anchorCandidates: Number(s.anchor_candidates ?? 0), engineVersion: s.engine_version ?? "v1", durationMs: Number(s.duration_ms ?? 0),
+  }
+}
+
+/** The workspace's finished runs, newest first, whoever started them. */
+export async function listSessions(orgId: string, opts: { fundProfileId?: string | null; limit?: number } = {}): Promise<RunSummaryRow[]> {
+  const limit = Math.max(1, Math.min(50, Math.floor(opts.limit ?? 20)))
+  const rows = (await sql`SELECT s.* FROM lp_match_sessions s LEFT JOIN fund_profiles f ON f.id = s.fund_profile_id
+    WHERE COALESCE(s.org_id, f.org_id) = ${orgId} AND s.status = 'completed' AND (${opts.fundProfileId ?? null}::text IS NULL OR s.fund_profile_id::text = ${opts.fundProfileId ?? null})
+    ORDER BY s.created_at DESC LIMIT ${limit}`) as any[]
+  return rows.map(shapeSession)
+}
+
+export interface RunComparison {
+  newer: RunSummaryRow; older: RunSummaryRow
+  newFirms: string[]; droppedFirms: string[]; newCount: number; droppedCount: number
+  firmsDelta: number; contactsDelta: number
+}
+/** What changed between two runs of the workspace: firms that appear only in the newer run, firms that appear only in the older, and the change in counts. */
+export async function compareSessions(orgId: string, newerId: string, olderId: string, cap = 25): Promise<RunComparison | null> {
+  const [n, o] = await Promise.all([sessionInWorkspace(orgId, newerId), sessionInWorkspace(orgId, olderId)])
+  if (!n || !o) return null
+  const side = async (id: string) => new Map(((await sql`SELECT firm_id::text AS id, firm_name AS name FROM lp_firm_matches WHERE session_id::text = ${id}`) as any[]).map((r) => [String(r.id), String(r.name)]))
+  const [a, b] = await Promise.all([side(newerId), side(olderId)])
+  const added = [...a].filter(([id]) => !b.has(id)).map(([, name]) => name), dropped = [...b].filter(([id]) => !a.has(id)).map(([, name]) => name)
+  const ns = shapeSession(n), os = shapeSession(o)
+  return { newer: ns, older: os, newFirms: added.slice(0, cap), droppedFirms: dropped.slice(0, cap), newCount: added.length, droppedCount: dropped.length,
+    firmsDelta: ns.qualifiedFirms - os.qualifiedFirms, contactsDelta: ns.qualifiedContacts - os.qualifiedContacts }
+}
+
+/** The run before this one for the same fund profile, if there is one. */
+export async function previousSessionId(orgId: string, session: { id: string; fund_profile_id: string; created_at: unknown }): Promise<string | null> {
+  const [r] = (await sql`SELECT s.id FROM lp_match_sessions s LEFT JOIN fund_profiles f ON f.id = s.fund_profile_id
+    WHERE COALESCE(s.org_id, f.org_id) = ${orgId} AND s.status = 'completed' AND s.fund_profile_id::text = ${String(session.fund_profile_id)} AND s.id::text <> ${String(session.id)} AND s.created_at < (SELECT x.created_at FROM lp_match_sessions x WHERE x.id::text = ${String(session.id)})
+    ORDER BY s.created_at DESC LIMIT 1`) as any[]
+  return r ? String(r.id) : null
+}

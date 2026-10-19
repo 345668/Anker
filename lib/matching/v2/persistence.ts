@@ -31,6 +31,8 @@ export interface SessionContext {
   filters?: unknown
   /** The run this one refines, so a change of mandate can be compared with what it replaced. */
   parentSessionId?: string | null
+  /** The options the run was started with (minimum score, caps, AI, whether known LPs were shown), for "run again with these settings". */
+  options?: Record<string, unknown> | null
 }
 
 export async function saveSessionV2(
@@ -50,7 +52,7 @@ export async function saveSessionV2(
       funnel_data, segment_counts, ai_enrichments_applied, duplicates_merged,
       engine_version, status,
       org_id, source, exclusion_counts, filters_applied,
-      total_firms_matched, total_contacts_matched, confidence_counts, parent_session_id
+      total_firms_matched, total_contacts_matched, confidence_counts, parent_session_id, run_options
     ) VALUES (
       ${result.sessionId}, ${result.fundProfileId}, ${result.fundName},
       ${result.totals.rawFirms}, ${result.totals.rawContacts},
@@ -62,7 +64,8 @@ export async function saveSessionV2(
       'v2', 'running',
       ${context.orgId ?? null}, ${context.source ?? "page"}, ${result.exclusions ? JSON.stringify(result.exclusions) : null}::jsonb, ${context.filters ? JSON.stringify(context.filters) : null}::jsonb,
       ${result.totals.qualifiedFirms}, ${result.totals.qualifiedContacts},
-      ${result.confidenceCounts ? JSON.stringify(result.confidenceCounts) : null}::jsonb, ${context.parentSessionId ?? null}
+      ${result.confidenceCounts ? JSON.stringify(result.confidenceCounts) : null}::jsonb, ${context.parentSessionId ?? null},
+      ${context.options ? JSON.stringify(context.options) : null}::jsonb
     )
     ON CONFLICT (id) DO NOTHING
   `
