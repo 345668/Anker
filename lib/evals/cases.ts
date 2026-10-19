@@ -24,7 +24,7 @@ export const staticCases: EvalCase[] = [
     return pass() } },
   { name: "a run that read outside content never auto-commits, whatever the switch", run: () => mayAutoCommit("R0", "untrusted", { R0: true }) ? fail("untrusted R0 auto-committed") : pass() },
   { name: "every capability has a known risk class; R1 and R2 are limited to the reviewed sets; nothing above R2 exists", run: () => {
-    const REVIEWED_R1 = ["outreach_save_drafts"] // saves drafts only; sending is a separate, gated path
+    const REVIEWED_R1 = ["outreach_save_drafts", "lp_match_to_crm"] // drafts only (sending is a separate, gated path); and suggested LPs into the CRM: internal, reaches nobody, undone while untouched (doc 63)
     const REVIEWED_R2 = ["outreach_send_batch"] // emails third parties: approved by the sender only, executed under a send authorization (doc 46)
     const bad = Object.values(CAPABILITIES).filter((c) => !["R0", "R1", "R2", "R3"].includes(c.risk)).map((c) => c.name)
     const above = Object.values(CAPABILITIES).filter((c) => c.risk === "R3" || (c.risk === "R2" && !REVIEWED_R2.includes(c.name)) || (c.risk === "R1" && !REVIEWED_R1.includes(c.name))).map((c) => c.name)

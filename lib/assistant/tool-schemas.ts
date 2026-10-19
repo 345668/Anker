@@ -38,6 +38,18 @@ export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
     fundName: str(), targetRaiseUsd: num(), sectors: arr(str()), geographicFocus: arr(str()),
     headquarters: str(), thesisKeywords: arr(str()),
   }),
+  lp_match_explain: obj({ name: str(), kind: str({ enum: ["firm", "contact"] }), sessionId: str() }, ["name"]),
+  lp_match_feedback: obj({
+    names: arr(str()), verdict: str({ enum: ["fit", "not_a_fit", "already_known", "wrong_data"] }),
+    reason: str({ enum: ["wrong_type", "too_small", "wrong_geography", "wrong_sector", "already_in_touch", "not_investing", "other"] }),
+    note: str(), neverAgain: bool(), kind: str({ enum: ["firm", "contact"] }), sessionId: str(),
+  }, ["names", "verdict"]),
+  lp_match_refine: obj({
+    filters: obj({ countries: arr(str()), regions: arr(str()), classes: arr(str()), excludeClasses: arr(str()), sectors: arr(str()) }),
+    reset: bool(), includeKnown: bool(), sessionId: str(),
+  }),
+  lp_match_draft: obj({ names: arr(str()), sessionId: str() }, ["names"]),
+  lp_match_to_crm: obj({ names: arr(str()), sessionId: str() }, ["names"]),
   match_investors: obj({
     startup: obj({
       name: str(), stage: str(), location: str(), sectors: arr(str()), askAmount: num({ minimum: 1 }),

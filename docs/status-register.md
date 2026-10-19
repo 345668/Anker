@@ -55,10 +55,10 @@ Spec only. Nothing built.
 
 | | |
 |---|---|
-| Built | M0 and M1 (2026-10-19): one service behind the page and Anker AI; the old assistant engine retired; workspace exclusions, the fund's rules, directory-source checks, counts on the page and in chat; workspace-owned runs; raise-path count fault fixed |
-| Verified live | Throwaway workspace on production: 3.9 s filtered and 12.5 s whole-directory runs; each exclusion reason removes the right rows and counts them; the rest keeps its order; "show anyway"; the assistant tool through the real AI context matches the service; cleanup verified |
-| Untested | The page in a browser; a model choosing the tool in chat and Telegram; two humans in one workspace in production; any editor for the fund's own rules (API only); the use gate with its flag on |
-| Open | M2 jobs and progress, M3 explanations and confidence, M4 feedback and actions, M5 page rework, M6 shadow factors and evaluation (needs the founder's labelled set), M7 investor side; counsel items in doc 63 section 11 |
+| Built | M0 and M1 (2026-10-19): one service behind the page and Anker AI, workspace exclusions, fund rules, workspace-owned runs. M3 and M4 (2026-10-19): reasons, gaps and confidence on every match; ranked list and drawer on the page; verdicts with "never suggest again"; add to CRM (page click, or governed proposal from chat); drafts for chosen people as proposals; refine the mandate; assistant tools lp_match_explain, lp_match_feedback, lp_match_refine, lp_match_draft, lp_match_to_crm |
+| Verified live | Throwaway workspace on production: runs of 3.9 s and 12.5 s; each exclusion reason; stored confidence and gaps for all 383 firms; lists without addresses; explain, feedback, refine through the real AI context; a never-again firm stays out of the refined run; the CRM proposal waits, applies on approval and undoes; cleanup verified zero |
+| Untested | The results panel and drawer in a browser; drafts with a real model; a model choosing these tools in chat and Telegram; two humans in one workspace; any editor for the fund's own rules (API only); the use gate with its flag on |
+| Open | M2 jobs and progress, M5 page rework (readiness strip, mandate chips, history and compare, zip), M6 shadow factors and evaluation (needs the founder's labelled set), M7 investor side; counsel items in doc 63 section 11 |
 
 ## 6. How a live test is done (so it can be repeated)
 A throwaway fund and investor with an obvious name are created in production, addressed to the founder's own mailbox; the portal is driven over HTTP; fund-side steps run through the library from a script (TypeScript run with `tsx`, `DATABASE_URL` pointed at the Neon database because `.env.local` points it at a dead local address, a temporary stub for `server-only`); everything is deleted in a `finally` block and the row counts are checked. Things that create a real account or password, or read the founder's inbox, are left to the founder.

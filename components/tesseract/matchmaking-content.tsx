@@ -35,6 +35,7 @@ import { CLASS_LABELS, REGION_LABELS, REGIONS, classesForPersona, type InvestorC
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { ShortlistUploader } from "@/components/tesseract/shortlist-uploader"
+import { LpResultsPanel } from "@/components/matching/lp-results-panel"
 import { fundReadiness, responseError } from "@/lib/matching/profile-readiness"
 import { MatchingReadiness } from "./matching-readiness"
 import { FundDeckUploader } from "@/components/tesseract/fund-deck-uploader"
@@ -135,6 +136,7 @@ export function MatchmakingContent({
   const [maxContacts, setMaxContacts] = useState<number | "">("")
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [includeKnown, setIncludeKnown] = useState(false)
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [latest, setLatest] = useState<RunSummary | null>(null)
   // Seed for the inline editor.  Populated by the FundDeckUploader's
@@ -540,6 +542,7 @@ export function MatchmakingContent({
                       <ExportLink sessionId={s.id} format="xlsx" label="xlsx" />
                       <ExportLink sessionId={s.id} format="methodology" label="methodology" />
                       <ExportLink sessionId={s.id} format="agenda" label="agenda" />
+                      <button type="button" onClick={() => setOpenSessionId(s.id)} className="font-mono text-[10px] underline underline-offset-2">open results</button>
                       <ShortlistUploader source="lp_matching" sessionId={s.id} compact />
                     </div>
                   </div>
@@ -578,6 +581,8 @@ export function MatchmakingContent({
             defaultCollapsed={false}
           />
           </div>
+
+          {openSessionId && openSessionId !== latest?.sessionId ? <LpResultsPanel key={openSessionId} sessionId={openSessionId} /> : null}
 
           {!latest ? (
             <div className="border border-dashed border-foreground/15 rounded-lg p-16 text-center">
@@ -716,6 +721,8 @@ export function MatchmakingContent({
                 <FunnelCard title="Firm funnel" stages={latest.funnel.firms} />
                 <FunnelCard title="Contact funnel" stages={latest.funnel.contacts} />
               </div>
+
+              <LpResultsPanel key={latest.sessionId} sessionId={latest.sessionId} />
 
               {/* Deliverables */}
               <div className="border border-foreground/10 rounded-lg p-6">

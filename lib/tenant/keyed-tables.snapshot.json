@@ -200,6 +200,7 @@
     "lp_firm_matches",
     "lp_information_sharing",
     "lp_match_audit",
+    "lp_match_feedback",
     "lp_match_sessions",
     "lp_onboarding_details",
     "lp_pipeline_events",
@@ -567,6 +568,9 @@
     ],
     "lp_information_sharing": [
       "fund_id"
+    ],
+    "lp_match_feedback": [
+      "org_id"
     ],
     "lp_match_sessions": [
       "org_id"

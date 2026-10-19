@@ -114,6 +114,13 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     run: async () => { throw new Error("crm_update_stage is a governed action: it must go through the proposal path (lib/actions)."); },
   },
 
+  lp_match_to_crm: {
+    name: "lp_match_to_crm",
+    description: "Propose adding named LPs from the latest LP matching run to the CRM (firms or people, up to 50, names as listed). It waits in the Actions inbox for a person to approve; it is not applied by this call. Nothing is sent to them.",
+    params: '{ "names": string[], "sessionId"?: string }',
+    run: async () => { throw new Error("lp_match_to_crm is a governed action: it must go through the proposal path (lib/actions)."); },
+  },
+
   crm_add_task: {
     name: "crm_add_task",
     description: "Propose a follow-up task/reminder, optionally attached to a CRM contact (get the id via crm_search) and with a due date. The task waits in the Actions inbox for a person to approve; it is not created by this call.",

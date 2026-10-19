@@ -7,8 +7,8 @@ import type { AiPrincipal } from "./context"
 // build_investor_profile is not here: it writes nothing (it reads a firm's site and public LinkedIn and synthesizes a profile), so it is an ordinary read tool whose run is marked untrusted.
 const BLOCKED = new Set(["enrich_db_from_xlsx","enrich_firms"])
 // Governed writes: these do not run, they become proposals a person decides (lib/actions, doc 43). Only a member who can write may propose.
-const PROPOSE = new Set(["crm_update_stage","crm_add_task","memory_remember","outreach_send_batch"])
-const READ_ONLY = new Set(["web_search","web_crawl","query_investors","crm_overview","crm_search","memory_recall","outreach_drafts","deal_pipeline","network_intro_paths","outreach_inbox","fund_performance","planning_snapshot","call_intelligence","lp_overview","analyze_image","ocr_image","translate_text"])
+const PROPOSE = new Set(["crm_update_stage","crm_add_task","memory_remember","outreach_send_batch","lp_match_to_crm"])
+const READ_ONLY = new Set(["web_search","web_crawl","query_investors","crm_overview","crm_search","memory_recall","outreach_drafts","deal_pipeline","network_intro_paths","outreach_inbox","fund_performance","planning_snapshot","call_intelligence","lp_overview","lp_match_explain","analyze_image","ocr_image","translate_text"])
 const FUND_READS = new Set(["fund_performance","deal_pipeline","portfolio_kpi_rollup"])
 export function canUseTool(p: AiPrincipal, name: string) {
   if (!toolAllowlistFor(p.persona).has(name) || !TOOL_SCHEMAS[name] || BLOCKED.has(name)) return false
@@ -18,7 +18,7 @@ export function canUseTool(p: AiPrincipal, name: string) {
   if (PROPOSE.has(name) && (p.readonly || !p.canWrite)) return false
   if (name === "send_outreach" && (p.readonly || !p.canWrite)) return false
   // Saves the startup profile and the run, so a read-only or non-writing member cannot run it.
-  if ((name === "match_investors" || name === "matchmake_lps") && (p.readonly || !p.canWrite)) return false
+  if ((name === "match_investors" || name === "matchmake_lps" || name === "lp_match_feedback" || name === "lp_match_refine" || name === "lp_match_draft") && (p.readonly || !p.canWrite)) return false
   return true
 }
 /** Validate the same bounded input contract advertised to MCP. */

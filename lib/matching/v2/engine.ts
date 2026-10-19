@@ -20,6 +20,7 @@ import { computeContactScore, computeFirmScore, MIN_QUALIFICATION_SCORE } from "
 import { raiseBand, scoreCapacity, type Capacity } from "./lp-capacity"
 import { checkPerson } from "./lp-person"
 import { countExclusion, emptyExclusionCounts, type LpRules } from "@/lib/matching/lp/rules"
+import { confidenceCounts, contactFacts, contactSentence, firmFacts, firmSentence } from "@/lib/matching/lp/explain"
 import { classifyContactSegments, classifyFirmSegments } from "./segmentation"
 import {
   enrichContactsWithRationales,
@@ -279,6 +280,10 @@ export async function runLpMatchingV2(
   firmsAccepted = firmsAccepted.slice(0, maxFirms)
   contactsAccepted = contactsAccepted.slice(0, maxContacts)
 
+  // ─── Facts each match rests on (docs/architecture/63 4.4) ───────────────
+  for (const f of firmsAccepted) Object.assign(f, firmFacts(f))
+  for (const c of contactsAccepted) Object.assign(c, contactFacts(c))
+
   // ─── Phase 5: segmentation ──────────────────────────────────────────────
   for (const f of firmsAccepted) f.segments = classifyFirmSegments(f, fund)
   for (const c of contactsAccepted) c.segments = classifyContactSegments(c, fund)
@@ -296,8 +301,8 @@ export async function runLpMatchingV2(
     aiEnrichmentsApplied = fr.enriched + cr.enriched
   } else {
     // Fill rationales via rule-based path even without AI
-    for (const firm of firmsAccepted) firm.whyThisLp = ruleBasedRationaleFirm(firm)
-    for (const contact of contactsAccepted) contact.whyThisLp = ruleBasedRationaleContact(contact)
+    for (const firm of firmsAccepted) firm.whyThisLp = firmSentence(firm)
+    for (const contact of contactsAccepted) contact.whyThisLp = contactSentence(contact)
   }
 
   // ─── Phase 7: stats + funnel ────────────────────────────────────────────
@@ -429,6 +434,7 @@ export async function runLpMatchingV2(
     firms: firmsAccepted,
     contacts: contactsAccepted,
     ...(rules ? { exclusions } : {}),
+    confidenceCounts: { firms: confidenceCounts(firmsAccepted), contacts: confidenceCounts(contactsAccepted) },
   }
   onProgress({ phase: "done", result })
   return result

@@ -22,6 +22,7 @@ import { fetchPublicText } from "./public-fetch";
 import { currentAiContext } from "./context";
 import { matchInvestors } from "./match-investors";
 import { matchmakeLps } from "./matchmake-lps";
+import { lpMatchExplain, lpMatchFeedback, lpMatchRefine, lpMatchDraft } from "./lp-match-tools";
 import { ScoredBatches, type ScoredRow } from "./score-merge";
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export";
 import { reconcileSheet, detectHeader } from "@/lib/dataroom/reconcile";
@@ -223,6 +224,34 @@ export const TOOLS: Record<string, ToolDef> = {
     description: "THE platform's LP matching for a fund: ranks family offices, funds of funds and other LPs for the workspace's saved fund profile (the same engine and rules as the Matchmaking page), leaves out LPs already in the CRM, passed, suppressed or already the fund's investors, saves the run to the Matchmaking page and returns one ranked workbook. Use it whenever a GP asks for LPs, a shortlist or a pipeline. The fund comes from the workspace's saved profile; pass the fund fields only when the workspace has none.",
     params: `{ "fundProfileId"?: string, "top"?: number (rows to list, default 10), "filters"?: { "countries"?: string[] (e.g. "US"), "regions"?: string[], "classes"?: string[] (e.g. "family-office"), "excludeClasses"?: string[], "sectors"?: string[] } (ONLY constraints the user stated), "includeKnown"?: boolean (also list LPs already in the CRM), and only when the workspace has no fund profile: "fundName": string, "targetRaiseUsd": number, "sectors": string[], "geographicFocus": string[], "headquarters": string, "thesisKeywords"?: string[] }`,
     async run(inp) { const ctx = currentAiContext(); return matchmakeLps(inp, ctx?.principal); },
+  },
+
+  lp_match_explain: {
+    name: "lp_match_explain",
+    description: "Explain why ONE LP from the latest matching run is suggested: the engine's reasons, how it scored, the likely cheque, what is not known about it and the confidence. Use it when the user asks why an LP ranks where it does. Name the LP as listed.",
+    params: `{ "name": string, "kind"?: "firm"|"contact", "sessionId"?: string }`,
+    async run(inp) { const ctx = currentAiContext(); return lpMatchExplain(inp, ctx?.principal); },
+  },
+
+  lp_match_feedback: {
+    name: "lp_match_feedback",
+    description: "Record the user's verdict on suggested LPs from the latest run: fit, not_a_fit, already_known or wrong_data, with an optional reason, and neverAgain to stop suggesting them in this workspace. Only when the user says so about named LPs.",
+    params: `{ "names": string[] (as listed, up to 20), "verdict": "fit"|"not_a_fit"|"already_known"|"wrong_data", "reason"?: "wrong_type"|"too_small"|"wrong_geography"|"wrong_sector"|"already_in_touch"|"not_investing"|"other", "note"?: string, "neverAgain"?: boolean, "kind"?: "firm"|"contact", "sessionId"?: string }`,
+    async run(inp) { const ctx = currentAiContext(); return lpMatchFeedback(inp, ctx?.principal); },
+  },
+
+  lp_match_refine: {
+    name: "lp_match_refine",
+    description: "Run the latest LP matching again with a changed mandate (for example only Europe, drop a type of LP) and report what changed against the previous run. A part you give replaces that part; parts you leave out stay. The new run is saved on the Matchmaking page.",
+    params: `{ "filters": { "countries"?: string[], "regions"?: string[], "classes"?: string[], "excludeClasses"?: string[], "sectors"?: string[] } (ONLY what the user changed; an empty list clears that part), "reset"?: boolean (clear the whole mandate first), "includeKnown"?: boolean, "sessionId"?: string }`,
+    async run(inp) { const ctx = currentAiContext(); return lpMatchRefine(inp, ctx?.principal); },
+  },
+
+  lp_match_draft: {
+    name: "lp_match_draft",
+    description: "Write first-contact drafts for named PEOPLE from the latest LP matching run, as proposals a person approves in the Actions inbox (they are added to the CRM first if needed). Up to 10 at a time; nothing is sent.",
+    params: `{ "names": string[] (people as listed, up to 10), "sessionId"?: string }`,
+    async run(inp) { const ctx = currentAiContext(); return lpMatchDraft(inp, ctx?.principal); },
   },
 
   match_investors: {

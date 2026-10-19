@@ -58,7 +58,7 @@ it("roundtrips all matching inputs and passes the saved canonical profile to the
   state.run.mockResolvedValue({ sessionId: "result", totals: {}, tierCounts: {}, segmentCounts: {}, funnel: {} })
   expect((await match(request({ fundProfileId: profile.id, enableAi: false }))).status).toBe(200)
   expect(state.run.mock.calls[0][0]).toMatchObject({ headquartersLocation: "Berlin", geographicFocus: ["Germany"], thesisKeywords: ["energy"], sectors: ["climate"], averageTicket: 1000000, fundNumber: 2 })
-  expect(state.persist).toHaveBeenCalledWith(expect.anything(), "alice", { orgId: "fund-a", source: "page", filters: expect.anything() })
+  expect(state.persist).toHaveBeenCalledWith(expect.anything(), "alice", { orgId: "fund-a", source: "page", filters: expect.anything(), parentSessionId: null })
   state.org = "fund-b"
   expect((await match(request({ fundProfileId: profile.id }))).status).toBe(404)
   expect((await save(request({ ...profile, name: "Wrong workspace" }))).status).toBe(404)

@@ -187,6 +187,8 @@ describe("saveSessionV2 against the migrated schema", () => {
     const migration = fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-09-23-lp-matching-repair.sql"), "utf8")
     await db.exec(migration)
     await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19-lp-match-workspace.sql"), "utf8"))
+    await db.exec("CREATE TABLE IF NOT EXISTS organizations (id text PRIMARY KEY)")
+    await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19c-lp-match-explain-feedback.sql"), "utf8"))
 
     await saveSessionV2(result(), "u-1")
 
@@ -217,6 +219,8 @@ describe("saveSessionV2 against the migrated schema", () => {
     const migration = fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-09-23-lp-matching-repair.sql"), "utf8")
     await db.exec(migration)
     await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19-lp-match-workspace.sql"), "utf8"))
+    await db.exec("CREATE TABLE IF NOT EXISTS organizations (id text PRIMARY KEY)")
+    await db.exec(fs.readFileSync(path.join(process.cwd(), "scripts/migrations/2026-10-19c-lp-match-explain-feedback.sql"), "utf8"))
     const broken = { ...result(), firms: [{ ...firm(1, 95), score: "not a number" as any }] }
     await expect(saveSessionV2(broken as MatchingResultV2, "u-1")).rejects.toThrow()
     const [row] = (await db.query<any>("SELECT status FROM lp_match_sessions")).rows

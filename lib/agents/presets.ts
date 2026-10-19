@@ -57,7 +57,7 @@ export const PRESETS: Record<Exclude<Persona, null>, AgentPreset> = {
     personaSkill: "personas/fund-copilot.md",
     tools: [
       ...SHARED,
-      "build_investor_profile", "score_investors", "enrich_firms", "matchmake_lps",
+      "build_investor_profile", "score_investors", "enrich_firms", "matchmake_lps", "lp_match_explain", "lp_match_feedback", "lp_match_refine", "lp_match_draft", "lp_match_to_crm",
       "deal_pipeline", "fund_performance", "network_intro_paths", "call_intelligence",
       "draft_outreach_batch", "outreach_sequence", "send_outreach", "followup_sweep", "outreach_inbox",
       "crm_overview", "crm_search", "crm_update_stage", "crm_add_task", "memory_recall", "memory_remember", "outreach_drafts", "outreach_send_batch",

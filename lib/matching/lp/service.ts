@@ -25,6 +25,8 @@ export interface LpMatchInput {
   mandate?: unknown
   /** Show LPs already in the CRM instead of leaving them out. */
   includeKnown?: boolean
+  /** The run this one refines (docs/architecture/63 M4). */
+  parentSessionId?: string | null
 }
 export class LpMatchError extends Error {
   constructor(message: string, readonly status = 409, readonly missingFields?: unknown) { super(message); this.name = "LpMatchError" }
@@ -77,10 +79,36 @@ export async function runLpMatch(scope: LpMatchScope, input: LpMatchInput = {}, 
   const rules: LpRules = buildLpRules(ruleData)
 
   const result = await deps.run(fund, { ...options.data, filters, rules })
-  await deps.save(result, scope.userId, { orgId: scope.orgId, source: scope.source, filters })
+  await deps.save(result, scope.userId, { orgId: scope.orgId, source: scope.source, filters, parentSessionId: input.parentSessionId ?? null })
   return {
     result, fund, filters,
     filterSummary: hasFilters(filters) ? describeFilters(filters) : "",
     exclusionSummary: result.exclusions ? describeExclusions(result.exclusions) : "",
   }
+}
+
+export interface RefineChanges { countries?: string[]; regions?: string[]; classes?: string[]; excludeClasses?: string[]; sectors?: string[] }
+export interface RefineOutcome extends LpMatchOutcome {
+  parentSessionId: string
+  addedFirms: string[]; droppedFirms: string[]; addedCount: number; droppedCount: number
+}
+
+/**
+ * Run the last finished run again with a changed mandate (docs/architecture/63 M4, "only Europe"). A key that is given replaces that part of the mandate (an empty list clears
+ * it); keys not given stay as they were. The new run is saved as its own, pointing at the one it refines, and the difference in firms is reported.
+ */
+export async function refineLpMatch(scope: LpMatchScope, input: { sessionId?: string | null; changes: RefineChanges; includeKnown?: boolean; options?: LpMatchInput["options"] }, deps: LpMatchDeps = defaultDeps): Promise<RefineOutcome> {
+  const { latestSession, sessionInWorkspace } = await import("./matches")
+  const parent = input.sessionId ? await sessionInWorkspace(scope.orgId, input.sessionId) : await latestSession(scope.orgId)
+  if (!parent) throw new LpMatchError("There is no finished matching run in this workspace to refine. Run the matching first.", 409)
+  const base = parseFilters(parent.filters_applied) ?? EMPTY_FILTERS
+  const merged: Record<string, unknown> = { ...base }
+  for (const k of ["countries", "regions", "classes", "excludeClasses", "sectors"] as const) if (input.changes[k] !== undefined) merged[k] = input.changes[k]
+  const before = (await sql`SELECT firm_id::text AS id, firm_name AS name FROM lp_firm_matches WHERE session_id = ${parent.id}`) as any[]
+  const out = await runLpMatch(scope, { fundProfileId: String(parent.fund_profile_id), mandate: merged, includeKnown: input.includeKnown, options: input.options, parentSessionId: String(parent.id) }, deps)
+  const prev = new Map(before.map((r) => [String(r.id), String(r.name)]))
+  const now = new Map(out.result.firms.map((f) => [String(f.firmId), f.name]))
+  const addedFirms = [...now].filter(([id]) => !prev.has(id)).map(([, n]) => n)
+  const droppedFirms = [...prev].filter(([id]) => !now.has(id)).map(([, n]) => n)
+  return { ...out, parentSessionId: String(parent.id), addedFirms, droppedFirms, addedCount: addedFirms.length, droppedCount: droppedFirms.length }
 }

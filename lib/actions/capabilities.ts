@@ -340,7 +340,64 @@ const lpRequestFollowup: Capability = {
   },
 }
 
-export const CAPABILITIES: Record<string, Capability> = { lp_request_followup: lpRequestFollowup, crm_update_stage: stageMove, crm_add_task: addTask, memory_remember: remember, outreach_save_drafts: saveDrafts, outreach_send_batch: sendBatch }
+
+/**
+ * Put suggested LPs from a matching run into the CRM (docs/architecture/63 M4). R1: bulk, and it creates records a person will then work on. It reaches nobody. Names are resolved
+ * to rows of the run when the proposal is made and travel in it, so what is approved is exactly what is added. Undo removes them only while nobody has worked on them.
+ */
+const lpMatchAddToCrm: Capability = {
+  name: "lp_match_to_crm",
+  risk: "R1",
+  check(input) {
+    const sessionId = input?.sessionId ? String(input.sessionId).trim() : null
+    const refs = (Array.isArray(input?.refs) ? input.refs : []).map((r: any) => ({ kind: r?.kind === "firm" ? "firm" : r?.kind === "contact" ? "contact" : "", id: String(r?.id ?? "").trim() })).filter((r: any) => r.kind && r.id)
+    const names = (Array.isArray(input?.names) ? input.names : []).map((n: any) => String(n ?? "").trim()).filter(Boolean)
+    if (!refs.length && !names.length) throw new ActionError("Name the LPs to add.")
+    if (refs.length + names.length > 50) throw new ActionError("Add at most 50 at a time.")
+    return { sessionId, refs, names }
+  },
+  async plan(scope, input) {
+    const { sessionId, refs, names } = this.check(input)
+    const m = await import("@/lib/matching/lp/matches"), a = await import("@/lib/matching/lp/actions")
+    const s = sessionId ? await m.sessionInWorkspace(scope.orgId, sessionId) : await m.latestSession(scope.orgId)
+    if (!s) throw new ActionError("There is no finished matching run in this workspace.")
+    let all = refs as Array<{ kind: "firm" | "contact"; id: string }>
+    if (names.length) {
+      const r = await m.resolveNames(scope.orgId, String(s.id), names)
+      if (r.unresolved.length || r.ambiguous.length) throw new ActionError(`Not found in the run: ${[...r.unresolved, ...r.ambiguous.map((n) => `${n} (more than one)`)].join(", ")}.`)
+      all = [...all, ...r.refs.map(({ kind, id }) => ({ kind, id }))]
+    }
+    const pv = await a.previewAdd(scope.orgId, String(s.id), all)
+    if (!pv.fresh.length) throw new ActionError(pv.already.length ? "These LPs are already in your CRM." : `None can be added: ${pv.skipped.map((x) => `${x.name} (${x.reason})`).join("; ") || "not found"}.`)
+    const clip = (xs: string[]) => xs.slice(0, 6).join(", ") + (xs.length > 6 ? `, and ${xs.length - 6} more` : "")
+    return {
+      summary: `Add ${pv.fresh.length} suggested LP${pv.fresh.length === 1 ? "" : "s"} to the CRM`,
+      diff: [
+        { label: "Added to the CRM (stage: queued)", before: null, after: clip(pv.fresh.map((l) => l.name)) },
+        ...(pv.already.length ? [{ label: "Already in the CRM, left as they are", before: null, after: clip(pv.already.map((x) => x.name)) }] : []),
+        ...(pv.skipped.length ? [{ label: "Cannot be added", before: null, after: clip(pv.skipped.map((x) => `${x.name} (${x.reason})`)) }] : []),
+      ],
+      evidence: { note: "Nothing is sent. They appear on a board named after the fund." },
+      bind: { sessionId: String(s.id), refs: all, names: [] },
+    }
+  },
+  async apply(scope, input) {
+    const { sessionId, refs } = this.check(input)
+    if (!sessionId || !refs.length) throw new ActionError("This proposal has no resolved list; ask again.")
+    const a = await import("@/lib/matching/lp/actions")
+    const r = await a.addMatchesToCrm(scope, sessionId, refs)
+    if (!r.added.length) throw new ActionError(r.already.length ? "Nothing added: they are already in the CRM." : "Nothing could be added.")
+    return { undo: { entryIds: r.added.map((x) => x.entryId) }, message: `Added ${r.added.length} to the CRM board "${r.boardName}".${r.already.length ? ` ${r.already.length} were already there.` : ""}` }
+  },
+  async undo(scope, _input, u) {
+    const a = await import("@/lib/matching/lp/actions")
+    const n = await a.removeAdded(scope.orgId, (u.entryIds as string[]) ?? [])
+    if (!n) throw new ActionError("Not undone: they have been worked on since, and undo will not remove later work.")
+    return `Removed ${n} untouched entr${n === 1 ? "y" : "ies"} from the CRM.`
+  },
+}
+
+export const CAPABILITIES: Record<string, Capability> = { lp_match_to_crm: lpMatchAddToCrm, lp_request_followup: lpRequestFollowup, crm_update_stage: stageMove, crm_add_task: addTask, memory_remember: remember, outreach_save_drafts: saveDrafts, outreach_send_batch: sendBatch }
 /** Capabilities only the platform itself proposes (an investor's request): the assistant can never name them. */
 const INTERNAL_ONLY = new Set(["lp_request_followup"])
 export const isProposeCapability = (name: string) => Object.hasOwn(CAPABILITIES, name) && !INTERNAL_ONLY.has(name)

@@ -42,6 +42,8 @@ export async function draftLpWave(
   scope: WaveScope,
   want: number,
   deps: WaveDeps = defaultDeps,
+  /** Draft for these CRM entries only (chosen on the Matchmaking page or in chat), still within the same limits and filters. */
+  only: string[] | null = null,
 ): Promise<WaveResult> {
   const [fr] =
     (await sql`SELECT * FROM fund_profiles WHERE org_id = ${scope.orgId} AND is_active = true ORDER BY updated_at DESC NULLS LAST LIMIT 1`) as any[]
@@ -65,7 +67,7 @@ export async function draftLpWave(
   const entries =
     (await sql`SELECT e.id, e.display_name, e.display_title, e.display_type, e.display_location, e.why_match, e.research_summary
     FROM crm_entries e
-    WHERE e.org_id = ${scope.orgId} AND e.source = 'lp_matching' AND e.stage = 'queued' AND (e.display_email LIKE '%@%' OR e.display_linkedin IS NOT NULL)
+    WHERE e.org_id = ${scope.orgId} AND (${only}::text[] IS NULL OR e.id = ANY(${only})) AND e.source = 'lp_matching' AND e.stage = 'queued' AND (e.display_email LIKE '%@%' OR e.display_linkedin IS NOT NULL)
       AND NOT EXISTS (SELECT 1 FROM outreach_messages m WHERE m.crm_entry_id = e.id AND m.kind IN ('email_intro','dm_intro'))
       AND NOT EXISTS (SELECT 1 FROM action_proposals p WHERE p.org_id = e.org_id AND p.capability = 'outreach_save_drafts' AND p.status = 'pending' AND p.input->>'entryId' = e.id)
     ORDER BY coalesce(e.display_email LIKE '%@%', false) DESC, e.display_score DESC NULLS LAST, e.added_at ASC LIMIT ${n}`) as any[]

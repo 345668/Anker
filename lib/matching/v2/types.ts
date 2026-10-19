@@ -182,6 +182,9 @@ export interface ScoredFirmV2 {
   rank?: { capacityKnown: number; thesisMatched: number; sectorMatched: number; evidence: number }
   /** The cheque this LP would plausibly write into this fund. */
   expectedTicket?: number | null
+  /** Facts the score could not rest on, and how much weight that leaves it (docs/architecture/63 4.4). */
+  gaps?: string[]
+  confidence?: "high" | "medium" | "low"
 }
 
 export interface ScoredContactV2 {
@@ -210,6 +213,8 @@ export interface ScoredContactV2 {
   hnwSignals: string[]
   rank?: { capacityKnown: number; thesisMatched: number; sectorMatched: number; evidence: number }
   expectedTicket?: number | null
+  gaps?: string[]
+  confidence?: "high" | "medium" | "low"
 }
 
 // ─── Funnel data (matches the methodology funnel table) ────────────────────
@@ -255,6 +260,8 @@ export interface MatchingResultV2 {
   contacts: ScoredContactV2[]
   /** What the workspace's hard rules left out before scoring, by reason (docs/architecture/63 4.2). Absent when no rules were applied. */
   exclusions?: import("@/lib/matching/lp/rules").LpExclusionCounts
+  /** How many qualified firms and people rest on enough known facts (docs/architecture/63 4.4). */
+  confidenceCounts?: { firms: Record<"high" | "medium" | "low", number>; contacts: Record<"high" | "medium" | "low", number> }
 }
 
 // ─── Progress event for streaming ───────────────────────────────────────────

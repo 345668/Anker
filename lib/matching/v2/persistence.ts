@@ -29,6 +29,8 @@ export interface SessionContext {
   source?: string
   /** The mandate the run applied. */
   filters?: unknown
+  /** The run this one refines, so a change of mandate can be compared with what it replaced. */
+  parentSessionId?: string | null
 }
 
 export async function saveSessionV2(
@@ -48,7 +50,7 @@ export async function saveSessionV2(
       funnel_data, segment_counts, ai_enrichments_applied, duplicates_merged,
       engine_version, status,
       org_id, source, exclusion_counts, filters_applied,
-      total_firms_matched, total_contacts_matched
+      total_firms_matched, total_contacts_matched, confidence_counts, parent_session_id
     ) VALUES (
       ${result.sessionId}, ${result.fundProfileId}, ${result.fundName},
       ${result.totals.rawFirms}, ${result.totals.rawContacts},
@@ -59,7 +61,8 @@ export async function saveSessionV2(
       ${result.totals.aiEnrichmentsApplied}, ${result.totals.duplicatesMerged},
       'v2', 'running',
       ${context.orgId ?? null}, ${context.source ?? "page"}, ${result.exclusions ? JSON.stringify(result.exclusions) : null}::jsonb, ${context.filters ? JSON.stringify(context.filters) : null}::jsonb,
-      ${result.totals.qualifiedFirms}, ${result.totals.qualifiedContacts}
+      ${result.totals.qualifiedFirms}, ${result.totals.qualifiedContacts},
+      ${result.confidenceCounts ? JSON.stringify(result.confidenceCounts) : null}::jsonb, ${context.parentSessionId ?? null}
     )
     ON CONFLICT (id) DO NOTHING
   `
@@ -93,7 +96,7 @@ async function insertFirmBatch(batch: ScoredFirmV2[], sessionId: string, fundPro
       firm_location, firm_aum, firm_aum_usd, firm_sectors, firm_website, firm_linkedin,
       score, tier, tags, reasons, why_this_lp,
       factor_lp_type, factor_aum, factor_sector, factor_geo, factor_thesis_signals,
-      segments, stage, expected_ticket_usd, created_at
+      segments, stage, expected_ticket_usd, gaps, confidence, created_at
     )
     SELECT * FROM UNNEST(
       ${ids}::uuid[],
@@ -121,6 +124,8 @@ async function insertFirmBatch(batch: ScoredFirmV2[], sessionId: string, fundPro
       ${batch.map((f) => JSON.stringify(f.segments))}::jsonb[],
       ${batch.map((f) => f.stage)}::text[],
       ${batch.map((f) => f.expectedTicket ?? null)}::float8[],
+      ${batch.map((f) => JSON.stringify(f.gaps ?? []))}::jsonb[],
+      ${batch.map((f) => f.confidence ?? null)}::text[],
       ${batch.map(() => new Date().toISOString())}::timestamptz[]
     )
   `
@@ -135,7 +140,7 @@ async function insertContactBatch(batch: ScoredContactV2[], sessionId: string, f
       contact_type, contact_location, contact_email, contact_linkedin, contact_sectors,
       score, tier, tags, reasons, why_this_lp,
       factor_lp_type, factor_sector, factor_geo, factor_thesis_signals, factor_contact_quality,
-      factor_capacity, segments, hnw_signals, stage, expected_ticket_usd, created_at
+      factor_capacity, segments, hnw_signals, stage, expected_ticket_usd, gaps, confidence, created_at
     )
     SELECT * FROM UNNEST(
       ${ids}::uuid[],
@@ -164,6 +169,8 @@ async function insertContactBatch(batch: ScoredContactV2[], sessionId: string, f
       ${batch.map((c) => JSON.stringify(c.hnwSignals))}::jsonb[],
       ${batch.map((c) => c.stage)}::text[],
       ${batch.map((c) => c.expectedTicket ?? null)}::float8[],
+      ${batch.map((c) => JSON.stringify(c.gaps ?? []))}::jsonb[],
+      ${batch.map((c) => c.confidence ?? null)}::text[],
       ${batch.map(() => new Date().toISOString())}::timestamptz[]
     )
   `
