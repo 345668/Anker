@@ -182,7 +182,7 @@ Doc 61 P2 lists funds an investor can request to join. Matchmaking adds "funds t
 | **M4** | Feedback and exclusions UI/tools; outcome events for LP matches; page actions (CRM, shortlist, drafts as proposals) and `lp_match_refine` | a "not a fit, never again" removes the LP from the next run; events recorded |
 | **M5** | Page rework (section 5): readiness strip, mandate chips, funnel, list, history/compare, zip, states, mobile | the walkthrough in section 13 passes on desktop and phone width |
 | **M6** | Shadow factors and the evaluation report (section 8); promotion by the founder in SAIL | report runs on the labelled set; no factor promoted without it |
-| **M7** | Investor-side "funds that fit you" after doc 61 P2 | on go-ahead for doc 61 P1 and P2 |
+| **M7** | Investor-side "funds that fit you" after doc 61 P2 | **built 2026-10-20 with the parts of doc 61 P1 and P2 it stands on; see doc 64; closed behind two switches** |
 
 M0 and M1 are the only slices that change correctness today and are the recommended start. Each slice ends with the status register entry (built / verified live / untested), per the existing practice.
 

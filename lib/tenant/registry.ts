@@ -201,12 +201,26 @@ export const RULES: Rule[] = [
   { scope: M, table: "matching_weight_history", where: "user_id::text = ANY($3::text[])" },
   { scope: M, table: "background_jobs", where: "user_id::text = ANY($3::text[])" },
   // ── last: the membership list and the workspace and fund themselves ──
+  // What a fund shows investors and the requests made to it belong to the fund (docs/architecture/64); the investors themselves do not (INVESTOR_OWNED below).
+  { scope: F, table: "fund_relationships", where: "fund_id::text = $2" },
+  { scope: F, table: "fund_listings", where: "fund_id::text = $2" },
   { scope: O, table: "memberships", where: "org_id::text = $1" },
   { scope: F, table: "funds", where: "id::text = $2" },
   { scope: O, table: "organizations", where: "id::text = $1" },
 ]
 
 /** Tables that carry a workspace, fund or user key but are NOT the customer's data, with the reason. The coverage test accepts these. */
+/**
+ * Tables that belong to the INVESTOR, not to any workspace or fund (docs/architecture/61 section 10, 64). A workspace's export and erasure never touch them: an investor who has
+ * asked a fund to talk is not the fund's data. Their own erasure (a privacy request) removes the profile and entities and anonymises what each fund kept. A test makes sure none
+ * of these is ever also in RULES or EXCLUDED, and that none carries a workspace, fund or owner key.
+ */
+export const INVESTOR_OWNED: { table: string; reason: string }[] = [
+  { table: "investor_profiles", reason: "The investor's own profile." },
+  { table: "investor_entities", reason: "The entities an investor invests through; owned by the person." },
+  { table: "investor_signup_codes", reason: "A pending sign-up before the address is proved; purged within a day." },
+]
+
 export const EXCLUDED: { table: string; reason: string }[] = [
   { table: "ai_studio_stages", reason: "Child of ai_studio_pipelines (ON DELETE CASCADE)." },
   { table: "ai_studio_artifacts", reason: "Child of ai_studio_pipelines (ON DELETE CASCADE); its files are removed as blobs (mediaRefs in the executor)." },

@@ -6,6 +6,7 @@ import { CommandPalette } from "@/components/shell/command-palette";
 import { isAdminUser } from "@/lib/auth/require-admin";
 import { resolveActiveMembership } from "@/lib/org/active";
 import { headers } from "next/headers";
+import { isInvestorOnly } from "@/lib/investor/profile";
 import { getEffective } from "@/lib/entitlements";
 import { featureForPath } from "@/lib/entitlements/routes";
 import { EntitlementBanner, ModuleNotIncluded } from "@/components/shell/entitlement-notice";
@@ -39,6 +40,8 @@ export default async function DashboardLayout({
   // the full nav; otherwise the sidebar is filtered to the active workspace's
   // persona — founder / vc / lp. `null` persona also falls through to "all".
   const { active } = await resolveActiveMembership(user.id);
+  // A person who signed up as an investor and has no workspace belongs in the investor area, not an empty workspace shell.
+  if (!active && (await isInvestorOnly(user.id).catch(() => false))) redirect("/investor");
   const ownLp = !active && user.email_confirmed_at && user.email ? await getLpMembershipsForEmail(user.email) : [];
   const persona = active?.persona ?? (ownLp.length ? "lp" : null);
 

@@ -168,6 +168,7 @@
     "2026-10-19f-lp-match-status-check.sql",
     "2026-10-19g-lp-match-one-open-run.sql",
     "2026-10-19h-lp-shadow-factors.sql",
+    "2026-10-20-investor-side.sql",
     "2026_06_02_email_oauth_accounts.sql"
   ]
 }

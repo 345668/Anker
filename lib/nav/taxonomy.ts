@@ -162,6 +162,7 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "Discover", href: "/dashboard/discover", icon: Compass, desc: "Founders: investors · Funds: LPs, co-investors, startups", personas: ["founder", "vc"] },
       { label: "Find Investors", href: "/dashboard/find-investors", icon: Wand2, badge: "AI", desc: "Upload deck → match investors", personas: ["founder"] },
       { label: "LP Matchmaking", href: "/dashboard/matchmaking", icon: TargetIcon, desc: "Fund → LP scoring", personas: ["vc"] },
+      { label: "Investor requests", href: "/dashboard/investor-requests", icon: Compass, desc: "Who asked to talk · show this fund", personas: ["vc"] },
       { label: "Deal Flow", href: "/dashboard/portfolio/fund/deals", icon: Target, desc: "Sourcing → IC → close", personas: ["vc"] },
     ],
   },

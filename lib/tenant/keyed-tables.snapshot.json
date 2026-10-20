@@ -1,5 +1,5 @@
 {
-  "takenAt": "2026-10-19",
+  "takenAt": "2026-10-20",
   "baseTables": [
     "accelerated_match_jobs",
     "action_proposals",
@@ -134,8 +134,10 @@
     "fund_compliance_profile",
     "fund_intake_configs",
     "fund_investments",
+    "fund_listings",
     "fund_lps",
     "fund_profiles",
+    "fund_relationships",
     "fund_subscription_packages",
     "fundraising_rounds",
     "funds",
@@ -157,7 +159,10 @@
     "investments",
     "investor_calls",
     "investor_company_links",
+    "investor_entities",
     "investor_matches",
+    "investor_profiles",
+    "investor_signup_codes",
     "investor_update_recipients",
     "investor_updates",
     "investors",
@@ -505,11 +510,17 @@
     "fund_investments": [
       "fund_id"
     ],
+    "fund_listings": [
+      "fund_id"
+    ],
     "fund_lps": [
       "fund_id"
     ],
     "fund_profiles": [
       "org_id"
+    ],
+    "fund_relationships": [
+      "fund_id"
     ],
     "fund_subscription_packages": [
       "fund_id"

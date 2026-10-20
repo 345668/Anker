@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest"
 import { readdirSync, readFileSync } from "node:fs"
-import { RULES, EXCLUDED, MEDIA_WORKSPACE_WHERE } from "./registry"
+import { RULES, EXCLUDED, INVESTOR_OWNED, MEDIA_WORKSPACE_WHERE } from "./registry"
 import SNAPSHOT from "./keyed-tables.snapshot.json"
 
 /** Rule tables with no workspace or fund key of their own: they hang off a parent through a join in the rule. */
@@ -83,5 +83,27 @@ describe("the erasure registry covers every workspace-keyed table", () => {
   })
   it("the shared directory and the do-not-contact lists can never be erased", () => {
     for (const t of ["investors", "email_suppressions", "li_suppressions", "outreach_consents"]) expect(RULES.map((r) => r.table)).not.toContain(t)
+  })
+})
+
+describe("the investor's own data is never a workspace's", () => {
+  it("no investor-owned table is ruled, excluded, or carries a workspace, fund or owner key", () => {
+    const names = INVESTOR_OWNED.map((t) => t.table)
+    expect(RULES.filter((r) => names.includes(r.table)).map((r) => r.table)).toEqual([])
+    expect(EXCLUDED.filter((e) => names.includes(e.table)).map((e) => e.table)).toEqual([])
+    const keyed = keyedTables()
+    expect(names.filter((t) => keyed.has(t)).map((t) => `${t}: ${keyed.get(t)}`)).toEqual([])
+    expect(Object.keys(SNAPSHOT.tables as Record<string, string[]>).filter((t) => names.includes(t))).toEqual([])
+  })
+  it("every investor-owned table exists in a migration, and every table a migration names investor_ is classified", () => {
+    for (const t of INVESTOR_OWNED) expect(migrationTables.has(t.table), t.table).toBe(true)
+    const named = [...migrationTables].filter((t) => /^investor_(profiles|entities|signup_codes)$/.test(t))
+    expect(named.sort()).toEqual(INVESTOR_OWNED.map((t) => t.table).sort())
+  })
+  it("the fund's side of an investor relationship is the fund's: ruled for export and erasure, ahead of the fund itself", () => {
+    const order = RULES.map((r) => r.table)
+    for (const t of ["fund_relationships", "fund_listings"]) expect(order.indexOf(t), t).toBeGreaterThan(-1)
+    expect(order.indexOf("fund_relationships")).toBeLessThan(order.indexOf("funds"))
+    expect(order.indexOf("fund_listings")).toBeLessThan(order.indexOf("funds"))
   })
 })
