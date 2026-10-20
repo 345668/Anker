@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sendNudges } from "@/lib/investor/talks"
+import { syncStages } from "@/lib/investor/bridge"
 import { trackCron, isCronAuthorised } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
@@ -12,6 +13,6 @@ export const maxDuration = 60
 
 async function handle(req: NextRequest) {
   if (!isCronAuthorised(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  try { return NextResponse.json({ ok: true, ...(await sendNudges()) }) } catch (e: any) { console.error("[investor-nudges]", e?.message ?? e); return NextResponse.json({ error: "Failed" }, { status: 500 }) }
+  try { return NextResponse.json({ ok: true, ...(await sendNudges()), stagesMoved: await syncStages() }) } catch (e: any) { console.error("[investor-nudges]", e?.message ?? e); return NextResponse.json({ error: "Failed" }, { status: 500 }) }
 }
 export const GET = trackCron("investor-nudges", handle)

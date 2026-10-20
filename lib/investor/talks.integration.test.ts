@@ -27,11 +27,13 @@ beforeAll(async () => {
     CREATE TABLE funds(id text PRIMARY KEY, name text, description text, vintage_year int, target_size numeric, currency text, status text, vehicle_kind text, listed_for_lps boolean DEFAULT false, listed_for_lps_at timestamptz, listed_for_lps_by text);
     CREATE TABLE profiles(id text PRIMARY KEY, email text, full_name text);
     CREATE TABLE platform_flags(key text PRIMARY KEY, enabled boolean, rollout_pct int, description text, updated_by text, updated_at timestamptz);
+    CREATE TABLE fund_lps (id text PRIMARY KEY DEFAULT gen_random_uuid()::text, fund_id text);
     CREATE TABLE notifications(id serial PRIMARY KEY, user_id text, org_id text, kind text, severity text DEFAULT 'info', title text, body text, href text, dedupe_key text, read_at timestamptz, created_at timestamptz DEFAULT now());
     CREATE UNIQUE INDEX notifications_dedupe ON notifications(user_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
   `)
   await db.exec(readFileSync("scripts/migrations/2026-10-20-investor-side.sql", "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
   await db.exec(readFileSync("scripts/migrations/2026-10-20b-investor-talks.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-20c-investor-bridge.sql", "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {

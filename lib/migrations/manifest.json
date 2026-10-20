@@ -170,6 +170,7 @@
     "2026-10-19h-lp-shadow-factors.sql",
     "2026-10-20-investor-side.sql",
     "2026-10-20b-investor-talks.sql",
+    "2026-10-20c-investor-bridge.sql",
     "2026_06_02_email_oauth_accounts.sql"
   ]
 }

@@ -9,6 +9,7 @@ import { fitFor, NOT_RAISING, type FundFit } from "./fit"
 import { InvestorError, factsOf, getEntity, getProfile, type EntityView } from "./profile"
 import { listedFund, type ListedFund } from "./listing"
 import { blockedByFund } from "./talks"
+import { nextStepFor, syncStages } from "./bridge"
 
 export const OPEN_STAGES = ["interested", "in_talks", "invited_to_onboard", "onboarding", "on_hold"] as const
 export const NOTE_MAX = 1000
@@ -84,16 +85,17 @@ async function notifyFund(fundId: string, relId: string, fundName: string) {
   for (const p of people) await createNotification({ userId: p.id, orgId: p.org_id, kind: "investor_request", title: `A new investor request for ${fundName}`, body: "An investor has asked to talk. Open the requests to answer.", href: "/dashboard/investor-requests", dedupeKey: `invreq:${relId}` })
 }
 
-export interface InvestorRequestView { id: string; fundId: string; fundName: string; entityId: string; entityName: string; stage: string; createdAt: string; decidedAt: string | null; note: string | null; message: string }
+export interface InvestorRequestView { id: string; fundId: string; fundName: string; entityId: string; entityName: string; stage: string; createdAt: string; decidedAt: string | null; note: string | null; message: string; nextStep: string | null }
 const STAGE_MESSAGE: Record<string, string> = {
   interested: "Sent. The fund has not answered yet.", in_talks: "The fund accepted and wants to talk.", invited_to_onboard: "The fund has invited you to onboard.", onboarding: "You are onboarding with this fund.",
   active: "You are an investor in this fund.", on_hold: "On hold.", declined: "The fund is not able to take this forward.", withdrawn: "You withdrew this request.",
 }
 export async function myRequests(userId: string): Promise<InvestorRequestView[]> {
-  const rows = (await sql`SELECT r.id, r.fund_id, r.entity_id, r.stage, r.created_at, r.decided_at, r.note, l.snapshot->>'name' AS fund_name, e.legal_name
-    FROM fund_relationships r JOIN investor_entities e ON e.id = r.entity_id LEFT JOIN fund_listings l ON l.fund_id = r.fund_id WHERE r.user_id = ${userId} ORDER BY r.created_at DESC LIMIT 100`) as any[]
+  await syncStages().catch(() => {})
+  const rows = (await sql`SELECT r.id, r.fund_id, r.entity_id, r.stage, r.created_at, r.decided_at, r.note, l.snapshot->>'name' AS fund_name, e.legal_name, lp.onboarding_state
+    FROM fund_relationships r JOIN investor_entities e ON e.id = r.entity_id LEFT JOIN fund_listings l ON l.fund_id = r.fund_id LEFT JOIN fund_lps lp ON lp.id = r.fund_lp_id WHERE r.user_id = ${userId} ORDER BY r.created_at DESC LIMIT 100`) as any[]
   return rows.map((r) => ({ id: String(r.id), fundId: String(r.fund_id), fundName: r.fund_name ?? "A fund", entityId: String(r.entity_id), entityName: r.legal_name, stage: r.stage, createdAt: new Date(r.created_at).toISOString(),
-    decidedAt: r.decided_at ? new Date(r.decided_at).toISOString() : null, note: r.note ?? null, message: STAGE_MESSAGE[r.stage] ?? r.stage }))
+    decidedAt: r.decided_at ? new Date(r.decided_at).toISOString() : null, note: r.note ?? null, message: STAGE_MESSAGE[r.stage] ?? r.stage, nextStep: r.stage === "invited_to_onboard" || r.stage === "onboarding" || r.stage === "active" ? nextStepFor(r.onboarding_state) : null }))
 }
 
 /** The investor takes a request back. Allowed until the fund has invited them to onboard. */
@@ -110,16 +112,20 @@ export interface InboundView {
   shared: Record<string, unknown>; eligibility: { status: string; failed: string[]; unclear: string[] } | null; fit: { score: number | null; confidence: string } | null
   /** The investor's address, only once the fund has accepted. */
   contactEmail: string | null
+  /** The fund's investor record, once invited, and where onboarding stands. */
+  lpId: string | null; onboardingState: string | null
 }
 const obj = (v: any) => (v && typeof v === "object" ? v : typeof v === "string" ? (() => { try { return JSON.parse(v) } catch { return null } })() : null)
 
 export async function inbound(fundId: string, opts: { stage?: string } = {}): Promise<InboundView[]> {
-  const rows = (await sql`SELECT r.*, p.email FROM fund_relationships r LEFT JOIN profiles p ON p.id::text = r.user_id
+  await syncStages(fundId).catch(() => {})
+  const rows = (await sql`SELECT r.*, p.email, lp.onboarding_state FROM fund_relationships r LEFT JOIN profiles p ON p.id::text = r.user_id LEFT JOIN fund_lps lp ON lp.id = r.fund_lp_id
     WHERE r.fund_id = ${fundId} AND (${opts.stage ?? null}::text IS NULL OR r.stage = ${opts.stage ?? null}) ORDER BY r.created_at DESC LIMIT 200`) as any[]
   return rows.map((r) => ({
     id: String(r.id), stage: r.stage, createdAt: new Date(r.created_at).toISOString(), decidedAt: r.decided_at ? new Date(r.decided_at).toISOString() : null, timing: r.timing ?? null, note: r.note ?? null,
     indicative: { min: r.indicative_min == null ? null : Number(r.indicative_min), max: r.indicative_max == null ? null : Number(r.indicative_max) },
     shared: obj(r.shared) ?? {}, eligibility: obj(r.eligibility_check), fit: obj(r.fit),
+    lpId: r.fund_lp_id ?? null, onboardingState: r.onboarding_state ?? null,
     contactEmail: ["in_talks", "invited_to_onboard", "onboarding", "active"].includes(r.stage) ? r.email ?? null : null,
   }))
 }
