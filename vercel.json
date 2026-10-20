@@ -120,6 +120,10 @@
     {
       "path": "/api/cron/lp-match-sweep",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/investor-nudges",
+      "schedule": "20 7 * * *"
     }
   ]
 }

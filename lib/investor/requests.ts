@@ -8,6 +8,7 @@ import { sql } from "@/lib/db"
 import { fitFor, NOT_RAISING, type FundFit } from "./fit"
 import { InvestorError, factsOf, getEntity, getProfile, type EntityView } from "./profile"
 import { listedFund, type ListedFund } from "./listing"
+import { blockedByFund } from "./talks"
 
 export const OPEN_STAGES = ["interested", "in_talks", "invited_to_onboard", "onboarding", "on_hold"] as const
 export const NOTE_MAX = 1000
@@ -48,6 +49,7 @@ export async function requestToConnect(userId: string, input: RequestInput): Pro
   const fund = await listedFund(String(input.fundId ?? ""))
   if (!fund) throw new InvestorError("That fund is not listed.", 404, "not_listed")
   if (NOT_RAISING.has((fund.snapshot.status ?? "").toLowerCase())) throw new InvestorError("That fund is closed to new investors.", 409, "closed")
+  if (await blockedByFund(userId, fund.facts.fundId)) throw new InvestorError("This fund is not able to take a request from you.", 403, "blocked")
   const { entity, fit } = await fitForEntity(userId, String(input.entityId ?? ""), fund)
   const note = String(input.note ?? "").trim()
   if (note.length > NOTE_MAX) throw new InvestorError(`Keep the note to ${NOTE_MAX} characters.`)

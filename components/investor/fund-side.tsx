@@ -1,6 +1,7 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
 import { call, field, btn, btnGhost, money } from "./api"
+import { Thread } from "./thread"
 
 const CATS = [["professional", "Professional"], ["semi_professional", "Semi-professional"], ["other", "Other"], ["unsure", "Unsure"]]
 function Listing() {
@@ -30,7 +31,7 @@ function Listing() {
 }
 
 function Queue() {
-  const [d, setD] = useState<any>(null), [err, setErr] = useState<string | null>(null)
+  const [open, setOpen] = useState<string | null>(null), [d, setD] = useState<any>(null), [err, setErr] = useState<string | null>(null)
   const load = useCallback(() => call("/api/fund/investor-requests").then(setD).catch((e) => setErr(e.message)), [])
   useEffect(() => { void load() }, [load])
   async function decide(id: string, decision: "accept" | "decline") { try { await call(`/api/fund/investor-requests/${id}`, { method: "POST", body: { decision } }); await load() } catch (e) { setErr(e instanceof Error ? e.message : "Try again.") } }
@@ -46,7 +47,8 @@ function Queue() {
           {q.fit && <p className="text-muted-foreground">Fit with your stated focus: {q.fit.score ?? "not judged"} ({q.fit.confidence} confidence)</p>}
           {q.note && <p className="mt-1">“{q.note}”</p>}
           {q.contactEmail && <p className="mt-1">Contact: <a className="underline" href={`mailto:${q.contactEmail}`}>{q.contactEmail}</a></p>}</div>
-          <div className="shrink-0 text-right">{q.stage === "interested" ? <div className="flex gap-2"><button className={btn} onClick={() => decide(q.id, "accept")}>Accept</button><button className={btnGhost} onClick={() => decide(q.id, "decline")}>Decline</button></div> : <p className="text-muted-foreground">{q.stage.replace("_", " ")}</p>}</div></div>
+          <div className="shrink-0 text-right">{q.stage === "interested" ? <div className="flex gap-2"><button className={btn} onClick={() => decide(q.id, "accept")}>Accept</button><button className={btnGhost} onClick={() => decide(q.id, "decline")}>Decline</button></div> : <div className="space-y-1"><p className="text-muted-foreground">{q.stage.replace("_", " ")}</p>{q.stage !== "declined" && q.stage !== "withdrawn" && <button className={btnGhost} onClick={() => setOpen(open === q.id ? null : q.id)}>{open === q.id ? "Hide messages" : "Messages"}</button>}</div>}</div></div>
+        {open === q.id && <Thread base={`/api/fund/investor-requests/${q.id}`} me="fund" />}
       </li>)}</ul>}</section>
 }
 export function InvestorSide() { return <div className="space-y-10"><div><h1 className="text-xl font-semibold">Investors</h1><p className="mt-1 text-sm text-muted-foreground">Let investors find this fund and ask to talk. You decide who sees it, and you answer each request.</p></div><Queue /><Listing /></div> }

@@ -44,6 +44,7 @@ beforeAll(async () => {
     CREATE TABLE fund_profiles(id text PRIMARY KEY, org_id text, is_active boolean DEFAULT true, sectors jsonb, geographic_focus jsonb, investment_stage text, minimum_commitment numeric, thesis_description text, fund_life int, updated_at timestamptz DEFAULT now());
   `)
   await db.exec(readFileSync("scripts/migrations/2026-10-20-investor-side.sql", "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-20b-investor-talks.sql", "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {
@@ -222,6 +223,13 @@ describe("asking a fund to talk, and the fund's answer", () => {
     await expect(requestToConnect(a, { entityId: "00000000-0000-0000-0000-000000000000", fundId: "fund-1" })).rejects.toMatchObject({ code: "not_found" })
     const b = await (async () => { await db.exec("UPDATE investor_signup_codes SET created_at = now() - interval '2 minutes'"); await startSignup({ email: "bob@example.com", name: "Bob", termsAccepted: true, ip: null }, send); return (await verifySignup({ email: "bob@example.com", code: codeOf(), password: "a-long-password" }, fakeAdmin())).userId })()
     await expect(requestToConnect(b, { entityId, fundId: "fund-1" })).rejects.toMatchObject({ code: "not_found" })      // Ann's entity is not Bob's
+  })
+  it("a fund that blocked a person refuses their next request", async () => {
+    const { a, entityId } = await setUp()
+    const { id } = await requestToConnect(a, { entityId, fundId: "fund-1" })
+    await decide("fund-1", id, "accept", "owner-1")
+    await db.query("UPDATE fund_relationships SET blocked_by = 'fund', stage = 'declined' WHERE id = $1", [id])
+    await expect(requestToConnect(a, { entityId, fundId: "fund-1" })).rejects.toMatchObject({ code: "blocked", status: 403 })
   })
   it("sends a request with what the investor chose to share, stores the eligibility and fit, and tells the fund's owners and admins, not its members", async () => {
     const { a, entityId } = await setUp()

@@ -283,6 +283,7 @@
     "private_artifacts",
     "profiles",
     "provider_bills",
+    "relationship_messages",
     "research_crawl_logs",
     "research_documents",
     "research_organizations",
@@ -656,6 +657,9 @@
     ],
     "private_artifacts": [
       "org_id"
+    ],
+    "relationship_messages": [
+      "fund_id"
     ],
     "send_authorizations": [
       "org_id"
