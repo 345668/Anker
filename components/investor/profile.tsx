@@ -1,6 +1,7 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
 import { call, field, btn, btnGhost } from "./api"
+import { Claims } from "./claims"
 
 const KINDS = [["individual", "Individual"], ["company", "Company"], ["trust", "Trust"], ["fund", "Fund"], ["family_office", "Family office"]]
 const CATS = [["", "Not stated"], ["professional", "Professional investor"], ["semi_professional", "Semi-professional investor"], ["other", "Other"], ["unsure", "I am not sure"]]
@@ -53,6 +54,7 @@ export function InvestorProfile() {
   async function remove(id: string) { try { await call(`/api/investor/entities/${id}`, { method: "DELETE" }); await load() } catch (x) { setErr(x instanceof Error ? x.message : "Try again.") } }
   const done = async () => { setEditing(null); setAdding(false); await load() }
   return <div className="space-y-10">
+    <Claims entities={d.entities} />
     <section><h1 className="text-xl font-semibold">Your profile</h1>
       <form onSubmit={saveProfile} className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-sm">Display name<input className={field} value={p.displayName} onChange={(e) => setP({ ...p, displayName: e.target.value })} required /></label>

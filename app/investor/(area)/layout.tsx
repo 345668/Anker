@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic"
 export default async function InvestorLayout({ children }: { children: React.ReactNode }) {
   const { data: { user } } = await (await createClient()).auth.getUser()
   if (!user) redirect("/auth/login?redirect=/investor")
-  if (!(await getProfile(user.id))) redirect("/dashboard")
+  if (!(await getProfile(user.id))) redirect("/investor/start")
   const tabs = [["Profile", "/investor"], ["Find a fund", "/investor/funds"], ["My requests", "/investor/requests"]]
   return <div className="min-h-screen">
     <nav aria-label="Investor area" className="border-b"><div className="mx-auto flex max-w-5xl items-center gap-6 px-6 py-3 text-sm">

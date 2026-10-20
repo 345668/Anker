@@ -220,6 +220,7 @@ export const INVESTOR_OWNED: { table: string; reason: string }[] = [
   { table: "investor_profiles", reason: "The investor's own profile." },
   { table: "investor_entities", reason: "The entities an investor invests through; owned by the person." },
   { table: "investor_signup_codes", reason: "A pending sign-up before the address is proved; purged within a day." },
+  { table: "investor_claim_codes", reason: "A pending claim of a fund-added record before the address is proved again; purged within a day." },
 ]
 
 export const EXCLUDED: { table: string; reason: string }[] = [

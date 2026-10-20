@@ -11,7 +11,14 @@ export async function investorContext() {
   const { data: { user } } = await (await createClient()).auth.getUser()
   if (!user) throw new InvestorError("Sign in to continue.", 401, "auth")
   if (!(await getProfile(user.id))) throw new InvestorError("This account has no investor profile.", 403, "no_profile")
-  return { userId: user.id, email: user.email ?? null }
+  return { userId: user.id, email: user.email ?? null, confirmed: !!user.email_confirmed_at, name: String(user.user_metadata?.full_name ?? "") }
+}
+
+/** A signed-in person who may not have an investor profile yet (to create one). */
+export async function accountContext() {
+  const { data: { user } } = await (await createClient()).auth.getUser()
+  if (!user) throw new InvestorError("Sign in to continue.", 401, "auth")
+  return { userId: user.id, email: user.email ?? null, confirmed: !!user.email_confirmed_at, name: String(user.user_metadata?.full_name ?? "") }
 }
 
 /** A fund workspace member who may answer investors: the workspace owner or an admin. */

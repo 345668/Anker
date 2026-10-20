@@ -158,6 +158,7 @@
     "investment_signals",
     "investments",
     "investor_calls",
+    "investor_claim_codes",
     "investor_company_links",
     "investor_entities",
     "investor_matches",

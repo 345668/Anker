@@ -10,6 +10,7 @@ const TABS = [
   { label: "Discover", href: "/lp/discover" },
   { label: "Call notes", href: "/lp/calls" },
   { label: "Investor Copilot", href: "/dashboard/assistant" },
+  { label: "Find funds", href: "/investor/start" },
 ];
 
 /** LP portal sub-navigation (teal accent — LP persona). */
