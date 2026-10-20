@@ -290,6 +290,7 @@
     "private_artifacts",
     "profiles",
     "provider_bills",
+    "relationship_attachments",
     "relationship_materials",
     "relationship_meetings",
     "relationship_messages",
@@ -669,6 +670,9 @@
     ],
     "private_artifacts": [
       "org_id"
+    ],
+    "relationship_attachments": [
+      "fund_id"
     ],
     "relationship_materials": [
       "fund_id"

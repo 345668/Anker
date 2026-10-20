@@ -176,6 +176,7 @@
     "2026-10-20f-investor-team.sql",
     "2026-10-20g-investor-passport.sql",
     "2026-10-20h-investor-discovery.sql",
+    "2026-10-20i-message-attachments.sql",
     "2026_06_02_email_oauth_accounts.sql"
   ]
 }

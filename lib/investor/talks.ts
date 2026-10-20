@@ -4,12 +4,15 @@
  */
 import { sql } from "@/lib/db"
 import { InvestorError, relationshipEntityIds, type Need } from "./profile"
+import { checkFiles, MAX_TOTAL_BYTES, type UploadedFile } from "./attachments"
+import { decryptBytes, encryptBytes } from "@/lib/db/secrets"
 
 export const MESSAGE_MAX = 4000, MESSAGES_PER_HOUR = 30, NOTIFY_EVERY_MIN = 60
 export const WRITABLE = ["in_talks", "invited_to_onboard", "onboarding", "active"] as const
 export type Side = "investor" | "fund"
 
-export interface MessageView { id: string; from: Side; body: string; at: string; read: boolean }
+export interface AttachmentView { id: string; filename: string; sizeBytes: number; contentType: string }
+export interface MessageView { id: string; from: Side; body: string; at: string; read: boolean; attachments: AttachmentView[] }
 export interface ThreadView { relationshipId: string; stage: string; writable: boolean; muted: boolean; blocked: boolean; messages: MessageView[] }
 
 const appUrl = () => (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://www.an-ker.de").replace(/\/$/, "")
@@ -35,8 +38,11 @@ export async function readThread(side: Side, who: { userId?: string; fundId?: st
   const other: Side = side === "investor" ? "fund" : "investor"
   await sql`UPDATE relationship_messages SET read_at = now() WHERE relationship_id = ${r.id} AND sender = ${other} AND read_at IS NULL`
   const rows = (await sql`SELECT id, sender, body, created_at, read_at FROM relationship_messages WHERE relationship_id = ${r.id} ORDER BY created_at ASC LIMIT 500`) as any[]
+  const att = (await sql`SELECT id, message_id, filename, size_bytes, content_type FROM relationship_attachments WHERE relationship_id = ${r.id} ORDER BY created_at`) as any[]
+  const files = new Map<string, AttachmentView[]>()
+  for (const a of att) files.set(String(a.message_id), [...(files.get(String(a.message_id)) ?? []), { id: String(a.id), filename: a.filename, sizeBytes: Number(a.size_bytes), contentType: a.content_type }])
   return { relationshipId: String(r.id), stage: r.stage, writable: !r.blocked_by && (WRITABLE as readonly string[]).includes(r.stage), muted: mutedBy(side, r), blocked: !!r.blocked_by,
-    messages: rows.map((m) => ({ id: String(m.id), from: m.sender, body: m.body, at: new Date(m.created_at).toISOString(), read: !!m.read_at })) }
+    messages: rows.map((m) => ({ id: String(m.id), from: m.sender, body: m.body, at: new Date(m.created_at).toISOString(), read: !!m.read_at, attachments: (files.get(String(m.id)) ?? []) })) }
 }
 
 /** Unread counts per relationship for one side. */
@@ -76,19 +82,41 @@ export async function notifyOther(from: Side, r: any, send: SendEmail) {
   }
 }
 
-export async function sendMessage(side: Side, who: { userId?: string; fundId?: string; senderId: string }, relId: string, body: unknown, send: SendEmail = defaultSend): Promise<MessageView> {
+export async function sendMessage(side: Side, who: { userId?: string; fundId?: string; senderId: string }, relId: string, body: unknown, send: SendEmail = defaultSend, uploads: UploadedFile[] = []): Promise<MessageView> {
   const r = await own(side, who, relId, "act")
   const text = String(body ?? "").replace(/\r\n/g, "\n").trim()
-  if (!text) throw new InvestorError("Write a message first.")
+  if (!text && !uploads.length) throw new InvestorError("Write a message or attach a file first.")
   if (text.length > MESSAGE_MAX) throw new InvestorError(`Keep a message to ${MESSAGE_MAX} characters.`)
   if (r.blocked_by) throw new InvestorError("This conversation is closed.", 409, "closed")
   if (!(WRITABLE as readonly string[]).includes(r.stage)) throw new InvestorError(r.stage === "interested" ? "You can write once the fund has accepted." : "This conversation is closed.", 409, "closed")
   const [n] = (await sql`SELECT count(*)::int n FROM relationship_messages WHERE relationship_id = ${r.id} AND sender = ${side} AND created_at > now() - interval '1 hour'`) as any[]
   if (Number(n.n) >= MESSAGES_PER_HOUR) throw new InvestorError("You are sending messages too fast. Try again in a while.", 429, "rate")
+  const checked = checkFiles(uploads)
+  if (checked.length) {
+    const [used] = (await sql`SELECT COALESCE(sum(size_bytes), 0)::bigint AS n FROM relationship_attachments WHERE relationship_id = ${r.id}`) as any[]
+    if (Number(used.n) + checked.reduce((a, f) => a + f.bytes.length, 0) > MAX_TOTAL_BYTES) throw new InvestorError(`This conversation has reached its limit of ${MAX_TOTAL_BYTES / 1024 / 1024} MB of attachments.`, 413, "total")
+  }
+  const encrypted: Buffer[] = []
+  for (const f of checked) { try { encrypted.push(encryptBytes(f.bytes)) } catch { throw new InvestorError("Files cannot be stored securely right now. Please try again later.", 503, "no_key") } }
   const [m] = (await sql`INSERT INTO relationship_messages (relationship_id, fund_id, sender, sender_user_id, body) VALUES (${r.id}, ${r.fund_id}, ${side}, ${who.senderId}, ${text}) RETURNING id, created_at`) as any[]
+  const saved: AttachmentView[] = []
+  for (let i = 0; i < checked.length; i++) {
+    const f = checked[i]
+    const [a] = (await sql`INSERT INTO relationship_attachments (message_id, relationship_id, fund_id, filename, content_type, size_bytes, sha256, content_enc) VALUES (${m.id}, ${r.id}, ${r.fund_id}, ${f.filename}, ${f.contentType}, ${f.bytes.length}, ${f.sha256}, ${encrypted[i]}) RETURNING id`) as any[]
+    saved.push({ id: String(a.id), filename: f.filename, sizeBytes: f.bytes.length, contentType: f.contentType })
+  }
   await sql`UPDATE fund_relationships SET last_message_at = now(), updated_at = now() WHERE id = ${r.id}`
   await notifyOther(side, r, send).catch((e) => console.warn("[investor-talks] notify failed:", e?.message))
-  return { id: String(m.id), from: side, body: text, at: new Date(m.created_at).toISOString(), read: false }
+  return { id: String(m.id), from: side, body: text, at: new Date(m.created_at).toISOString(), read: false, attachments: saved }
+}
+
+/** One attachment for a person who belongs to the conversation (either side; viewers may read). */
+export async function attachmentFor(side: Side, who: { userId?: string; fundId?: string }, relId: string, attachmentId: string): Promise<{ filename: string; contentType: string; bytes: Buffer }> {
+  const r = await own(side, who, relId)
+  const [a] = (await sql`SELECT filename, content_type, content_enc FROM relationship_attachments WHERE id::text = ${attachmentId} AND relationship_id = ${r.id}`) as any[]
+  const bytes = a ? decryptBytes(Buffer.from(a.content_enc)) : null
+  if (!a || !bytes) throw new InvestorError("That file was not found.", 404, "not_found")
+  return { filename: a.filename, contentType: a.content_type, bytes }
 }
 
 /** Mute or unmute this side's notifications, or block: the fund's block declines and stops that person asking again; the investor's withdraws. */

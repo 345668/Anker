@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { fundContext, investorFailure } from "@/lib/investor/access"
 import { readThread, sendMessage } from "@/lib/investor/talks"
+import { readMessage } from "@/lib/investor/read-message"
 
 export const runtime = "nodejs"
 type Ctx = { params: Promise<{ id: string }> }
