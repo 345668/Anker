@@ -55,6 +55,11 @@ const asList = (v: any): string[] => (Array.isArray(v) ? v.map(String) : typeof 
 const asObj = (v: any): any => (v && typeof v === "object" ? v : typeof v === "string" ? (() => { try { return JSON.parse(v) } catch { return {} } })() : {})
 
 function profileRow(r: any): ProfileView { return { userId: String(r.user_id), displayName: r.display_name, country: r.country ?? null, languages: asList(r.languages), contactPref: r.contact_pref ?? null, about: r.about ?? null, createdAt: new Date(r.created_at).toISOString() } }
+/** Interests as stored, with every list present. */
+export function interestsOf(raw: any): Interests {
+  const i = asObj(raw)
+  return { stages: asList(i.stages), sectors: asList(i.sectors), geographies: asList(i.geographies), ticketMin: i.ticketMin ?? null, ticketMax: i.ticketMax ?? null, horizonYears: i.horizonYears ?? null }
+}
 function entityRow(r: any, role: EntityRole = "owner"): EntityView {
   const i = asObj(r.interests)
   return { id: String(r.id), legalName: r.legal_name, kind: r.kind, country: r.country ?? null, taxResidence: r.tax_residence ?? null, category: r.category ?? null,

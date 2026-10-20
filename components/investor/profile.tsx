@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react"
 import { call, field, btn, btnGhost } from "./api"
 import { Claims } from "./claims"
 import { Invitations } from "./invitations"
+import { ConnectInvites } from "./connect-invites"
 import Link from "next/link"
 
 const KINDS = [["individual", "Individual"], ["company", "Company"], ["trust", "Trust"], ["fund", "Fund"], ["family_office", "Family office"]]
@@ -57,6 +58,7 @@ export function InvestorProfile() {
   const done = async () => { setEditing(null); setAdding(false); await load() }
   return <div className="space-y-10">
     <Invitations onJoined={load} />
+    <ConnectInvites />
     <Claims entities={d.entities.filter((e: any) => e.role !== "can_view")} />
     <section><h1 className="text-xl font-semibold">Your profile</h1>
       <form onSubmit={saveProfile} className="mt-4 grid gap-3 sm:grid-cols-2">

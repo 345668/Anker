@@ -57,4 +57,21 @@ function Queue() {
         {open === q.id && <><Thread base={`/api/fund/investor-requests/${q.id}`} me="fund" /><TalkExtras base={`/api/fund/investor-requests/${q.id}`} me="fund" /></>}
       </li>)}</ul>}</section>
 }
-export function InvestorSide() { return <div className="space-y-10"><div><h1 className="text-xl font-semibold">Investors</h1><p className="mt-1 text-sm text-muted-foreground">Let investors find this fund and ask to talk. You decide who sees it, and you answer each request.</p></div><Queue /><Listing /></div> }
+function Discovery() {
+  const [d, setD] = useState<any>(null), [err, setErr] = useState<string | null>(null), [msg, setMsg] = useState<string | null>(null)
+  const load = useCallback(() => call("/api/fund/investor-discovery").then(setD).catch((e) => setErr(e.message)), [])
+  useEffect(() => { void load() }, [load])
+  if (!d || !d.open) return err ? <p role="alert" className="text-sm text-red-600">{err}</p> : null
+  const invite = (cardId: string) => call("/api/fund/investor-discovery", { method: "POST", body: { cardId } }).then(() => { setMsg("Invitation sent."); return load() }).catch((e) => setErr(e.message))
+  return <section className="space-y-3"><h2 className="text-lg font-semibold">Find investors</h2>
+    <p className="max-w-3xl text-sm text-muted-foreground">Investors who chose to be found, whose category and country meet your rules, best fit first. You see a card, never a name or address. An invitation carries no message; the investor decides whether to accept and what to share.</p>
+    {err && <p role="alert" className="text-sm text-red-600">{err}</p>}{msg && <p role="status" className="text-sm">{msg}</p>}
+    {d.cards.length === 0 ? <p className="text-sm">No investor who fits is open to being found yet.</p> : <ul className="space-y-2">{d.cards.map((c: any) => <li key={c.cardId} className="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm">
+      <div><p className="font-medium">{c.kind.replace("_", " ")}{c.country ? ` · ${c.country}` : ""}{c.category ? ` · ${c.category.replace("_", " ")} (${c.categoryNote})` : ""}</p>
+        <p className="text-muted-foreground">Cheque {c.interests.ticketMin ?? "?"} to {c.interests.ticketMax ?? "?"} · {c.interests.sectors.join(", ") || "no sectors stated"} · {c.interests.stages.join(", ") || "no stages stated"} · {c.interests.geographies.join(", ") || "no regions stated"}</p>
+        <p>{c.sentence}</p></div>
+      {c.invited ? <span className="shrink-0 text-muted-foreground">Invited</span> : <button className={btn} onClick={() => invite(c.cardId)}>Invite to connect</button>}</li>)}</ul>}
+    {d.invites.length > 0 && <div className="text-sm"><p className="font-medium">Your invitations</p><ul className="space-y-1">{d.invites.map((i: any) => <li key={i.id} className="flex items-center justify-between gap-2"><span>{i.card.kind.replace("_", " ")}{i.card.country ? ` · ${i.card.country}` : ""} <span className="text-muted-foreground">· {i.status}</span></span>
+      {i.status === "sent" && <button className={btnGhost} onClick={() => call(`/api/fund/investor-discovery?inviteId=${i.id}`, { method: "DELETE" }).then(load).catch((e) => setErr(e.message))}>Withdraw</button>}</li>)}</ul></div>}</section>
+}
+export function InvestorSide() { return <div className="space-y-10"><div><h1 className="text-xl font-semibold">Investors</h1><p className="mt-1 text-sm text-muted-foreground">Let investors find this fund and ask to talk. You decide who sees it, and you answer each request.</p></div><Queue /><Discovery /><Listing /></div> }
