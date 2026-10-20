@@ -97,7 +97,7 @@ describe("the investor's own data is never a workspace's", () => {
   })
   it("every investor-owned table exists in a migration, and every table a migration names investor_ is classified", () => {
     for (const t of INVESTOR_OWNED) expect(migrationTables.has(t.table), t.table).toBe(true)
-    const named = [...migrationTables].filter((t) => /^investor_(profiles|entities|signup_codes|claim_codes|entity_members|entity_invites|entity_events)$/.test(t))
+    const named = [...migrationTables].filter((t) => /^(passport_(documents|shares)|investor_(profiles|entities|signup_codes|claim_codes|entity_members|entity_invites|entity_events))$/.test(t))
     expect(named.sort()).toEqual(INVESTOR_OWNED.map((t) => t.table).sort())
   })
   it("the fund's side of an investor relationship is the fund's: ruled for export and erasure, ahead of the fund itself", () => {

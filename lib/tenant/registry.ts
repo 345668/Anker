@@ -225,6 +225,8 @@ export const INVESTOR_OWNED: { table: string; reason: string }[] = [
   { table: "investor_entity_members", reason: "The people an investor entity has given a role; they belong to the people, not a workspace." },
   { table: "investor_entity_invites", reason: "Invitations to join an investor entity; purged by expiry." },
   { table: "investor_entity_events", reason: "Who did what on an investor entity." },
+  { table: "passport_documents", reason: "Identity documents an investor keeps for reuse (encrypted); they belong to the investor, not a workspace." },
+  { table: "passport_shares", reason: "Which passport documents were shared with which fund, and when." },
   { table: "investor_claim_codes", reason: "A pending claim of a fund-added record before the address is proved again; purged within a day." },
 ]
 

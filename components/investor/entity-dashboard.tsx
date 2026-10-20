@@ -2,10 +2,11 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { call, field, btn, btnGhost } from "./api"
+import { Passport } from "./passport"
 
 const ROLE: Record<string, string> = { owner: "Owner", can_act: "Can act", can_view: "Can view" }
 const STAGE: Record<string, string> = { interested: "Waiting for the fund", in_talks: "In talks", declined: "Not taken forward", withdrawn: "Withdrawn", invited_to_onboard: "Invited to onboard", onboarding: "Onboarding", active: "Investor", on_hold: "On hold" }
-const WHAT: Record<string, string> = { entity_created: "created this entity", entity_edited: "edited the entity", request_sent: "asked a fund to talk", request_withdrawn: "withdrew a request", nda_accepted: "accepted a fund’s NDA", team_invited: "invited someone", team_invite_revoked: "withdrew an invitation", team_removed: "removed someone", team_role_changed: "changed a role", team_joined: "joined the team", team_left: "left the team" }
+const WHAT: Record<string, string> = { entity_created: "created this entity", entity_edited: "edited the entity", request_sent: "asked a fund to talk", request_withdrawn: "withdrew a request", nda_accepted: "accepted a fund’s NDA", team_invited: "invited someone", team_invite_revoked: "withdrew an invitation", team_removed: "removed someone", team_role_changed: "changed a role", team_joined: "joined the team", team_left: "left the team", passport_added: "added a passport document", passport_shared: "shared passport documents with a fund", passport_share_revoked: "took back a shared document", passport_removed: "removed a passport document" }
 
 export function EntityDashboard({ id }: { id: string }) {
   const [d, setD] = useState<any>(null), [err, setErr] = useState<string | null>(null), [f, setF] = useState({ email: "", role: "can_view" }), [msg, setMsg] = useState<string | null>(null)
@@ -32,6 +33,7 @@ export function EntityDashboard({ id }: { id: string }) {
         <label className="text-sm">Role<select className={field} value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}><option value="can_view">Can view</option><option value="can_act">Can act</option></select></label>
         <button className={btn}>Invite</button>{msg && <span role="status" className="text-sm">{msg}</span>}</form>
         : <button className={btnGhost} onClick={() => confirm("Leave this team?") && team({ action: "leave" }).then(() => window.location.assign("/investor"))}>Leave this team</button>}</section>
+    <Passport entityId={id} />
     <section className="space-y-2"><h2 className="text-lg font-semibold">Activity</h2>
       {d.events.length === 0 ? <p className="text-sm">Nothing yet.</p> : <ul className="space-y-1 text-sm">{d.events.map((e: any) => <li key={e.id}>{e.by} {WHAT[e.action] ?? e.action} <span className="text-muted-foreground">· {new Date(e.at).toLocaleString()}</span></li>)}</ul>}</section>
   </div>

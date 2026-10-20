@@ -272,6 +272,8 @@
     "outreach_reply_deliveries",
     "outreach_templates",
     "outreaches",
+    "passport_documents",
+    "passport_shares",
     "password_reset_tokens",
     "pitch_deck_analyses",
     "pitch_decks",
