@@ -123,17 +123,15 @@ export async function checksToday(): Promise<number> {
   return Number(r?.n ?? 0)
 }
 
-/**
- * Check the firms founders are actually being shown: the top results of runs
- * from the last 30 days whose activity is unknown or older than 90 days.
- */
-export async function runActivitySweep(opts: { limit?: number; ids?: string[]; deps?: ActivityDeps; timeBudgetMs?: number; concurrency?: number; now?: () => number } = {}) {
-  const budget = Math.max(0, Math.min(opts.limit ?? dailyLimit(), dailyLimit() - (await checksToday())))
-  if (budget === 0) return { checked: 0, withDate: 0, errors: 0, deferred: 0, budgetLeft: 0 }
+type SweepRow = { id: string; name: string; website: string | null; from: "founder" | "lp" }
 
-  const rows = opts.ids?.length
-    ? await sql`SELECT id::text AS id, name, website FROM investment_firms WHERE id::text = ANY(${opts.ids}) LIMIT ${budget}`
-    : await sql`
+/**
+ * The firms worth checking: those founders are being shown (the top results of runs from the last 30 days) and, since the LP matching reads the same date
+ * (docs/architecture/63 M6), the LPs funds are being shown (the top of each LP run from the last 30 days, only those with a website). Either list is skipped for a firm
+ * checked in the last 90 days. The daily budget is shared, taking turns between the two lists so neither starves the other.
+ */
+export async function activityCandidates(budget: number): Promise<SweepRow[]> {
+  const founder = (await sql`
         SELECT f.id::text AS id, f.name, f.website
           FROM investment_firms f
          WHERE f.id::text IN (
@@ -142,14 +140,45 @@ export async function runActivitySweep(opts: { limit?: number; ids?: string[]; d
                   WHERE run.created_at > now() - interval '30 days' AND r.kind = 'group' AND r.rank <= 200)
            AND (f.activity_checked_at IS NULL OR f.activity_checked_at < now() - interval '90 days')
          ORDER BY f.activity_checked_at NULLS FIRST
-         LIMIT ${budget}`
+         LIMIT ${budget}`) as any[]
+  // Never-checked firms first, and among them the best matches first, so a limited budget goes to the LPs that rank highest in a fund's runs.
+  const lp = (await sql`
+        SELECT f.id::text AS id, f.name, f.website
+          FROM investment_firms f
+          JOIN (
+                 SELECT m.firm_id::text AS firm_id, max(m.score) AS best FROM (
+                   SELECT firm_id, score, row_number() OVER (PARTITION BY session_id ORDER BY score DESC) AS rn
+                     FROM lp_firm_matches WHERE created_at > now() - interval '30 days') m
+                  WHERE m.rn <= 200 GROUP BY m.firm_id::text) top ON top.firm_id = f.id::text
+         WHERE COALESCE(f.website, '') <> ''
+           AND (f.activity_checked_at IS NULL OR f.activity_checked_at < now() - interval '90 days')
+         ORDER BY f.activity_checked_at NULLS FIRST, top.best DESC
+         LIMIT ${budget}`) as any[]
+  const out: SweepRow[] = [], seen = new Set<string>()
+  for (let i = 0; out.length < budget && (i < founder.length || i < lp.length); i++) {
+    for (const [list, from] of [[founder, "founder"], [lp, "lp"]] as const) {
+      const r = list[i]
+      if (r && !seen.has(r.id) && out.length < budget) { seen.add(r.id); out.push({ id: r.id, name: r.name, website: r.website, from }) }
+    }
+  }
+  return out
+}
+
+export async function runActivitySweep(opts: { limit?: number; ids?: string[]; deps?: ActivityDeps; timeBudgetMs?: number; concurrency?: number; now?: () => number } = {}) {
+  const budget = Math.max(0, Math.min(opts.limit ?? dailyLimit(), dailyLimit() - (await checksToday())))
+  if (budget === 0) return { checked: 0, withDate: 0, errors: 0, deferred: 0, budgetLeft: 0, fromLp: 0 }
+
+  const rows: SweepRow[] = opts.ids?.length
+    ? ((await sql`SELECT id::text AS id, name, website FROM investment_firms WHERE id::text = ANY(${opts.ids}) LIMIT ${budget}`) as any[]).map((r) => ({ ...r, from: "founder" as const }))
+    : await activityCandidates(budget)
 
   // The function is killed at 300 seconds. Each firm can take minutes (three page fetches and a model call), so the sweep used to run 60 of them one after another and never
   // finish: every run since at least 2026-10-11 stayed "running". Now a few run at once and no new firm is started after the time budget; the rest wait for tomorrow.
   const now = opts.now ?? Date.now
   const until = now() + (opts.timeBudgetMs ?? 230_000)
   let withDate = 0, errors = 0, done = 0, cursor = 0
-  const list = rows as any[]
+  const list = rows
+  let fromLp = 0
   async function worker() {
     for (;;) {
       if (now() >= until) return
@@ -165,6 +194,7 @@ export async function runActivitySweep(opts: { limit?: number; ids?: string[]; d
                          activity_checked_at = now()
                    WHERE id::text = ${firm.id}`
         if (found.lastInvestmentAt) withDate++
+        if (firm.from === "lp") fromLp++
         done++
       } catch (e: any) {
         errors++
@@ -173,7 +203,7 @@ export async function runActivitySweep(opts: { limit?: number; ids?: string[]; d
     }
   }
   await Promise.all(Array.from({ length: Math.min(Math.max(1, Math.min(8, opts.concurrency ?? 4)), list.length) }, worker))
-  return { checked: done + errors, withDate, errors, deferred: Math.max(0, list.length - Math.min(cursor, list.length)), budgetLeft: Math.max(0, dailyLimit() - (await checksToday())) }
+  return { checked: done + errors, withDate, errors, fromLp, deferred: Math.max(0, list.length - Math.min(cursor, list.length)), budgetLeft: Math.max(0, dailyLimit() - (await checksToday())) }
 }
 
 /** Re-exported so callers have one import for activity (definition: normalize/recency.ts). */

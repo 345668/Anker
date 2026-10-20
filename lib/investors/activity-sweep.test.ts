@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 vi.mock("server-only", () => ({}))
-const state = vi.hoisted(() => ({ firms: [] as any[], updates: [] as string[], checked: 0 }))
+const state = vi.hoisted(() => ({ firms: [] as any[], lpFirms: [] as any[], updates: [] as string[], checked: 0 }))
 vi.mock("@/lib/db", () => ({ sql: Object.assign(async (s: TemplateStringsArray, ...v: unknown[]) => {
   const q = s.join("?")
   if (q.includes("count(*)")) return [{ n: state.checked }]
   if (q.startsWith("UPDATE")) { state.updates.push(String(v[v.length - 1])); return [] }
-  return state.firms
+  return q.includes("lp_firm_matches") ? state.lpFirms : state.firms
 }, { unsafe: async () => [] }) }))
 vi.mock("@/lib/ai/provider", () => ({ generate: vi.fn(async () => "{}") }))
 import { runActivitySweep } from "./activity"
 
 const firm = (i: number) => ({ id: `f${i}`, name: `Firm ${i}`, website: `https://firm${i}.example` })
 const page = (text: string) => async () => ({ finalUrl: "https://x.example/", body: Buffer.from(`<html><body>${text}</body></html>`), contentType: "text/html" })
-beforeEach(() => { state.firms = []; state.updates = []; state.checked = 0 })
+beforeEach(() => { state.firms = []; state.lpFirms = []; state.updates = []; state.checked = 0 })
 
 describe("runActivitySweep: it must finish inside the platform's time limit", () => {
   it("runs several firms at once, not one after another", async () => {
@@ -50,5 +50,25 @@ describe("runActivitySweep: it must finish inside the platform's time limit", ()
       await vi.advanceTimersByTimeAsync(61_000)
       expect(await run).toMatchObject({ checked: 1, errors: 0, withDate: 0 })
     } finally { vi.useRealTimers() }
+  })
+})
+
+describe("runActivitySweep: the LPs funds are shown are checked too (docs/architecture/63 M6)", () => {
+  it("takes turns between the founders' firms and the funds' LPs so neither starves the other, without checking a firm twice", async () => {
+    state.firms = [firm(1), firm(2), firm(3), firm(4)]
+    state.lpFirms = [firm(11), firm(12), firm(2)]            // firm 2 is on both lists
+    const seen: string[] = []
+    const deps = { fetchPage: async (u: string) => { seen.push(u); throw new Error("unreachable") }, ask: async () => "{}" }
+    const r = await runActivitySweep({ limit: 5, deps, concurrency: 1 })
+    expect(r).toMatchObject({ checked: 5, fromLp: 2 })        // two LP firms, in the first five turns
+    expect(seen.map((u) => u.replace("https://", "").replace(".example", ""))).toEqual(["firm1", "firm11", "firm2", "firm12", "firm3"])
+    expect(new Set(state.updates).size).toBe(5)
+  })
+  it("gives the whole budget to LPs when no founder run has been shown lately, and to founders when no LP run has", async () => {
+    state.lpFirms = Array.from({ length: 6 }, (_, i) => firm(100 + i))
+    const deps = { fetchPage: async () => { throw new Error("unreachable") }, ask: async () => "{}" }
+    expect(await runActivitySweep({ limit: 4, deps, concurrency: 1 })).toMatchObject({ checked: 4, fromLp: 4 })
+    state.lpFirms = []; state.firms = Array.from({ length: 3 }, (_, i) => firm(i)); state.updates = []
+    expect(await runActivitySweep({ limit: 4, deps, concurrency: 1 })).toMatchObject({ checked: 3, fromLp: 0 })
   })
 })
