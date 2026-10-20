@@ -203,6 +203,8 @@ export const RULES: Rule[] = [
   // ── last: the membership list and the workspace and fund themselves ──
   // What a fund shows investors and the requests made to it belong to the fund (docs/architecture/64); the investors themselves do not (INVESTOR_OWNED below).
   { scope: F, table: "relationship_messages", where: "fund_id::text = $2" },
+  { scope: F, table: "relationship_materials", where: "fund_id::text = $2" },
+  { scope: F, table: "relationship_meetings", where: "fund_id::text = $2" },
   { scope: F, table: "fund_relationships", where: "fund_id::text = $2" },
   { scope: F, table: "fund_listings", where: "fund_id::text = $2" },
   { scope: O, table: "memberships", where: "org_id::text = $1" },

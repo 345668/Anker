@@ -47,6 +47,8 @@ beforeAll(async () => {
   await db.exec(readFileSync("scripts/migrations/2026-10-20-investor-side.sql", "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
   await db.exec(readFileSync("scripts/migrations/2026-10-20b-investor-talks.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-20c-investor-bridge.sql", "utf8"))
+  await db.exec("CREATE TABLE data_room_documents(id text PRIMARY KEY, fund_id text, fund_lp_id text, title text, category text, file_url text, file_name text, byte_size bigint, archived_at timestamptz, created_at timestamptz DEFAULT now())")
+  await db.exec(readFileSync("scripts/migrations/2026-10-20e-investor-materials.sql", "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {
@@ -175,7 +177,8 @@ describe("a fund's listing", () => {
     expect(() => readRules({ categories: ["king"] })).toThrow(/Choose professional/)
     expect(() => readRules({ minTicket: -1 })).toThrow(/minimum cheque/)
     expect(() => readRules({ dailyCap: 0 })).toThrow(/between 1 and 100/)
-    const r = readRules({ categories: ["professional", "professional"], countries: "de, fr", minTicket: "250000", dailyCap: 5, ndaRequired: true })
+    expect(() => readRules({ ndaRequired: true })).toThrow(/Paste the text of your NDA/)
+    const r = readRules({ categories: ["professional", "professional"], countries: "de, fr", minTicket: "250000", dailyCap: 5, ndaRequired: true, ndaText: "  Confidential.  " })
     expect(r).toMatchObject({ categories: ["professional"], countries: ["DE", "FR"], minTicket: 250000, dailyCap: 5, ndaRequired: true })
     expect(whoMayInvest(r)).toBe("Open to professional investors, from DE, FR, minimum 250,000.")
     expect(whoMayInvest({ ...DEFAULT_RULES, professionalOnly: true, excludedCountries: ["US"] })).toBe("Professional investors only, not from US.")

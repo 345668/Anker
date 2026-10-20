@@ -16,7 +16,7 @@ const appUrl = () => (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 
 const notFound = () => new InvestorError("That conversation was not found.", 404, "not_found")
 
 /** The relationship, if this side owns it. */
-async function own(side: Side, who: { userId?: string; fundId?: string }, relId: string): Promise<any> {
+export async function own(side: Side, who: { userId?: string; fundId?: string }, relId: string): Promise<any> {
   const [r] = (side === "investor"
     ? await sql`SELECT * FROM fund_relationships WHERE id::text = ${relId} AND user_id = ${who.userId ?? ""}`
     : await sql`SELECT * FROM fund_relationships WHERE id::text = ${relId} AND fund_id = ${who.fundId ?? ""}`) as any[]
@@ -45,7 +45,7 @@ export async function unreadCounts(side: Side, who: { userId?: string; fundId?: 
 }
 
 export type SendEmail = (m: { to: string; subject: string; text: string }) => Promise<void>
-const defaultSend: SendEmail = async (m) => {
+export const defaultSend: SendEmail = async (m) => {
   const { isResendConfigured, sendEmail } = await import("@/lib/email/resend")
   if (!isResendConfigured()) return
   await sendEmail({ ...m, noTracking: true })
@@ -58,17 +58,17 @@ async function investorEmail(userId: string): Promise<string | null> {
   return p?.email ?? null
 }
 /** Tell the other side something is waiting, never what. At most one a hour per side per relationship, and not at all to a side that muted it. */
-async function notifyOther(from: Side, r: any, send: SendEmail) {
+export async function notifyOther(from: Side, r: any, send: SendEmail) {
   const to: Side = from === "investor" ? "fund" : "investor", col = to === "investor" ? "investor_notified_at" : "fund_notified_at"
   if (mutedBy(to, r)) return
   const [claimed] = (await sql.unsafe(`UPDATE fund_relationships SET ${col} = now() WHERE id = $1 AND (${col} IS NULL OR ${col} < now() - interval '${NOTIFY_EVERY_MIN} minutes') RETURNING id`, [r.id])) as any[]
   if (!claimed) return
   if (to === "fund") {
     const { createNotification } = await import("@/lib/notifications/store")
-    for (const p of await fundPeople(r.fund_id)) await createNotification({ userId: p.id, orgId: p.org_id, kind: "investor_message", title: "A new message from an investor", body: "Open the investor requests to read it.", href: "/dashboard/investor-requests", dedupeKey: `invmsg:${r.id}:${new Date().toISOString().slice(0, 13)}` })
+    for (const p of await fundPeople(r.fund_id)) await createNotification({ userId: p.id, orgId: p.org_id, kind: "investor_message", title: "Something new from an investor", body: "Open the investor requests to see it.", href: "/dashboard/investor-requests", dedupeKey: `invmsg:${r.id}:${new Date().toISOString().slice(0, 13)}` })
   } else {
     const email = await investorEmail(r.user_id)
-    if (email) await send({ to: email, subject: "You have a new message on Anker", text: `A fund you asked to talk to has written to you.\n\nRead it here: ${appUrl()}/investor/requests\n\nIf you do not want these emails, mute the conversation there.` })
+    if (email) await send({ to: email, subject: "You have a new message on Anker", text: `A fund you asked to talk to has something for you.\n\nRead it here: ${appUrl()}/investor/requests\n\nIf you do not want these emails, mute the conversation there.` })
   }
 }
 

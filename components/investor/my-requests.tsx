@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { call, btnGhost } from "./api"
 import { Thread } from "./thread"
+import { TalkExtras } from "./talk-extras"
 
 const STAGE: Record<string, string> = { interested: "Waiting for the fund", in_talks: "The fund wants to talk", declined: "Not taken forward", withdrawn: "Withdrawn", invited_to_onboard: "Invited to onboard", onboarding: "Onboarding", on_hold: "On hold" }
 export function MyRequests() {
@@ -19,6 +20,6 @@ export function MyRequests() {
           <div className="flex shrink-0 gap-2">
             {r.stage !== "interested" && r.stage !== "withdrawn" && <button className={btnGhost} onClick={() => setOpen(open === r.id ? null : r.id)}>{open === r.id ? "Hide messages" : "Messages"}</button>}
             {["interested", "in_talks"].includes(r.stage) && <button className={btnGhost} onClick={() => call(`/api/investor/requests/${r.id}`, { method: "DELETE" }).then(load).catch((e) => setErr(e.message))}>Withdraw</button>}</div></div>
-        {open === r.id && <Thread base={`/api/investor/requests/${r.id}`} me="investor" />}
+        {open === r.id && <><Thread base={`/api/investor/requests/${r.id}`} me="investor" /><TalkExtras base={`/api/investor/requests/${r.id}`} me="investor" /></>}
       </li>)}</ul>}</div>
 }

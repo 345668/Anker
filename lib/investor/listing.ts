@@ -10,8 +10,9 @@ import type { AuditContext } from "@/lib/audit/record-change"
 import { CATEGORIES, type Category, type FundFacts, type Rules } from "./fit"
 import { InvestorError } from "./profile"
 
-export interface ListingRules extends Rules { dailyCap: number; ndaRequired: boolean }
-export const DEFAULT_RULES: ListingRules = { categories: [], countries: [], excludedCountries: [], minTicket: null, professionalOnly: false, dailyCap: 10, ndaRequired: false }
+export interface ListingRules extends Rules { dailyCap: number; ndaRequired: boolean; ndaText: string }
+export const NDA_MAX = 20000
+export const DEFAULT_RULES: ListingRules = { categories: [], countries: [], excludedCountries: [], minTicket: null, professionalOnly: false, dailyCap: 10, ndaRequired: false, ndaText: "" }
 
 const code = (v: unknown) => String(v ?? "").trim().toUpperCase()
 const codes = (v: unknown, field: string): string[] => {
@@ -29,7 +30,10 @@ export function readRules(raw: any): ListingRules {
   if (!Number.isFinite(dailyCap) || dailyCap < 1 || dailyCap > 100) throw new InvestorError("The daily limit on new requests is between 1 and 100.")
   const countries = codes(raw?.countries, "Countries that may invest"), excludedCountries = codes(raw?.excludedCountries, "Countries that may not invest")
   if (countries.some((c) => excludedCountries.includes(c))) throw new InvestorError("A country cannot be both allowed and excluded.")
-  return { categories: categories as Category[], countries, excludedCountries, minTicket: minTicket === null ? null : Math.round(minTicket), professionalOnly: raw?.professionalOnly === true, dailyCap, ndaRequired: raw?.ndaRequired === true }
+  const ndaText = String(raw?.ndaText ?? "").replace(/\r\n/g, "\n").trim()
+  if (ndaText.length > NDA_MAX) throw new InvestorError(`Keep the NDA text to ${NDA_MAX} characters.`)
+  if (raw?.ndaRequired === true && !ndaText) throw new InvestorError("Paste the text of your NDA, or turn the NDA requirement off. Anker records that an investor accepted your text; it does not write one.")
+  return { categories: categories as Category[], countries, excludedCountries, minTicket: minTicket === null ? null : Math.round(minTicket), professionalOnly: raw?.professionalOnly === true, dailyCap, ndaRequired: raw?.ndaRequired === true, ndaText }
 }
 
 /** The rules in the words an investor reads on the fund's page. */

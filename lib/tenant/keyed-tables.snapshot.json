@@ -284,6 +284,8 @@
     "private_artifacts",
     "profiles",
     "provider_bills",
+    "relationship_materials",
+    "relationship_meetings",
     "relationship_messages",
     "research_crawl_logs",
     "research_documents",
@@ -658,6 +660,12 @@
     ],
     "private_artifacts": [
       "org_id"
+    ],
+    "relationship_materials": [
+      "fund_id"
+    ],
+    "relationship_meetings": [
+      "fund_id"
     ],
     "relationship_messages": [
       "fund_id"
