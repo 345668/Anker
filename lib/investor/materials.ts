@@ -3,7 +3,7 @@
  */
 import { createHash } from "node:crypto"
 import { sql } from "@/lib/db"
-import { InvestorError } from "./profile"
+import { InvestorError, logEvent } from "./profile"
 import { own, notifyOther, defaultSend, WRITABLE, type Side, type SendEmail } from "./talks"
 import { DEFAULT_RULES } from "./listing"
 
@@ -29,13 +29,14 @@ const ndaMet = (n: NdaView) => !n.required || n.accepted
 
 /** The investor accepts the fund's own NDA text. Once; the copy, its hash, the time, the address and a hash of the browser string are kept. */
 export async function acceptNda(userId: string, relId: string, ip: string | null, userAgent: string | null): Promise<NdaView> {
-  const r = await own("investor", { userId }, relId)
+  const r = await own("investor", { userId }, relId, "act")
   if (!isOpen(r)) throw closed()
   const n = await ndaOf(r)
   if (!n.required) throw new InvestorError("This fund does not ask for an NDA.", 409, "no_nda")
   if (n.accepted) throw new InvestorError("You already accepted this NDA.", 409, "accepted")
   const rules = await rulesOf(r.fund_id)
   await sql`UPDATE fund_relationships SET nda_accepted_at = now(), nda_text = ${rules.ndaText}, nda_text_hash = ${sha(rules.ndaText)}, nda_ip = ${ip}, nda_agent_hash = ${userAgent ? sha(userAgent) : null}, updated_at = now() WHERE id = ${r.id}`
+  await logEvent(String(r.entity_id), userId, "nda_accepted", { relationshipId: String(r.id) })
   return ndaOf(await own("investor", { userId }, relId))
 }
 
@@ -67,8 +68,8 @@ export interface FundMaterials { open: boolean; ndaRequired: boolean; ndaAccepte
 export async function materialsForFund(fundId: string, relId: string): Promise<FundMaterials> {
   const r = await own("fund", { fundId }, relId)
   const nda = await ndaOf(r)
-  const [p] = (await sql`SELECT email FROM profiles WHERE id::text = ${r.user_id}`) as any[]
-  const granted = (await sql`SELECT m.id, m.document_id, m.granted_at, d.title, d.category, EXISTS (SELECT 1 FROM data_room_document_views v WHERE v.document_id = m.document_id AND v.fund_id = m.fund_id AND lower(v.viewer_email) = lower(${p?.email ?? ""}) AND v.viewed_at >= m.granted_at) AS opened
+  const team = ((await sql`SELECT p.email FROM profiles p WHERE p.email IS NOT NULL AND p.id::text IN (SELECT user_id FROM investor_entities WHERE id = ${r.entity_id} UNION SELECT user_id FROM investor_entity_members WHERE entity_id = ${r.entity_id})`) as any[]).map((x) => String(x.email).toLowerCase())
+  const granted = (await sql`SELECT m.id, m.document_id, m.granted_at, d.title, d.category, EXISTS (SELECT 1 FROM data_room_document_views v WHERE v.document_id = m.document_id AND v.fund_id = m.fund_id AND lower(v.viewer_email) = ANY(${team}::text[]) AND v.viewed_at >= m.granted_at) AS opened
     FROM relationship_materials m JOIN data_room_documents d ON d.id = m.document_id WHERE m.relationship_id = ${r.id} AND m.revoked_at IS NULL ORDER BY m.granted_at DESC`.catch(() => [])) as any[]
   const available = (await sql`SELECT id, title, category, file_name FROM data_room_documents WHERE fund_id = ${fundId} AND fund_lp_id IS NULL AND archived_at IS NULL
     AND id NOT IN (SELECT document_id FROM relationship_materials WHERE relationship_id = ${r.id} AND revoked_at IS NULL) ORDER BY created_at DESC LIMIT 200`) as any[]
@@ -102,7 +103,7 @@ export async function listMeetings(side: Side, who: Who, relId: string): Promise
   return rows.map((m) => ({ id: String(m.id), by: m.proposed_by, startsAt: m.starts_at ? new Date(m.starts_at).toISOString() : null, link: m.link ?? null, note: m.note ?? null, status: m.status, createdAt: new Date(m.created_at).toISOString(), mine: m.proposed_by === side }))
 }
 export async function proposeMeeting(side: Side, who: Who, relId: string, input: { startsAt?: unknown; link?: unknown; note?: unknown }, send: SendEmail = defaultSend): Promise<void> {
-  const r = await own(side, who, relId)
+  const r = await own(side, who, relId, "act")
   if (!isOpen(r)) throw closed()
   const startsAt = input.startsAt ? new Date(String(input.startsAt)) : null
   if (startsAt && (Number.isNaN(startsAt.getTime()) || startsAt.getTime() < Date.now() - 60_000)) throw new InvestorError("Choose a time in the future.")
@@ -119,7 +120,7 @@ export async function proposeMeeting(side: Side, who: Who, relId: string, input:
 }
 /** The other side accepts or declines; the proposer cancels. */
 export async function answerMeeting(side: Side, who: Who, relId: string, meetingId: string, action: "accept" | "decline" | "cancel", send: SendEmail = defaultSend): Promise<string> {
-  const r = await own(side, who, relId)
+  const r = await own(side, who, relId, "act")
   if (!isOpen(r)) throw closed()
   const [m] = (await sql`SELECT * FROM relationship_meetings WHERE id::text = ${meetingId} AND relationship_id = ${r.id}`) as any[]
   if (!m || m.status !== "proposed") throw new InvestorError("That proposal was not found, or it has already been answered.", 404, "not_found")

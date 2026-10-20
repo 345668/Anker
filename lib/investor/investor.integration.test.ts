@@ -49,6 +49,7 @@ beforeAll(async () => {
   await db.exec(readFileSync("scripts/migrations/2026-10-20c-investor-bridge.sql", "utf8"))
   await db.exec("CREATE TABLE data_room_documents(id text PRIMARY KEY, fund_id text, fund_lp_id text, title text, category text, file_url text, file_name text, byte_size bigint, archived_at timestamptz, created_at timestamptz DEFAULT now())")
   await db.exec(readFileSync("scripts/migrations/2026-10-20e-investor-materials.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-20f-investor-team.sql", "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {
@@ -294,7 +295,7 @@ describe("asking a fund to talk, and the fund's answer", () => {
     expect(await myRequests("other")).toEqual([])
   })
   it("the copy for a fund is built only from what was chosen", () => {
-    const e = { id: "e", legalName: "Ann", kind: "individual" as const, country: "Germany", taxResidence: "Germany", category: "professional" as const, interests: { stages: ["seed"], sectors: [], geographies: [], ticketMin: null, ticketMax: null, horizonYears: null }, createdAt: "", updatedAt: "" }
+    const e = { id: "e", legalName: "Ann", kind: "individual" as const, country: "Germany", taxResidence: "Germany", category: "professional" as const, interests: { stages: ["seed"], sectors: [], geographies: [], ticketMin: null, ticketMax: null, horizonYears: null }, createdAt: "", updatedAt: "", role: "owner" as const }
     const c = sharedCopy(e, { name: false, country: false, category: false, interests: false }, new Date("2026-10-20T10:00:00Z"))
     expect(c).toEqual({ at: "2026-10-20T10:00:00.000Z", choice: { name: false, country: false, category: false, interests: false }, kind: "individual" })
     expect(sharedCopy(e, DEFAULT_SHARE)).not.toHaveProperty("taxResidence")      // tax residence is never in the copy

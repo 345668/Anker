@@ -26,7 +26,7 @@ export async function syncStages(fundId?: string): Promise<number> {
 
 export async function inviteToOnboard(fundId: string, relId: string, by: string, appUrl: string, send?: Send): Promise<{ lpId: string; stage: string; emailSent: boolean; sentTo: string | null; emailError: string | null }> {
   const [r] = (await sql`SELECT r.id, r.stage, r.fund_lp_id, r.entity_id, r.user_id, e.legal_name, e.kind, p.email
-    FROM fund_relationships r JOIN investor_entities e ON e.id = r.entity_id LEFT JOIN profiles p ON p.id::text = r.user_id
+    FROM fund_relationships r JOIN investor_entities e ON e.id = r.entity_id LEFT JOIN profiles p ON p.id::text = e.user_id
     WHERE r.id::text = ${relId} AND r.fund_id = ${fundId}`) as any[]
   if (!r) throw new InvestorError("That request was not found.", 404, "not_found")
   if (r.fund_lp_id || r.stage !== "in_talks") throw new InvestorError(r.stage === "in_talks" ? "This investor has already been invited." : "You can invite an investor once you have accepted their request and are talking.", 409, "stage")

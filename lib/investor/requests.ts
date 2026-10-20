@@ -6,7 +6,7 @@
  */
 import { sql } from "@/lib/db"
 import { fitFor, NOT_RAISING, type FundFit } from "./fit"
-import { InvestorError, factsOf, getEntity, getProfile, type EntityView } from "./profile"
+import { InvestorError, factsOf, requireEntity, getProfile, logEvent, relationshipEntityIds, type EntityView } from "./profile"
 import { listedFund, type ListedFund } from "./listing"
 import { blockedByFund } from "./talks"
 import { nextStepFor, syncStages } from "./bridge"
@@ -40,8 +40,7 @@ export function sharedCopy(e: EntityView, share: ShareChoice, now = new Date()) 
 }
 
 export async function fitForEntity(userId: string, entityId: string, fund: ListedFund): Promise<{ entity: EntityView; fit: FundFit }> {
-  const entity = await getEntity(userId, entityId)
-  if (!entity) throw new InvestorError("That entity was not found.", 404, "not_found")
+  const entity = await requireEntity(userId, entityId, "act")
   return { entity, fit: fitFor(factsOf(entity), fund.facts) }
 }
 
@@ -74,6 +73,7 @@ export async function requestToConnect(userId: string, input: RequestInput): Pro
     if (e?.code === "23505" || /fund_relationships_open_uq|duplicate key/i.test(String(e?.message))) throw new InvestorError("You already have an open request with this fund for this entity.", 409, "open")
     throw e
   }
+  await logEvent(entity.id, userId, "request_sent", { fundId: fund.facts.fundId, fund: fund.snapshot.name })
   await notifyFund(fund.facts.fundId, String(row.id), fund.snapshot.name).catch((e) => console.warn("[investor-request] notify failed:", e?.message))
   return { id: String(row.id), fit }
 }
@@ -90,18 +90,21 @@ const STAGE_MESSAGE: Record<string, string> = {
   interested: "Sent. The fund has not answered yet.", in_talks: "The fund accepted and wants to talk.", invited_to_onboard: "The fund has invited you to onboard.", onboarding: "You are onboarding with this fund.",
   active: "You are an investor in this fund.", on_hold: "On hold.", declined: "The fund is not able to take this forward.", withdrawn: "You withdrew this request.",
 }
-export async function myRequests(userId: string): Promise<InvestorRequestView[]> {
+export async function myRequests(userId: string, opts: { entityId?: string } = {}): Promise<InvestorRequestView[]> {
   await syncStages().catch(() => {})
+  const ids = (await relationshipEntityIds(userId)).filter((id) => !opts.entityId || id === opts.entityId)
   const rows = (await sql`SELECT r.id, r.fund_id, r.entity_id, r.stage, r.created_at, r.decided_at, r.note, l.snapshot->>'name' AS fund_name, e.legal_name, lp.onboarding_state
-    FROM fund_relationships r JOIN investor_entities e ON e.id = r.entity_id LEFT JOIN fund_listings l ON l.fund_id = r.fund_id LEFT JOIN fund_lps lp ON lp.id = r.fund_lp_id WHERE r.user_id = ${userId} ORDER BY r.created_at DESC LIMIT 100`) as any[]
+    FROM fund_relationships r JOIN investor_entities e ON e.id = r.entity_id LEFT JOIN fund_listings l ON l.fund_id = r.fund_id LEFT JOIN fund_lps lp ON lp.id = r.fund_lp_id WHERE r.entity_id::text = ANY(${ids}::text[]) ORDER BY r.created_at DESC LIMIT 100`) as any[]
   return rows.map((r) => ({ id: String(r.id), fundId: String(r.fund_id), fundName: r.fund_name ?? "A fund", entityId: String(r.entity_id), entityName: r.legal_name, stage: r.stage, createdAt: new Date(r.created_at).toISOString(),
     decidedAt: r.decided_at ? new Date(r.decided_at).toISOString() : null, note: r.note ?? null, message: STAGE_MESSAGE[r.stage] ?? r.stage, nextStep: r.stage === "invited_to_onboard" || r.stage === "onboarding" || r.stage === "active" ? nextStepFor(r.onboarding_state) : null }))
 }
 
 /** The investor takes a request back. Allowed until the fund has invited them to onboard. */
 export async function withdraw(userId: string, relId: string): Promise<void> {
-  const rows = (await sql`UPDATE fund_relationships SET stage = 'withdrawn', updated_at = now() WHERE id::text = ${relId} AND user_id = ${userId} AND stage IN ('interested', 'in_talks', 'on_hold') RETURNING id`) as any[]
+  const ids = await relationshipEntityIds(userId, "act")
+  const rows = (await sql`UPDATE fund_relationships SET stage = 'withdrawn', updated_at = now() WHERE id::text = ${relId} AND entity_id::text = ANY(${ids}::text[]) AND stage IN ('interested', 'in_talks', 'on_hold') RETURNING id, entity_id`) as any[]
   if (!rows.length) throw new InvestorError("That request cannot be withdrawn: it was not found, or it has moved on to onboarding.", 404, "not_found")
+  await logEvent(String(rows[0].entity_id), userId, "request_withdrawn", { relationshipId: relId })
 }
 
 // ─── the fund's side ───────────────────────────────────────────────────────────
@@ -119,7 +122,7 @@ const obj = (v: any) => (v && typeof v === "object" ? v : typeof v === "string" 
 
 export async function inbound(fundId: string, opts: { stage?: string } = {}): Promise<InboundView[]> {
   await syncStages(fundId).catch(() => {})
-  const rows = (await sql`SELECT r.*, p.email, lp.onboarding_state FROM fund_relationships r LEFT JOIN profiles p ON p.id::text = r.user_id LEFT JOIN fund_lps lp ON lp.id = r.fund_lp_id
+  const rows = (await sql`SELECT r.*, p.email, lp.onboarding_state FROM fund_relationships r LEFT JOIN investor_entities ie ON ie.id = r.entity_id LEFT JOIN profiles p ON p.id::text = ie.user_id LEFT JOIN fund_lps lp ON lp.id = r.fund_lp_id
     WHERE r.fund_id = ${fundId} AND (${opts.stage ?? null}::text IS NULL OR r.stage = ${opts.stage ?? null}) ORDER BY r.created_at DESC LIMIT 200`) as any[]
   return rows.map((r) => ({
     id: String(r.id), stage: r.stage, createdAt: new Date(r.created_at).toISOString(), decidedAt: r.decided_at ? new Date(r.decided_at).toISOString() : null, timing: r.timing ?? null, note: r.note ?? null,

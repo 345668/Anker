@@ -4,7 +4,7 @@
  */
 import { createHash, randomInt, timingSafeEqual } from "node:crypto"
 import { sql } from "@/lib/db"
-import { InvestorError, TERMS_VERSION, getEntity, getProfile } from "./profile"
+import { InvestorError, TERMS_VERSION, requireEntity, getProfile } from "./profile"
 import { maskEmail, CODE_MINUTES, CODE_MAX_TRIES, CODE_PER_HOUR, CODE_COOLDOWN_SEC } from "./signup"
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex")
@@ -56,8 +56,7 @@ const stageFor = (state: string) => (state === "countersigned" ? "active" : ["no
 
 export async function confirmClaim(userId: string, email: string | null, confirmed: boolean, input: { lpId: string; entityId: string; code?: unknown }): Promise<{ relationshipId: string; stage: string }> {
   const c = await theClaim(userId, email, confirmed, input.lpId)
-  const entity = await getEntity(userId, String(input.entityId ?? ""))
-  if (!entity) throw new InvestorError("Choose which of your entities this investment belongs to.", 404, "not_found")
+  const entity = await requireEntity(userId, String(input.entityId ?? ""), "act").catch((e) => { if (e?.code === "not_found") throw new InvestorError("Choose which of your entities this investment belongs to.", 404, "not_found"); throw e })
   if (!c.proved) {
     const code = String(input.code ?? "").replace(/\s+/g, "")
     if (!/^\d{6}$/.test(code)) throw new InvestorError("Enter the six digits from the email.")
@@ -74,7 +73,7 @@ export async function confirmClaim(userId: string, email: string | null, confirm
   // The doc 60 account link, so the investment shows under /lp. Never over another person's.
   await sql`INSERT INTO lp_accounts (lp_id, fund_id, user_id, email) VALUES (${input.lpId}, ${lp.fund_id}, ${userId}, ${String(email).trim().toLowerCase()}) ON CONFLICT (lp_id) DO NOTHING`
   // An open request for the same entity and fund is linked; otherwise the fund's record becomes a relationship started by the fund.
-  const linked = (await sql`UPDATE fund_relationships SET fund_lp_id = ${input.lpId}, stage = ${stage}, updated_at = now() WHERE fund_id = ${lp.fund_id} AND entity_id = ${entity.id} AND user_id = ${userId} AND fund_lp_id IS NULL AND stage IN ('interested', 'in_talks', 'invited_to_onboard', 'onboarding', 'on_hold') RETURNING id`) as any[]
+  const linked = (await sql`UPDATE fund_relationships SET fund_lp_id = ${input.lpId}, stage = ${stage}, updated_at = now() WHERE fund_id = ${lp.fund_id} AND entity_id = ${entity.id} AND fund_lp_id IS NULL AND stage IN ('interested', 'in_talks', 'invited_to_onboard', 'onboarding', 'on_hold') RETURNING id`) as any[]
   if (linked.length) return { relationshipId: String(linked[0].id), stage }
   try {
     const [rel] = (await sql`INSERT INTO fund_relationships (fund_id, entity_id, user_id, stage, initiated_by, fund_lp_id, shared) VALUES (${lp.fund_id}, ${entity.id}, ${userId}, ${stage}, 'fund', ${input.lpId}, ${JSON.stringify({ at: new Date().toISOString(), kind: entity.kind, name: entity.legalName })}::jsonb) RETURNING id`) as any[]

@@ -3,7 +3,7 @@
  * notifications that carry no content, and the daily nudges. A side reads only its own relationships' threads.
  */
 import { sql } from "@/lib/db"
-import { InvestorError } from "./profile"
+import { InvestorError, relationshipEntityIds, type Need } from "./profile"
 
 export const MESSAGE_MAX = 4000, MESSAGES_PER_HOUR = 30, NOTIFY_EVERY_MIN = 60
 export const WRITABLE = ["in_talks", "invited_to_onboard", "onboarding", "active"] as const
@@ -16,11 +16,15 @@ const appUrl = () => (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 
 const notFound = () => new InvestorError("That conversation was not found.", 404, "not_found")
 
 /** The relationship, if this side owns it. */
-export async function own(side: Side, who: { userId?: string; fundId?: string }, relId: string): Promise<any> {
+export async function own(side: Side, who: { userId?: string; fundId?: string }, relId: string, need: Need = "view"): Promise<any> {
+  const ids = side === "investor" ? await relationshipEntityIds(who.userId ?? "", need) : []
   const [r] = (side === "investor"
-    ? await sql`SELECT * FROM fund_relationships WHERE id::text = ${relId} AND user_id = ${who.userId ?? ""}`
+    ? await sql`SELECT * FROM fund_relationships WHERE id::text = ${relId} AND entity_id::text = ANY(${ids}::text[])`
     : await sql`SELECT * FROM fund_relationships WHERE id::text = ${relId} AND fund_id = ${who.fundId ?? ""}`) as any[]
-  if (!r) throw notFound()
+  if (!r) {
+    if (side === "investor" && need !== "view" && (await sql`SELECT 1 AS x FROM fund_relationships WHERE id::text = ${relId} AND entity_id::text = ANY(${await relationshipEntityIds(who.userId ?? "")}::text[])` as any[]).length) throw new InvestorError("Your role on this entity is view only.", 403, "view_only")
+    throw notFound()
+  }
   return r
 }
 const mutedBy = (side: Side, r: any) => (side === "investor" ? !!r.investor_muted : !!r.fund_muted)
@@ -39,7 +43,7 @@ export async function readThread(side: Side, who: { userId?: string; fundId?: st
 export async function unreadCounts(side: Side, who: { userId?: string; fundId?: string }): Promise<Record<string, number>> {
   const other: Side = side === "investor" ? "fund" : "investor"
   const rows = (side === "investor"
-    ? await sql`SELECT m.relationship_id AS id, count(*)::int n FROM relationship_messages m JOIN fund_relationships r ON r.id = m.relationship_id WHERE r.user_id = ${who.userId ?? ""} AND m.sender = ${other} AND m.read_at IS NULL GROUP BY 1`
+    ? await sql`SELECT m.relationship_id AS id, count(*)::int n FROM relationship_messages m JOIN fund_relationships r ON r.id = m.relationship_id WHERE r.entity_id::text = ANY(${await relationshipEntityIds(who.userId ?? "")}::text[]) AND m.sender = ${other} AND m.read_at IS NULL GROUP BY 1`
     : await sql`SELECT relationship_id AS id, count(*)::int n FROM relationship_messages WHERE fund_id = ${who.fundId ?? ""} AND sender = ${other} AND read_at IS NULL GROUP BY 1`) as any[]
   return Object.fromEntries(rows.map((r) => [String(r.id), Number(r.n)]))
 }
@@ -53,9 +57,10 @@ export const defaultSend: SendEmail = async (m) => {
 async function fundPeople(fundId: string) {
   return (await sql`SELECT m.user_id::text AS id, m.org_id FROM organizations o JOIN memberships m ON m.org_id = o.id WHERE o.fund_id = ${fundId} AND m.org_role IN ('workspace_owner', 'admin')`) as any[]
 }
-async function investorEmail(userId: string): Promise<string | null> {
-  const [p] = (await sql`SELECT email FROM profiles WHERE id::text = ${userId}`) as any[]
-  return p?.email ?? null
+/** Where the investor side is written to: the entity's owner and the people who can act on it. */
+async function investorEmails(entityId: string): Promise<string[]> {
+  const rows = (await sql`SELECT DISTINCT p.email FROM profiles p WHERE p.email IS NOT NULL AND p.id::text IN (SELECT user_id FROM investor_entities WHERE id = ${entityId} UNION SELECT user_id FROM investor_entity_members WHERE entity_id = ${entityId} AND role = 'can_act')`) as any[]
+  return rows.map((r) => String(r.email))
 }
 /** Tell the other side something is waiting, never what. At most one a hour per side per relationship, and not at all to a side that muted it. */
 export async function notifyOther(from: Side, r: any, send: SendEmail) {
@@ -67,13 +72,12 @@ export async function notifyOther(from: Side, r: any, send: SendEmail) {
     const { createNotification } = await import("@/lib/notifications/store")
     for (const p of await fundPeople(r.fund_id)) await createNotification({ userId: p.id, orgId: p.org_id, kind: "investor_message", title: "Something new from an investor", body: "Open the investor requests to see it.", href: "/dashboard/investor-requests", dedupeKey: `invmsg:${r.id}:${new Date().toISOString().slice(0, 13)}` })
   } else {
-    const email = await investorEmail(r.user_id)
-    if (email) await send({ to: email, subject: "You have a new message on Anker", text: `A fund you asked to talk to has something for you.\n\nRead it here: ${appUrl()}/investor/requests\n\nIf you do not want these emails, mute the conversation there.` })
+    for (const email of await investorEmails(r.entity_id)) await send({ to: email, subject: "You have a new message on Anker", text: `A fund you asked to talk to has something for you.\n\nRead it here: ${appUrl()}/investor/requests\n\nIf you do not want these emails, mute the conversation there.` })
   }
 }
 
 export async function sendMessage(side: Side, who: { userId?: string; fundId?: string; senderId: string }, relId: string, body: unknown, send: SendEmail = defaultSend): Promise<MessageView> {
-  const r = await own(side, who, relId)
+  const r = await own(side, who, relId, "act")
   const text = String(body ?? "").replace(/\r\n/g, "\n").trim()
   if (!text) throw new InvestorError("Write a message first.")
   if (text.length > MESSAGE_MAX) throw new InvestorError(`Keep a message to ${MESSAGE_MAX} characters.`)
@@ -89,7 +93,7 @@ export async function sendMessage(side: Side, who: { userId?: string; fundId?: s
 
 /** Mute or unmute this side's notifications, or block: the fund's block declines and stops that person asking again; the investor's withdraws. */
 export async function setPrefs(side: Side, who: { userId?: string; fundId?: string }, relId: string, action: "mute" | "unmute" | "block"): Promise<{ stage: string; muted: boolean }> {
-  const r = await own(side, who, relId)
+  const r = await own(side, who, relId, "act")
   if (action === "block") {
     const stage = side === "fund" ? "declined" : "withdrawn"
     await sql`UPDATE fund_relationships SET blocked_by = ${side}, stage = ${stage}, decided_at = COALESCE(decided_at, now()), updated_at = now() WHERE id = ${r.id}`
@@ -116,10 +120,10 @@ export async function sendNudges(send: SendEmail = defaultSend): Promise<{ remin
     for (const p of await fundPeople(r.fund_id)) await createNotification({ userId: p.id, orgId: p.org_id, kind: "investor_request", title: "An investor request has waited a week", body: "Open the requests to answer it.", href: "/dashboard/investor-requests", dedupeKey: `invnudge:${r.id}` })
     reminded++
   }
-  const quiet = (await sql`UPDATE fund_relationships SET quiet_asked_at = now() WHERE stage = 'in_talks' AND COALESCE(last_message_at, decided_at, created_at) < now() - interval '30 days' AND (quiet_asked_at IS NULL OR quiet_asked_at < now() - interval '30 days') RETURNING id, fund_id, user_id, investor_muted, fund_muted`) as any[]
+  const quiet = (await sql`UPDATE fund_relationships SET quiet_asked_at = now() WHERE stage = 'in_talks' AND COALESCE(last_message_at, decided_at, created_at) < now() - interval '30 days' AND (quiet_asked_at IS NULL OR quiet_asked_at < now() - interval '30 days') RETURNING id, fund_id, entity_id, user_id, investor_muted, fund_muted`) as any[]
   for (const r of quiet) {
     if (!r.fund_muted) for (const p of await fundPeople(r.fund_id)) await createNotification({ userId: p.id, orgId: p.org_id, kind: "investor_request", title: "A conversation with an investor has gone quiet", body: "Open the requests to continue or close it.", href: "/dashboard/investor-requests", dedupeKey: `invquiet:${r.id}:${new Date().toISOString().slice(0, 7)}` })
-    if (!r.investor_muted) { const email = await investorEmail(r.user_id); if (email) await send({ to: email, subject: "Do you want to continue your conversation?", text: `Your conversation with a fund has been quiet for a month. You can write again or withdraw here: ${appUrl()}/investor/requests` }) }
+    if (!r.investor_muted) { for (const email of await investorEmails(r.entity_id)) await send({ to: email, subject: "Do you want to continue your conversation?", text: `Your conversation with a fund has been quiet for a month. You can write again or withdraw here: ${appUrl()}/investor/requests` }) }
     asked++
   }
   return { reminded, asked }

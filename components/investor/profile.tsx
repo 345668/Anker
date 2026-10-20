@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { call, field, btn, btnGhost } from "./api"
 import { Claims } from "./claims"
+import { Invitations } from "./invitations"
+import Link from "next/link"
 
 const KINDS = [["individual", "Individual"], ["company", "Company"], ["trust", "Trust"], ["fund", "Fund"], ["family_office", "Family office"]]
 const CATS = [["", "Not stated"], ["professional", "Professional investor"], ["semi_professional", "Semi-professional investor"], ["other", "Other"], ["unsure", "I am not sure"]]
@@ -54,7 +56,8 @@ export function InvestorProfile() {
   async function remove(id: string) { try { await call(`/api/investor/entities/${id}`, { method: "DELETE" }); await load() } catch (x) { setErr(x instanceof Error ? x.message : "Try again.") } }
   const done = async () => { setEditing(null); setAdding(false); await load() }
   return <div className="space-y-10">
-    <Claims entities={d.entities} />
+    <Invitations onJoined={load} />
+    <Claims entities={d.entities.filter((e: any) => e.role !== "can_view")} />
     <section><h1 className="text-xl font-semibold">Your profile</h1>
       <form onSubmit={saveProfile} className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-sm">Display name<input className={field} value={p.displayName} onChange={(e) => setP({ ...p, displayName: e.target.value })} required /></label>
@@ -69,9 +72,9 @@ export function InvestorProfile() {
         {adding && <EntityEditor entity={null} onSaved={done} onCancel={() => setAdding(false)} />}
         {d.entities.map((e: any) => editing === e.id ? <EntityEditor key={e.id} entity={e} onSaved={done} onCancel={() => setEditing(null)} /> :
           <div key={e.id} className="flex items-start justify-between rounded-lg border p-4 text-sm">
-            <div><p className="font-medium">{e.legalName} <span className="font-normal text-muted-foreground">· {e.kind.replace("_", " ")}{e.country ? ` · ${e.country}` : ""}</span></p>
+            <div><p className="font-medium">{e.legalName} <span className="font-normal text-muted-foreground">· {e.kind.replace("_", " ")}{e.country ? ` · ${e.country}` : ""}{e.role !== "owner" ? ` · you ${e.role === "can_act" ? "can act" : "can view"}` : ""}</span></p>
               <p className="text-muted-foreground">{e.category ? `Declares: ${e.category.replace("_", " ")}` : "Category not stated"} · {e.interests.sectors.length ? e.interests.sectors.join(", ") : "no sectors yet"}</p></div>
-            <div className="flex gap-2"><button className={btnGhost} onClick={() => setEditing(e.id)}>Edit</button><button className={btnGhost} onClick={() => remove(e.id)}>Remove</button></div>
+            <div className="flex gap-2"><Link className={btnGhost} href={`/investor/entities/${e.id}`}>Open</Link>{e.role === "owner" && <><button className={btnGhost} onClick={() => setEditing(e.id)}>Edit</button><button className={btnGhost} onClick={() => remove(e.id)}>Remove</button></>}</div>
           </div>)}
       </div></section>
   </div>

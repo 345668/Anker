@@ -222,6 +222,9 @@ export const INVESTOR_OWNED: { table: string; reason: string }[] = [
   { table: "investor_profiles", reason: "The investor's own profile." },
   { table: "investor_entities", reason: "The entities an investor invests through; owned by the person." },
   { table: "investor_signup_codes", reason: "A pending sign-up before the address is proved; purged within a day." },
+  { table: "investor_entity_members", reason: "The people an investor entity has given a role; they belong to the people, not a workspace." },
+  { table: "investor_entity_invites", reason: "Invitations to join an investor entity; purged by expiry." },
+  { table: "investor_entity_events", reason: "Who did what on an investor entity." },
   { table: "investor_claim_codes", reason: "A pending claim of a fund-added record before the address is proved again; purged within a day." },
 ]
 
