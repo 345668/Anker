@@ -31,7 +31,7 @@ beforeAll(async () => {
     CREATE TABLE data_room_documents(id text PRIMARY KEY, fund_id text, fund_lp_id text, title text, category text, file_url text, file_name text, byte_size bigint, archived_at timestamptz, created_at timestamptz DEFAULT now());
     CREATE TABLE data_room_document_views(id text PRIMARY KEY DEFAULT gen_random_uuid()::text, document_id text NOT NULL, fund_id text, fund_lp_id text, viewer_email text, is_lp boolean NOT NULL DEFAULT false, viewed_at timestamptz NOT NULL DEFAULT now());
   `)
-  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20e-investor-materials", "2026-10-20f-investor-team"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
+  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20e-investor-materials", "2026-10-20f-investor-team", "2026-10-21-investor-legal"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {

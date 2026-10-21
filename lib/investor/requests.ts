@@ -10,6 +10,7 @@ import { InvestorError, factsOf, requireEntity, getProfile, logEvent, relationsh
 import { listedFund, type ListedFund } from "./listing"
 import { blockedByFund } from "./talks"
 import { nextStepFor, syncStages } from "./bridge"
+import { LEGAL_VERSION, TEXTS } from "./legal"
 
 export const OPEN_STAGES = ["interested", "in_talks", "invited_to_onboard", "onboarding", "on_hold"] as const
 export const NOTE_MAX = 1000
@@ -51,6 +52,7 @@ export async function requestToConnect(userId: string, input: RequestInput): Pro
   if (NOT_RAISING.has((fund.snapshot.status ?? "").toLowerCase())) throw new InvestorError("That fund is closed to new investors.", 409, "closed")
   if (await blockedByFund(userId, fund.facts.fundId)) throw new InvestorError("This fund is not able to take a request from you.", 403, "blocked")
   const { entity, fit } = await fitForEntity(userId, String(input.entityId ?? ""), fund)
+  if (fund.rules.strict && fit.eligibility.status === "ineligible") throw new InvestorError(TEXTS.strictRefusal.text, 403, "ineligible")
   const note = String(input.note ?? "").trim()
   if (note.length > NOTE_MAX) throw new InvestorError(`Keep the note to ${NOTE_MAX} characters.`)
   const timing = input.timing == null || input.timing === "" ? null : String(input.timing)
@@ -66,9 +68,9 @@ export async function requestToConnect(userId: string, input: RequestInput): Pro
 
   let row: any
   try {
-    ;[row] = (await sql`INSERT INTO fund_relationships (fund_id, entity_id, user_id, stage, initiated_by, indicative_min, indicative_max, timing, note, shared, eligibility_check, fit)
+    ;[row] = (await sql`INSERT INTO fund_relationships (fund_id, entity_id, user_id, stage, initiated_by, indicative_min, indicative_max, timing, note, shared, eligibility_check, fit, statement_version)
       VALUES (${fund.facts.fundId}, ${entity.id}, ${userId}, 'interested', 'investor', ${min}, ${max}, ${timing}, ${note || null}, ${JSON.stringify(sharedCopy(entity, share))}::jsonb,
-        ${JSON.stringify(fit.eligibility)}::jsonb, ${JSON.stringify({ score: fit.fit.score, confidence: fit.fit.confidence, listingVersion: fund.version })}::jsonb) RETURNING id`) as any[]
+        ${JSON.stringify(fit.eligibility)}::jsonb, ${JSON.stringify({ score: fit.fit.score, confidence: fit.fit.confidence, listingVersion: fund.version })}::jsonb, ${LEGAL_VERSION}) RETURNING id`) as any[]
   } catch (e: any) {
     if (e?.code === "23505" || /fund_relationships_open_uq|duplicate key/i.test(String(e?.message))) throw new InvestorError("You already have an open request with this fund for this entity.", 409, "open")
     throw e

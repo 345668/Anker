@@ -8,6 +8,7 @@ import { decryptBytes, encryptBytes } from "@/lib/db/secrets"
 import { REQUIRED_DOCS, recomputeCase } from "@/lib/modules/kyc"
 import { logAudit } from "@/lib/audit/audit-log"
 import { InvestorError, logEvent, requireEntity } from "./profile"
+import { LEGAL_VERSION } from "./legal"
 
 export const MAX_FILE_BYTES = 4 * 1024 * 1024
 const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex")
@@ -94,7 +95,7 @@ export async function shareWithFund(userId: string, entityId: string, relationsh
     if (!bytes) { skipped.push({ type, why: "could not be read" }); continue }
     try { await uploadDocument(String(r.fund_lp_id), type, { filename: String(d.filename), bytes }) }
     catch (x: any) { skipped.push({ type, why: x?.code === "verified" ? "the fund has already checked this one" : String(x?.message ?? "the fund could not take it").slice(0, 120) }); continue }
-    await sql`INSERT INTO passport_shares (document_id, entity_id, relationship_id, with_fund, lp_id, doc_type, sha256, shared_by) VALUES (${String(d.id)}::uuid, ${entityId}, ${String(r.id)}::uuid, ${r.fund_id}, ${String(r.fund_lp_id)}, ${type}, ${String(d.sha256)}, ${userId})`
+    await sql`INSERT INTO passport_shares (document_id, entity_id, relationship_id, with_fund, lp_id, doc_type, sha256, shared_by, consent_version) VALUES (${String(d.id)}::uuid, ${entityId}, ${String(r.id)}::uuid, ${r.fund_id}, ${String(r.fund_lp_id)}, ${type}, ${String(d.sha256)}, ${userId}, ${LEGAL_VERSION})`
     shared.push(type)
     await logAudit({ actorId: userId, action: "passport.shared", targetType: "passport_document", targetId: String(d.id), metadata: { fundId: r.fund_id, lpId: r.fund_lp_id, type } })
   }

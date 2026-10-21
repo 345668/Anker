@@ -1,5 +1,6 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
+import { TEXTS } from "@/lib/investor/legal"
 import { call, field, btn, btnGhost } from "./api"
 
 /** Records funds added that carry this person's address: link one to a profile entity. */
@@ -18,7 +19,7 @@ export function Claims({ entities }: { entities: Array<{ id: string; legalName: 
     try { await call("/api/investor/claims", { method: "POST", body: { action: "confirm", lpId, entityId: entity[lpId] ?? entities[0]?.id, code: code[lpId] } }); setMsg("Linked. You can follow it under My requests."); await load() } catch (x) { setErr(x instanceof Error ? x.message : "Try again.") }
   }
   return <section className="space-y-3 rounded-lg border p-4"><h2 className="text-lg font-semibold">Funds that added you</h2>
-    <p className="text-sm text-muted-foreground">These funds hold a record with your email address. Link one to your profile to follow it here.</p>
+    <p className="text-sm text-muted-foreground">{TEXTS.claimIntro.text}</p>
     {msg && <p role="status" className="text-sm">{msg}</p>}{err && <p role="alert" className="text-sm text-red-600">{err}</p>}
     <ul className="space-y-3">{claims.map((c) => <li key={c.lpId} className="text-sm"><p className="font-medium">{c.fundName} <span className="font-normal text-muted-foreground">· held as “{c.name}”</span></p>
       {step[c.lpId] ? <div className="mt-2 flex flex-wrap items-end gap-2">

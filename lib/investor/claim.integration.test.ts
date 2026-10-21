@@ -30,7 +30,7 @@ beforeAll(async () => {
     CREATE TABLE fund_lps (id text PRIMARY KEY DEFAULT gen_random_uuid()::text, fund_id text, lp_contact_id text, lp_name text NOT NULL, status text DEFAULT 'committed', contact_email text, onboarding_state text NOT NULL DEFAULT 'not_invited', metadata jsonb DEFAULT '{}', commitment_amount numeric);
     CREATE TABLE lp_accounts (lp_id text PRIMARY KEY, fund_id text NOT NULL, user_id text NOT NULL, email text NOT NULL, created_at timestamptz DEFAULT now());
   `)
-  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20d-investor-claim", "2026-10-20e-investor-materials", "2026-10-20f-investor-team"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
+  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20d-investor-claim", "2026-10-20e-investor-materials", "2026-10-20f-investor-team", "2026-10-21-investor-legal"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {

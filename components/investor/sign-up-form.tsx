@@ -1,5 +1,7 @@
 "use client"
 import { useState } from "react"
+import { LegalText } from "./legal-text"
+import { TEXTS } from "@/lib/investor/legal"
 import Link from "next/link"
 import { call, field, btn } from "./api"
 
@@ -22,7 +24,7 @@ export function InvestorSignUpForm() {
     {step === "start" ? <>
       <label className="block text-sm">Your name<input className={field} value={v.name} onChange={set("name")} autoComplete="name" required /></label>
       <label className="block text-sm">Email address<input className={field} type="email" value={v.email} onChange={set("email")} autoComplete="email" required /></label>
-      <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-1" /><span>I accept the <Link className="underline" href="/terms">terms</Link> and have read the <Link className="underline" href="/privacy">privacy notice</Link>.</span></label>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-1" /><span><LegalText text={TEXTS.signupConsent.text} /></span></label>
     </> : <>
       {note && <p role="status" className="text-sm">{note}</p>}
       <label className="block text-sm">Six-digit code<input className={field} inputMode="numeric" autoComplete="one-time-code" value={v.code} onChange={set("code")} required /></label>

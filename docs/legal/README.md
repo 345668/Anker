@@ -8,3 +8,4 @@ scoped counsel review"). Nothing here is published. Each draft names the fact it
 | `directory-privacy-notice-DRAFT.md` | The Article 14 notice for the investor directory | After the founder reviews it and counsel's fixed-fee review (counsel trigger) |
 | `legitimate-interest-assessment-DRAFT.md` | The written balancing test behind the directory | Kept internally; shown to counsel and to a regulator on request |
 | `counsel-brief.md` | Six questions with the facts attached, for a fixed-fee review | Send at the counsel trigger |
+| `investor-side/` | The counsel pack for the investor side: brief, one document per area, the wording as shipped and the retention as configured (both generated from the code), and a draft investor privacy notice | Send before opening `investor_signup`, listing a first fund or opening `investor_discoverability` |

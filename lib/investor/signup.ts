@@ -5,6 +5,7 @@
  * Closed while the platform flag `investor_signup` is off.
  */
 import { createHash, randomInt, timingSafeEqual } from "node:crypto"
+import { EMAILS } from "./legal"
 import { sql } from "@/lib/db"
 import { InvestorError, TERMS_VERSION } from "./profile"
 
@@ -44,7 +45,7 @@ export async function startSignup(input: { email: unknown; name: unknown; termsA
   await sql`DELETE FROM investor_signup_codes WHERE created_at < now() - interval '1 day'`.catch(() => {})
   await sql`INSERT INTO investor_signup_codes (email, name, code_hash, ip, terms_version, expires_at) VALUES (${email}, ${name}, ${sha(`${email}:${code}`)}, ${input.ip}, ${TERMS_VERSION}, now() + make_interval(mins => ${CODE_MINUTES}))`
   // The email holds the code and nothing else.
-  await send({ to: email, subject: `Your code: ${code}`, text: `Your Anker code is ${code}\n\nIt is valid for ${CODE_MINUTES} minutes. If you did not ask to sign up, ignore this email: nothing is created without this code.` })
+  await send({ to: email, ...EMAILS.signupCode({ code, minutes: CODE_MINUTES }) })
   return { sentTo: maskEmail(email), expiresInMinutes: CODE_MINUTES }
 }
 

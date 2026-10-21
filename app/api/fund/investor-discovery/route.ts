@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
+import { sql } from "@/lib/db"
 import { fundContext, investorFailure } from "@/lib/investor/access"
-import { discoverabilityOpen, inviteEntity, invitesOfFund, searchForFund, withdrawInvite } from "@/lib/investor/discovery"
+import { DISCOVERY_MIN_POOL, discoverabilityOpen, inviteEntity, invitesOfFund, searchForFund, withdrawInvite } from "@/lib/investor/discovery"
 
 export const runtime = "nodejs"
 /** Cards of opt-in investor entities that fit this fund's own rules, and this fund's invitations. Says `open: false` while the platform flag is off. */
@@ -8,7 +9,9 @@ export async function GET() {
   try {
     const c = await fundContext()
     if (!(await discoverabilityOpen())) return NextResponse.json({ open: false, cards: [], invites: [] })
-    return NextResponse.json({ open: true, cards: await searchForFund(c.fund.fundId), invites: await invitesOfFund(c.fund.fundId) })
+    const cards = await searchForFund(c.fund.fundId)
+    const [pool] = (await sql`SELECT count(*)::int n FROM investor_entities WHERE discoverable = true AND archived_at IS NULL`) as any[]
+    return NextResponse.json({ open: true, cards, poolTooSmall: Number(pool.n) < DISCOVERY_MIN_POOL, invites: await invitesOfFund(c.fund.fundId) })
   } catch (e) { return investorFailure(e) }
 }
 /** { cardId } — invite that entity to connect. No message can be added. */

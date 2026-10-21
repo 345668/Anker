@@ -1,5 +1,6 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
+import { TEXTS } from "@/lib/investor/legal"
 import { call, field, btn, btnGhost, money } from "./api"
 import { Thread } from "./thread"
 import { TalkExtras } from "./talk-extras"
@@ -7,7 +8,7 @@ import { TalkExtras } from "./talk-extras"
 const CATS = [["professional", "Professional"], ["semi_professional", "Semi-professional"], ["other", "Other"], ["unsure", "Unsure"]]
 function Listing() {
   const [s, setS] = useState<any>(null), [r, setR] = useState<any>(null), [err, setErr] = useState<string | null>(null), [busy, setBusy] = useState(false), [ok, setOk] = useState<string | null>(null)
-  useEffect(() => { call("/api/fund/investor-listing").then((x) => { setS(x.listing); setR({ categories: x.listing.rules?.categories ?? [], countries: (x.listing.rules?.countries ?? []).join(", "), excludedCountries: (x.listing.rules?.excludedCountries ?? []).join(", "), minTicket: x.listing.rules?.minTicket ?? "", professionalOnly: !!x.listing.rules?.professionalOnly, dailyCap: x.listing.rules?.dailyCap ?? 10, ndaRequired: !!x.listing.rules?.ndaRequired, ndaText: x.listing.rules?.ndaText ?? "" }) }).catch((e) => setErr(e.message)) }, [])
+  useEffect(() => { call("/api/fund/investor-listing").then((x) => { setS(x.listing); setR({ categories: x.listing.rules?.categories ?? [], countries: (x.listing.rules?.countries ?? []).join(", "), excludedCountries: (x.listing.rules?.excludedCountries ?? []).join(", "), minTicket: x.listing.rules?.minTicket ?? "", professionalOnly: !!x.listing.rules?.professionalOnly, dailyCap: x.listing.rules?.dailyCap ?? 10, ndaRequired: !!x.listing.rules?.ndaRequired, strict: !!x.listing.rules?.strict, ndaText: x.listing.rules?.ndaText ?? "" }) }).catch((e) => setErr(e.message)) }, [])
   async function save(listed?: boolean) {
     setBusy(true); setErr(null); setOk(null)
     try { const x = await call("/api/fund/investor-listing", { method: "PUT", body: { rules: { ...r, minTicket: r.minTicket === "" ? null : r.minTicket }, ...(listed === undefined ? {} : { listed }) } }); setS(x.listing); setOk(listed === undefined ? "Saved, and what investors see is refreshed." : listed ? "Your fund is now shown to investors." : "Your fund is no longer shown to investors.") } catch (e) { setErr(e instanceof Error ? e.message : "Try again.") } finally { setBusy(false) }
@@ -15,16 +16,17 @@ function Listing() {
   if (!s || !r) return err ? <p role="alert">{err}</p> : <p role="status">Loading…</p>
   const toggle = (c: string) => setR({ ...r, categories: r.categories.includes(c) ? r.categories.filter((x: string) => x !== c) : [...r.categories, c] })
   return <section className="space-y-4"><h2 className="text-lg font-semibold">Show this fund to investors</h2>
-    <p className="max-w-3xl text-sm text-muted-foreground">Investors see a fixed summary taken from your fund and your profile: never documents, your LP list, performance or your CRM. Nothing is shown until you set who may invest and switch it on. {s.listed ? <strong>It is on.</strong> : <strong>It is off.</strong>}</p>
+    <p className="max-w-3xl text-sm text-muted-foreground">{TEXTS.listingManagerNotice.text} {s.listed ? <strong>It is on.</strong> : <strong>It is off.</strong>}</p>
     <div className="grid max-w-3xl gap-3 sm:grid-cols-2">
       <fieldset className="text-sm sm:col-span-2"><legend className="font-medium">Investor categories you accept (none ticked = any)</legend>{CATS.map(([v, l]) => <label key={v} className="mr-4 inline-flex items-center gap-1.5"><input type="checkbox" checked={r.categories.includes(v)} onChange={() => toggle(v)} />{l}</label>)}</fieldset>
       <label className="text-sm">Only these countries (two-letter codes)<input className={field} value={r.countries} onChange={(e) => setR({ ...r, countries: e.target.value })} placeholder="DE, FR, GB" /></label>
       <label className="text-sm">Never these countries<input className={field} value={r.excludedCountries} onChange={(e) => setR({ ...r, excludedCountries: e.target.value })} placeholder="US" /></label>
       <label className="text-sm">Minimum cheque<input className={field} inputMode="numeric" value={r.minTicket} onChange={(e) => setR({ ...r, minTicket: e.target.value })} /></label>
       <label className="text-sm">New requests a day (1 to 100)<input className={field} inputMode="numeric" value={r.dailyCap} onChange={(e) => setR({ ...r, dailyCap: e.target.value })} /></label>
+      <label className="inline-flex items-center gap-1.5 text-sm sm:col-span-2"><input type="checkbox" checked={r.strict} onChange={(e) => setR({ ...r, strict: e.target.checked })} />{TEXTS.listingStrictLabel.text}</label>
       <label className="inline-flex items-center gap-1.5 text-sm"><input type="checkbox" checked={r.professionalOnly} onChange={(e) => setR({ ...r, professionalOnly: e.target.checked })} />Professional investors only</label>
       <label className="inline-flex items-center gap-1.5 text-sm"><input type="checkbox" checked={r.ndaRequired} onChange={(e) => setR({ ...r, ndaRequired: e.target.checked })} />An NDA is needed before documents are opened</label>
-      {r.ndaRequired && <label className="text-sm sm:col-span-2">Text of your NDA (Anker records that an investor accepted it; it does not write or check it)<textarea className={field} rows={6} maxLength={20000} value={r.ndaText} onChange={(e) => setR({ ...r, ndaText: e.target.value })} /></label>}
+      {r.ndaRequired && <label className="text-sm sm:col-span-2">{TEXTS.ndaFundLabel.text}<textarea className={field} rows={6} maxLength={20000} value={r.ndaText} onChange={(e) => setR({ ...r, ndaText: e.target.value })} /></label>}
     </div>
     {s.snapshot && <p className="text-sm text-muted-foreground">Investors read: “{s.snapshot.whoMayInvest}” · version {s.version}</p>}
     {err && <p role="alert" className="text-sm text-red-600">{err}</p>}{ok && <p role="status" className="text-sm">{ok}</p>}
@@ -64,9 +66,9 @@ function Discovery() {
   if (!d || !d.open) return err ? <p role="alert" className="text-sm text-red-600">{err}</p> : null
   const invite = (cardId: string) => call("/api/fund/investor-discovery", { method: "POST", body: { cardId } }).then(() => { setMsg("Invitation sent."); return load() }).catch((e) => setErr(e.message))
   return <section className="space-y-3"><h2 className="text-lg font-semibold">Find investors</h2>
-    <p className="max-w-3xl text-sm text-muted-foreground">Investors who chose to be found, whose category and country meet your rules, best fit first. You see a card, never a name or address. An invitation carries no message; the investor decides whether to accept and what to share.</p>
+    <p className="max-w-3xl text-sm text-muted-foreground">{TEXTS.discoverabilityFund.text}</p>
     {err && <p role="alert" className="text-sm text-red-600">{err}</p>}{msg && <p role="status" className="text-sm">{msg}</p>}
-    {d.cards.length === 0 ? <p className="text-sm">No investor who fits is open to being found yet.</p> : <ul className="space-y-2">{d.cards.map((c: any) => <li key={c.cardId} className="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm">
+    {d.cards.length === 0 ? <p className="text-sm">{d.poolTooSmall ? TEXTS.discoveryPoolNotice.text : "No investor who fits is open to being found yet."}</p> : <ul className="space-y-2">{d.cards.map((c: any) => <li key={c.cardId} className="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm">
       <div><p className="font-medium">{c.kind.replace("_", " ")}{c.country ? ` · ${c.country}` : ""}{c.category ? ` · ${c.category.replace("_", " ")} (${c.categoryNote})` : ""}</p>
         <p className="text-muted-foreground">Cheque {c.interests.ticketMin ?? "?"} to {c.interests.ticketMax ?? "?"} · {c.interests.sectors.join(", ") || "no sectors stated"} · {c.interests.stages.join(", ") || "no stages stated"} · {c.interests.geographies.join(", ") || "no regions stated"}</p>
         <p>{c.sentence}</p></div>

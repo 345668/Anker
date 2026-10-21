@@ -3,6 +3,7 @@
  * notifications that carry no content, and the daily nudges. A side reads only its own relationships' threads.
  */
 import { sql } from "@/lib/db"
+import { EMAILS } from "./legal"
 import { InvestorError, relationshipEntityIds, type Need } from "./profile"
 import { checkFiles, MAX_TOTAL_BYTES, type UploadedFile } from "./attachments"
 import { decryptBytes, encryptBytes } from "@/lib/db/secrets"
@@ -78,7 +79,7 @@ export async function notifyOther(from: Side, r: any, send: SendEmail) {
     const { createNotification } = await import("@/lib/notifications/store")
     for (const p of await fundPeople(r.fund_id)) await createNotification({ userId: p.id, orgId: p.org_id, kind: "investor_message", title: "Something new from an investor", body: "Open the investor requests to see it.", href: "/dashboard/investor-requests", dedupeKey: `invmsg:${r.id}:${new Date().toISOString().slice(0, 13)}` })
   } else {
-    for (const email of await investorEmails(r.entity_id)) await send({ to: email, subject: "You have a new message on Anker", text: `A fund you asked to talk to has something for you.\n\nRead it here: ${appUrl()}/investor/requests\n\nIf you do not want these emails, mute the conversation there.` })
+    for (const email of await investorEmails(r.entity_id)) await send({ to: email, ...EMAILS.newMessage({ url: appUrl() }) })
   }
 }
 
@@ -151,7 +152,7 @@ export async function sendNudges(send: SendEmail = defaultSend): Promise<{ remin
   const quiet = (await sql`UPDATE fund_relationships SET quiet_asked_at = now() WHERE stage = 'in_talks' AND COALESCE(last_message_at, decided_at, created_at) < now() - interval '30 days' AND (quiet_asked_at IS NULL OR quiet_asked_at < now() - interval '30 days') RETURNING id, fund_id, entity_id, user_id, investor_muted, fund_muted`) as any[]
   for (const r of quiet) {
     if (!r.fund_muted) for (const p of await fundPeople(r.fund_id)) await createNotification({ userId: p.id, orgId: p.org_id, kind: "investor_request", title: "A conversation with an investor has gone quiet", body: "Open the requests to continue or close it.", href: "/dashboard/investor-requests", dedupeKey: `invquiet:${r.id}:${new Date().toISOString().slice(0, 7)}` })
-    if (!r.investor_muted) { for (const email of await investorEmails(r.entity_id)) await send({ to: email, subject: "Do you want to continue your conversation?", text: `Your conversation with a fund has been quiet for a month. You can write again or withdraw here: ${appUrl()}/investor/requests` }) }
+    if (!r.investor_muted) { for (const email of await investorEmails(r.entity_id)) await send({ to: email, ...EMAILS.quiet({ url: appUrl() }) }) }
     asked++
   }
   return { reminded, asked }

@@ -49,7 +49,7 @@ beforeAll(async () => {
     CREATE TABLE kyc_documents(id text PRIMARY KEY DEFAULT gen_random_uuid()::text, case_id text, doc_type text, status text DEFAULT 'requested', received_at timestamptz);
     CREATE TABLE kyc_document_files(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), doc_id text, sha256 text, superseded boolean DEFAULT false, created_at timestamptz DEFAULT now());
   `)
-  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20e-investor-materials", "2026-10-20f-investor-team", "2026-10-20g-investor-passport"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
+  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20e-investor-materials", "2026-10-20f-investor-team", "2026-10-20g-investor-passport", "2026-10-21-investor-legal"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {

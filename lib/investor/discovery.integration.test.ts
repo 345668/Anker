@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs"
 const state = vi.hoisted(() => ({ query: vi.fn() }))
 vi.mock("@/lib/db", () => ({ sql: Object.assign((strings: TemplateStringsArray, ...values: unknown[]) => state.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values), { unsafe: (q: string, values: unknown[]) => state.query(q, values) }) }))
 
-import { setDiscoverable, discoverableState, searchForFund, inviteEntity, withdrawInvite, invitesOfFund, invitesForMe, answerInvite, FUND_INVITES_PER_DAY } from "./discovery"
+import { setDiscoverable, discoverableState, searchForFund, inviteEntity, withdrawInvite, invitesOfFund, invitesForMe, answerInvite, FUND_INVITES_PER_DAY, DISCOVERY_MIN_POOL } from "./discovery"
 import { inbound } from "./requests"
 import { setPrefs } from "./talks"
 
@@ -16,6 +16,8 @@ const send = async (m: { to: string; subject: string; text: string }) => { sent.
 const one = async (q: string, v: unknown[] = []) => (await db.query<any>(q, v)).rows[0]
 const all = async (q: string, v: unknown[] = []) => (await db.query<any>(q, v)).rows
 const FUND_SNAPSHOT = { name: "Alpha Climate", status: "fundraising", sectors: ["climate"], stages: ["seed"], geographies: ["Europe"], strategy: "Backs climate founders.", whoMayInvest: "Professional investors from DE.", minCommitment: 100000, termYears: 10 }
+/** Enough other opted-in entities (none of which fit the fund) that a card cannot point to one person. */
+const fillPool = async () => { for (let i = 0; i < DISCOVERY_MIN_POOL; i++) await db.query("INSERT INTO investor_entities (user_id, legal_name, kind, country, category, discoverable) VALUES ('filler', $1, 'individual', 'Brazil', 'other', true)", [`Filler ${i}`]) }
 const setFlag = (on: boolean) => db.query("UPDATE platform_flags SET enabled = $1 WHERE key = 'investor_discoverability'", [on])
 let E1: string, E2: string, E3: string
 
@@ -33,7 +35,7 @@ beforeAll(async () => {
     CREATE TABLE notifications(id serial PRIMARY KEY, user_id text, org_id text, kind text, severity text DEFAULT 'info', title text, body text, href text, dedupe_key text, read_at timestamptz, created_at timestamptz DEFAULT now());
     CREATE UNIQUE INDEX notifications_dedupe ON notifications(user_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
   `)
-  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20e-investor-materials", "2026-10-20f-investor-team", "2026-10-20h-investor-discovery"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
+  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20e-investor-materials", "2026-10-20f-investor-team", "2026-10-21-investor-legal", "2026-10-20h-investor-discovery"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {
@@ -69,7 +71,13 @@ describe("the investor's switch", () => {
 })
 
 describe("what a fund can find", () => {
-  beforeEach(async () => { for (const [u, e] of [["owner1", E1], ["owner2", E2], ["owner3", E3]]) await setDiscoverable(u, e, true) })
+  beforeEach(async () => { for (const [u, e] of [["owner1", E1], ["owner2", E2], ["owner3", E3]]) await setDiscoverable(u, e, true); await fillPool() })
+  it("shows no card until enough entities have opted in that a card cannot point to one person", async () => {
+    await db.exec("DELETE FROM investor_entities WHERE user_id = 'filler'")
+    expect(await searchForFund("fund-1")).toEqual([])                                                  // three opted in: too few
+    await fillPool()
+    expect((await searchForFund("fund-1")).length).toBe(2)
+  })
   it("returns cards only: no name, address, team or user, no ineligible entity, best fit first", async () => {
     const cards = await searchForFund("fund-1")
     expect(cards.map((c) => c.cardId)).toEqual([E1, E2])
@@ -93,7 +101,7 @@ describe("what a fund can find", () => {
 })
 
 describe("inviting and answering", () => {
-  beforeEach(async () => { await setDiscoverable("owner1", E1, true); await setDiscoverable("owner2", E2, true) })
+  beforeEach(async () => { await setDiscoverable("owner1", E1, true); await setDiscoverable("owner2", E2, true); await fillPool() })
   it("the fund invites with no message; the entity's owner and actors are told with no content, a viewer is not", async () => {
     const { id } = await inviteEntity("fund-1", "fundowner", E1, send)
     expect(sent.map((m) => m.to).sort()).toEqual(["actor@example.com", "o1@example.com"]); expect(sent[0].subject + sent[0].text).not.toMatch(/Alpha|Climate|Secret/)

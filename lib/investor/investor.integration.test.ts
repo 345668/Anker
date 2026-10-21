@@ -50,6 +50,7 @@ beforeAll(async () => {
   await db.exec("CREATE TABLE data_room_documents(id text PRIMARY KEY, fund_id text, fund_lp_id text, title text, category text, file_url text, file_name text, byte_size bigint, archived_at timestamptz, created_at timestamptz DEFAULT now())")
   await db.exec(readFileSync("scripts/migrations/2026-10-20e-investor-materials.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-20f-investor-team.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-21-investor-legal.sql", "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {
@@ -258,6 +259,15 @@ describe("asking a fund to talk, and the fund's answer", () => {
     await requestToConnect(a, { entityId: second.id, fundId: "fund-1" })
     const third = await createEntity(a, { legalName: "Ann GmbH", kind: "company", category: "professional", country: "Germany", interests: { ticketMax: 500000 } })
     await expect(requestToConnect(a, { entityId: third.id, fundId: "fund-1" })).rejects.toMatchObject({ code: "cap", status: 429 })
+  })
+  it("a fund that chose strict mode refuses an investor who clearly does not meet its rules, and still takes an unclear one", async () => {
+    const { a, entityId } = await setUp()
+    await db.exec(`UPDATE fund_listings SET eligibility = eligibility::jsonb || '{"strict":true}'::jsonb WHERE fund_id = 'fund-1'`)
+    await updateEntity(a, entityId, { legalName: "Ann Investor", kind: "individual", country: "Brazil", category: "other", interests: { ticketMax: 1000000 } })
+    await expect(requestToConnect(a, { entityId, fundId: "fund-1" })).rejects.toMatchObject({ code: "ineligible", status: 403 })
+    expect((await db.query<any>("SELECT count(*)::int n FROM fund_relationships")).rows[0].n).toBe(0)
+    await updateEntity(a, entityId, { legalName: "Ann Investor", kind: "individual", country: "Germany", category: null, interests: { ticketMax: 1000000 } })   // category unknown: unclear, not refused
+    await expect(requestToConnect(a, { entityId, fundId: "fund-1" })).resolves.toMatchObject({ fit: { eligibility: { status: "unclear" } } })
   })
   it("an ineligible investor can still ask; the fund sees why, held for it rather than dropped", async () => {
     const { a, entityId } = await setUp()

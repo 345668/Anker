@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import { TEXTS } from "@/lib/investor/legal"
 import Link from "next/link"
 import { call, field } from "./api"
 
@@ -11,7 +12,7 @@ export function FundFinder() {
   if (err) return <p role="alert">{err}</p>
   return <div className="space-y-6">
     <div><h1 className="text-xl font-semibold">Funds that fit you</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Funds are ranked by how well their stated focus matches what you say you look for. This is not advice and not a recommendation; check each fund yourself.</p></div>
+      <p className="mt-1 text-sm text-muted-foreground">{TEXTS.fitDisclaimer.text}</p></div>
     <label className="block max-w-sm text-sm">Looking for<select className={field} value={entityId} onChange={(e) => setEntityId(e.target.value)}>{entities.map((e) => <option key={e.id} value={e.id}>{e.legalName}</option>)}</select></label>
     {!funds ? <p role="status">Loading…</p> : funds.length === 0 ? <p className="text-sm">No fund is open to investors yet. Check back later.</p> :
       <ul className="space-y-3">{funds.map((f) => <li key={f.fundId} className="rounded-lg border p-4 text-sm">

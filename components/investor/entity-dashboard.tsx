@@ -1,5 +1,6 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
+import { TEXTS } from "@/lib/investor/legal"
 import Link from "next/link"
 import { call, field, btn, btnGhost } from "./api"
 import { Passport } from "./passport"
@@ -24,7 +25,7 @@ export function EntityDashboard({ id }: { id: string }) {
       {d.requests.length === 0 ? <p className="text-sm">No requests from this entity yet.</p> : <ul className="space-y-2">{d.requests.map((r: any) => <li key={r.id} className="rounded-lg border p-3 text-sm"><p className="font-medium">{r.fundName} <span className="font-normal text-muted-foreground">· {STAGE[r.stage] ?? r.stage}</span></p>{r.nextStep && <p>Next: {r.nextStep}</p>}</li>)}</ul>}
       <p className="text-sm"><Link className="underline" href="/investor/requests">Open conversations →</Link></p></section>
     <section className="space-y-3"><h2 className="text-lg font-semibold">Team</h2>
-      <p className="text-sm text-muted-foreground">People with a role here see this entity’s requests and conversations. Funds never see the team.</p>
+      <p className="text-sm text-muted-foreground">{TEXTS.teamNote.text}</p>
       <ul className="space-y-1 text-sm"><li>{t.owner.name} <span className="text-muted-foreground">· Owner</span></li>
         {t.members.map((m: any) => <li key={m.userId} className="flex items-center justify-between gap-2"><span>{m.name}{m.email ? ` (${m.email})` : ""} <span className="text-muted-foreground">· {ROLE[m.role]}</span></span>
           {owner && <span className="flex gap-1"><button className={btnGhost} onClick={() => team({ action: "role", userId: m.userId, role: m.role === "can_act" ? "can_view" : "can_act" })}>Make “{m.role === "can_act" ? "can view" : "can act"}”</button><button className={btnGhost} onClick={() => team({ action: "remove", userId: m.userId })}>Remove</button></span>}</li>)}

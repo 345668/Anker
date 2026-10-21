@@ -3,12 +3,15 @@
  * A card never carries a name, an address, a team or a user id; an invitation has no free text.
  */
 import { sql } from "@/lib/db"
+import { EMAILS, LEGAL_VERSION } from "./legal"
 import { fitFor, NOT_RAISING, type FundFit } from "./fit"
 import { InvestorError, factsOf, interestsOf, logEvent, relationshipEntityIds, requireEntity, type EntityView } from "./profile"
 import { listedFund } from "./listing"
 import { DEFAULT_SHARE, sharedCopy, type ShareChoice } from "./requests"
 
 export const FLAG = "investor_discoverability"
+/** Cards are shown only when at least this many entities have opted in, so a card cannot point to one person. Proposed; counsel to confirm. */
+export const DISCOVERY_MIN_POOL = 10
 export const FUND_INVITES_PER_DAY = 20, DECLINE_COOLDOWN_DAYS = 90, CARDS_MAX = 50
 type Send = (m: { to: string; subject: string; text: string }) => Promise<void>
 const appUrl = () => (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://www.an-ker.de").replace(/\/$/, "")
@@ -30,7 +33,7 @@ export async function setDiscoverable(userId: string, entityId: string, on: bool
   const e = await requireEntity(userId, entityId, "view")
   if (e.role !== "owner") throw new InvestorError("Only the owner of this entity can change this.", 403, "owner_only")
   if (on && !(await discoverabilityOpen())) throw CLOSED()
-  await sql`UPDATE investor_entities SET discoverable = ${on}, discoverable_at = ${on ? new Date().toISOString() : null}, updated_at = now() WHERE id = ${entityId}`
+  await sql`UPDATE investor_entities SET discoverable = ${on}, discoverable_at = ${on ? new Date().toISOString() : null}, discoverable_version = ${on ? LEGAL_VERSION : null}, updated_at = now() WHERE id = ${entityId}`
   await logEvent(entityId, userId, on ? "discoverable_on" : "discoverable_off")
   return { discoverable: on }
 }
@@ -63,6 +66,8 @@ async function listedOrThrow(fundId: string) {
 /** Opt-in entities that this fund's own rules allow, best fit first. No ineligible entity is ever returned. */
 export async function searchForFund(fundId: string): Promise<Card[]> {
   const fund = await listedOrThrow(fundId)
+  const [pool] = (await sql`SELECT count(*)::int n FROM investor_entities WHERE discoverable = true AND archived_at IS NULL`) as any[]
+  if (Number(pool.n) < DISCOVERY_MIN_POOL) return []
   const rows = (await sql`SELECT e.id, e.kind, e.country, e.tax_residence, e.category, e.interests FROM investor_entities e WHERE e.discoverable = true AND e.archived_at IS NULL
     AND NOT EXISTS (SELECT 1 FROM fund_relationships r WHERE r.fund_id = ${fundId} AND r.entity_id = e.id AND r.stage IN ('interested', 'in_talks', 'invited_to_onboard', 'onboarding', 'on_hold', 'active'))
     AND NOT EXISTS (SELECT 1 FROM fund_connect_invites i WHERE i.fund_id = ${fundId} AND i.entity_id = e.id AND i.status = 'declined' AND i.answered_at > now() - make_interval(days => ${DECLINE_COOLDOWN_DAYS}))
@@ -94,7 +99,7 @@ export async function inviteEntity(fundId: string, by: string, cardId: string, s
   try { [row] = (await sql`INSERT INTO fund_connect_invites (fund_id, entity_id, invited_by, card) VALUES (${fundId}, ${cardId}::uuid, ${by}, ${JSON.stringify(card)}::jsonb) RETURNING id`) as any[] }
   catch (e: any) { if (e?.code === "23505") throw new InvestorError("You have already invited this investor.", 409, "exists"); throw e }
   await logEvent(cardId, by, "fund_invited", { fund: fund.snapshot.name })
-  for (const to of await teamEmails(cardId)) await send({ to, subject: "You have an invitation on Anker", text: `A fund would like to connect with one of your investing entities.\n\nSee it and decide here: ${appUrl()}/investor\n\nNothing is shared with the fund unless you accept.` }).catch(() => {})
+  for (const to of await teamEmails(cardId)) await send({ to, ...EMAILS.fundInvite({ url: appUrl() }) }).catch(() => {})
   return { id: String(row.id) }
 }
 export async function withdrawInvite(fundId: string, inviteId: string): Promise<void> {
@@ -133,9 +138,9 @@ export async function answerInvite(userId: string, inviteId: string, action: "ac
   const fit = fitFor(factsOf(entity), fund.facts)
   let rel: any
   try {
-    ;[rel] = (await sql`INSERT INTO fund_relationships (fund_id, entity_id, user_id, stage, initiated_by, shared, eligibility_check, fit, decided_by, decided_at)
+    ;[rel] = (await sql`INSERT INTO fund_relationships (fund_id, entity_id, user_id, stage, initiated_by, shared, eligibility_check, fit, decided_by, decided_at, statement_version)
       VALUES (${inv.fund_id}, ${entity.id}, ${userId}, 'in_talks', 'fund', ${JSON.stringify(sharedCopy(entity, choice))}::jsonb, ${JSON.stringify(fit.eligibility)}::jsonb,
-        ${JSON.stringify({ score: fit.fit.score, confidence: fit.fit.confidence, listingVersion: fund.version })}::jsonb, ${inv.invited_by}, now()) RETURNING id`) as any[]
+        ${JSON.stringify({ score: fit.fit.score, confidence: fit.fit.confidence, listingVersion: fund.version })}::jsonb, ${inv.invited_by}, now(), ${LEGAL_VERSION}) RETURNING id`) as any[]
   } catch (e: any) {
     if (e?.code === "23505") throw new InvestorError("This entity already has an open relationship with that fund.", 409, "open")
     throw e

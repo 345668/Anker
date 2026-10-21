@@ -1,5 +1,6 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
+import { TEXTS } from "@/lib/investor/legal"
 import { call, field, btn, btnGhost } from "./api"
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "")
@@ -11,12 +12,12 @@ function Materials({ base, me }: { base: string; me: "investor" | "fund" }) {
   const act = (body: unknown) => call(`${base}/${me === "investor" ? "nda" : "materials"}`, { method: "POST", body }).then(load).catch((e) => setErr(e.message))
   if (!d) return err ? <p role="alert" className="text-sm text-red-600">{err}</p> : null
   if (me === "investor") return <div className="space-y-2"><h3 className="font-medium">Documents from the fund</h3>
-    {d.nda.required && !d.nda.accepted && d.open && <div className="space-y-2 rounded-md border p-3"><p>This fund asks you to accept its NDA before you can open documents. Anker records that you accepted the fund’s text; it does not review it, so read it carefully.</p>
+    {d.nda.required && !d.nda.accepted && d.open && <div className="space-y-2 rounded-md border p-3"><p>{TEXTS.ndaInvestorNotice.text}</p>
       <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded bg-background p-2 text-xs">{d.nda.text}</pre><button className={btn} onClick={() => call(`${base}/nda`, { method: "POST" }).then(load).catch((e) => setErr(e.message))}>I accept this NDA</button></div>}
     {d.nda.accepted && <p className="text-xs text-muted-foreground">You accepted the fund’s NDA on {fmt(d.nda.acceptedAt)}.</p>}
     {d.items.length === 0 ? <p className="text-muted-foreground">{d.nda.required && !d.nda.accepted ? "Nothing to show until you accept the NDA." : "The fund has not shared any documents yet."}</p> :
       <ul className="space-y-1">{d.items.map((i: any) => <li key={i.grantId}><a className="underline" href={`${base}/materials/${i.documentId}`} target="_blank" rel="noreferrer">{i.title}</a> <span className="text-muted-foreground">· {i.category.replace(/_/g, " ")}{i.bytes ? ` · ${Math.round(i.bytes / 1024)} KB` : ""}</span></li>)}</ul>}
-    <p className="text-xs text-muted-foreground">The fund can withdraw a document at any time. A copy you have downloaded stays with you.</p>
+    <p className="text-xs text-muted-foreground">{TEXTS.materialsNote.text}</p>
     {err && <p role="alert" className="text-red-600">{err}</p>}</div>
   return <div className="space-y-2"><h3 className="font-medium">Share documents</h3>
     {d.ndaRequired && !d.ndaAccepted && <p className="text-muted-foreground">NDA not yet accepted: the investor cannot open documents yet.</p>}

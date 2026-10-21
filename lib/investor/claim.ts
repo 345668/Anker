@@ -3,6 +3,7 @@
  * The address must be the account's confirmed one; a code sent to it proves it again unless doc 60's portal already did. Nothing about the record is copied into the profile.
  */
 import { createHash, randomInt, timingSafeEqual } from "node:crypto"
+import { EMAILS } from "./legal"
 import { sql } from "@/lib/db"
 import { InvestorError, TERMS_VERSION, requireEntity, getProfile } from "./profile"
 import { maskEmail, CODE_MINUTES, CODE_MAX_TRIES, CODE_PER_HOUR, CODE_COOLDOWN_SEC } from "./signup"
@@ -48,7 +49,7 @@ export async function startClaim(userId: string, email: string | null, confirmed
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0")
   await sql`DELETE FROM investor_claim_codes WHERE created_at < now() - interval '1 day'`.catch(() => {})
   await sql`INSERT INTO investor_claim_codes (user_id, lp_id, code_hash, expires_at) VALUES (${userId}, ${lpId}, ${sha(`${userId}:${lpId}:${code}`)}, now() + make_interval(mins => ${CODE_MINUTES}))`
-  await send({ to, subject: `Your code: ${code}`, text: `Your Anker code is ${code}\n\nIt is valid for ${CODE_MINUTES} minutes. If you did not ask to link an investment, ignore this email.` })
+  await send({ to, ...EMAILS.claimCode({ code, minutes: CODE_MINUTES }) })
   return { sentTo: maskEmail(to), expiresInMinutes: CODE_MINUTES }
 }
 

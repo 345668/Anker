@@ -37,6 +37,7 @@ beforeAll(async () => {
   await db.exec("CREATE TABLE data_room_documents(id text PRIMARY KEY, fund_id text, fund_lp_id text, title text, category text, file_url text, file_name text, byte_size bigint, archived_at timestamptz, created_at timestamptz DEFAULT now())")
   await db.exec(readFileSync("scripts/migrations/2026-10-20e-investor-materials.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-20f-investor-team.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-21-investor-legal.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-20i-message-attachments.sql", "utf8"))
 })
 afterAll(async () => db.close())

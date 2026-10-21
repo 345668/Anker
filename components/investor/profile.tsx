@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react"
 import { call, field, btn, btnGhost } from "./api"
 import { Claims } from "./claims"
 import { Invitations } from "./invitations"
+import { YourData } from "./your-data"
 import { ConnectInvites } from "./connect-invites"
 import Link from "next/link"
 
@@ -79,5 +80,6 @@ export function InvestorProfile() {
             <div className="flex gap-2"><Link className={btnGhost} href={`/investor/entities/${e.id}`}>Open</Link>{e.role === "owner" && <><button className={btnGhost} onClick={() => setEditing(e.id)}>Edit</button><button className={btnGhost} onClick={() => remove(e.id)}>Remove</button></>}</div>
           </div>)}
       </div></section>
+    <YourData />
   </div>
 }

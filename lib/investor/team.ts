@@ -3,6 +3,7 @@
  * A fund never sees the team.
  */
 import { sql } from "@/lib/db"
+import { EMAILS } from "./legal"
 import { InvestorError, entityIdsFor, getEntity, logEvent, type EntityView } from "./profile"
 import { myRequests, type InvestorRequestView } from "./requests"
 
@@ -57,7 +58,7 @@ export async function invite(ownerId: string, entityId: string, input: { email: 
   try { await sql`INSERT INTO investor_entity_invites (entity_id, email, role, invited_by, expires_at) VALUES (${entityId}, ${to}, ${r}, ${ownerId}, now() + make_interval(days => ${INVITE_DAYS}))` }
   catch (x: any) { if (x?.code === "23505") throw new InvestorError("That address already has an invitation waiting.", 409, "pending"); throw x }
   await logEvent(entityId, ownerId, "team_invited", { role: r })
-  await send({ to, subject: "You have an invitation on Anker", text: `Someone has invited you to an investor account on Anker.\n\nSign in with this email address to see it and answer: ${appUrl()}/investor\n\nThe invitation is valid for ${INVITE_DAYS} days. If you did not expect it, ignore this email.` }).catch((x) => console.warn("[investor-team] invite email failed:", x?.message))
+  await send({ to, ...EMAILS.teamInvite({ url: appUrl(), days: INVITE_DAYS }) }).catch((x) => console.warn("[investor-team] invite email failed:", x?.message))
   void e
 }
 export async function revokeInvite(ownerId: string, entityId: string, inviteId: string): Promise<void> {

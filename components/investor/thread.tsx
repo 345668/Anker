@@ -1,5 +1,6 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
+import { TEXTS } from "@/lib/investor/legal"
 import { call, field, btn, btnGhost } from "./api"
 
 /** The conversation for one request. `base` is the API path of the request: /api/investor/requests/<id> or /api/fund/investor-requests/<id>. */
@@ -31,7 +32,7 @@ export function Thread({ base, me, canWrite = true }: { base: string; me: "inves
         {m.attachments?.length > 0 && <span className="block text-xs">{m.attachments.map((a: any) => <a key={a.id} className="mr-3 underline" href={`${base}/messages/files/${a.id}`} target="_blank" rel="noreferrer">{a.filename} ({Math.max(1, Math.round(a.sizeBytes / 1024))} KB)</a>)}</span>}
         <p className="text-xs text-muted-foreground">{m.from === me ? "You" : me === "investor" ? "The fund" : "The investor"} · {new Date(m.at).toLocaleString()}</p></li>)}</ul>}
     {t.writable && canWrite ? <form onSubmit={send} className="space-y-2"><textarea className={field} rows={3} maxLength={4000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message" aria-label="Message" />
-      <label className="block text-xs text-muted-foreground">Attach up to 3 files (PDF, JPEG or PNG, 4 MB each). Only open files you expect; Anker checks them but is not a virus scanner.<input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" className="mt-1 block text-xs" onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, 3))} /></label>
+      <label className="block text-xs text-muted-foreground">{TEXTS.attachmentWarning.text}<input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" className="mt-1 block text-xs" onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, 3))} /></label>
       {files.length > 0 && <p className="text-xs">{files.map((f) => f.name).join(", ")}</p>}
       <div className="flex items-center gap-2"><button className={btn} disabled={busy || (!text.trim() && !files.length)}>{busy ? "Sending…" : "Send"}</button>
         <button type="button" className={btnGhost} onClick={() => pref(t.muted ? "unmute" : "mute")}>{t.muted ? "Unmute notifications" : "Mute notifications"}</button>

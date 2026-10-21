@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import { TEXTS } from "@/lib/investor/legal"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { call, field, btn, money } from "./api"
@@ -32,7 +33,7 @@ export function FundPage({ fundId }: { fundId: string }) {
         {fit.eligibility.failed.map((r: string) => <p key={r} className="text-red-700">✕ {r}</p>)}
         {fit.fit.gaps.length > 0 && <p className="text-xs text-muted-foreground">Not judged: {fit.fit.gaps.join("; ")}</p>}</div>}</section>
     <section className="max-w-3xl"><h2 className="text-lg font-semibold">Ask to talk</h2>
-      <p className="mt-1 text-sm text-muted-foreground">This is an expression of interest. It is not an offer, a subscription or an obligation. The fund sees what you choose to share below, and your email address only if it accepts.</p>
+      <p className="mt-1 text-sm text-muted-foreground">{TEXTS.requestStatement.text}</p>
       {sent ? <p role="status" className="mt-4 text-sm">Sent. You can follow it under <Link className="underline" href="/investor/requests">My requests</Link>.</p> :
         <form onSubmit={send} className="mt-4 space-y-3">
           <div className="grid gap-3 sm:grid-cols-3">
