@@ -12,8 +12,8 @@ const hash = () => createHash("sha256").update(JSON.stringify(legalCatalogue()))
 // To change any sentence of legal weight: edit lib/investor/legal.ts, raise LEGAL_VERSION, regenerate the pack
 // (npx tsx scripts/legal/gen-investor-pack.ts), send the changed sentences to counsel, and only then update both values below.
 const PINNED_VERSION = "2026-10-23"
-const PINNED_TERMS_VERSION = "2026-10-23-draft-1"
-const PINNED_TERMS_HASH = "5838f107a6df15690ae3174bb6dfd7717c700b8a0b61cd9cb0ec1f6d9e781921"
+const PINNED_TERMS_VERSION = "2026-10-23-draft-2"
+const PINNED_TERMS_HASH = "a5c7e970e64293673b75bf6c347224c7a8bba57285aa4f22246138f7c2587a27"
 const PINNED_HASH = "7892bfa03176b4ef57535fdeb6097c4791da85eb7448c1beef570904cf324b4e"
 
 describe("the wording counsel reads", () => {

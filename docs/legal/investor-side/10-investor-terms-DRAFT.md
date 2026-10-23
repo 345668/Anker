@@ -2,11 +2,11 @@
 
 # Investor terms
 
-*Version 2026-10-23-draft-1. Status: draft.*
+*Version 2026-10-23-draft-2. Status: draft.*
 
 ## 1. Who these terms are between
 
-These terms are between [company name, registered office] (“Anker”, “we”) and you, a person who has an investor account on Anker. If you use Anker for a company, trust, family office or other entity, “you” includes that entity and you confirm that you are allowed to act for it.
+These terms are between Anker AI [legal form and registered office in Berlin, Germany] (“Anker”, “we”) and you, a person who has an investor account on Anker. If you use Anker for a company, trust, family office or other entity, “you” includes that entity and you confirm that you are allowed to act for it.
 
 ## 2. What Anker is, and is not
 
@@ -62,7 +62,7 @@ How we use your data is described in the investor privacy notice. You can downlo
 
 ## 12. Availability and changes
 
-Anker is provided as it is available; [counsel: availability and warranty wording]. We may change these terms. If we change them in a way that matters we will ask you to accept the new version before you continue.
+Anker is provided as it is available, and we do not promise that it will be uninterrupted or error-free, to the extent the law allows. We may change these terms. If we change them in a way that matters we will ask you to accept the new version before you continue.
 
 ## 13. Liability
 
@@ -70,8 +70,8 @@ Anker is provided as it is available; [counsel: availability and warranty wordin
 
 ## 14. Governing law and place of jurisdiction
 
-[Counsel to supply.]
+These terms are governed by the laws of Germany. If you are a consumer, mandatory rights under the law of the country where you live remain, and you may bring a claim in the courts there. Otherwise the courts of Berlin have jurisdiction. [Counsel to confirm.]
 
 ## 15. Contact
 
-[Name, address and email for questions and notices.]
+Questions and notices: privacy@an-ker.de for anything about your data; vc@an-ker.de for everything else. [Postal address.]

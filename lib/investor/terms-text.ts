@@ -8,14 +8,14 @@
  */
 import { POLICY } from "./retention-policy"
 
-export const INVESTOR_TERMS_VERSION = "2026-10-23-draft-1"
+export const INVESTOR_TERMS_VERSION = "2026-10-23-draft-2"
 export const TERMS_STATUS: "draft" | "approved" = "draft"
 export const DRAFT_BANNER = "Draft for legal review. This text is not yet in force and may change. It is shown so that you can see what investor accounts will be governed by."
 
 export interface Section { heading: string; body: string[] }   // a body line starting "- " is a list item
 
 export const TERMS: Section[] = [
-  { heading: "1. Who these terms are between", body: ["These terms are between [company name, registered office] (“Anker”, “we”) and you, a person who has an investor account on Anker. If you use Anker for a company, trust, family office or other entity, “you” includes that entity and you confirm that you are allowed to act for it."] },
+  { heading: "1. Who these terms are between", body: ["These terms are between Anker AI [legal form and registered office in Berlin, Germany] (“Anker”, “we”) and you, a person who has an investor account on Anker. If you use Anker for a company, trust, family office or other entity, “you” includes that entity and you confirm that you are allowed to act for it."] },
   { heading: "2. What Anker is, and is not", body: [
     "Anker is a platform. Venture funds present themselves on it to registered investors, and investors can say that they are interested in a fund and talk to it.",
     "Anker is not a broker, an adviser, a marketplace or an issuer. **No interest in any fund is offered, sold or subscribed on Anker.** Anything you decide to do with a fund you do with that fund, under that fund’s own documents. Anker does not take or move money and takes no investment decision for you." ] },
@@ -43,16 +43,16 @@ export const TERMS: Section[] = [
   { heading: "11. Your data", body: [
     "How we use your data is described in the investor privacy notice. You can download your data and delete your investor account from your profile page." ] },
   { heading: "12. Availability and changes", body: [
-    "Anker is provided as it is available; [counsel: availability and warranty wording]. We may change these terms. If we change them in a way that matters we will ask you to accept the new version before you continue." ] },
+    "Anker is provided as it is available, and we do not promise that it will be uninterrupted or error-free, to the extent the law allows. We may change these terms. If we change them in a way that matters we will ask you to accept the new version before you continue." ] },
   { heading: "13. Liability", body: ["[Counsel to supply: limits and exclusions of liability appropriate to the service and to consumers and businesses, in accordance with the applicable law.]"] },
-  { heading: "14. Governing law and place of jurisdiction", body: ["[Counsel to supply.]"] },
-  { heading: "15. Contact", body: ["[Name, address and email for questions and notices.]"] },
+  { heading: "14. Governing law and place of jurisdiction", body: ["These terms are governed by the laws of Germany. If you are a consumer, mandatory rights under the law of the country where you live remain, and you may bring a claim in the courts there. Otherwise the courts of Berlin have jurisdiction. [Counsel to confirm.]"] },
+  { heading: "15. Contact", body: ["Questions and notices: privacy@an-ker.de for anything about your data; vc@an-ker.de for everything else. [Postal address.]"] },
 ]
 
 const policyLines = POLICY.map((p) => `- ${p.data}: ${p.period}. Then: ${p.then.charAt(0).toLowerCase()}${p.then.slice(1)}.`)
 
 export const NOTICE: Section[] = [
-  { heading: "Who we are", body: ["[Company name, registered office, email, data-protection contact.] We run Anker, a platform for venture funds, founders and investors. For your investor account we decide how and why your data is used (we are the controller)."] },
+  { heading: "Who we are", body: ["Anker AI [legal form and registered office in Berlin, Germany] runs Anker. Contact for anything about your data: privacy@an-ker.de [and the data-protection officer, if one is appointed]. We run Anker, a platform for venture funds, founders and investors. For your investor account we decide how and why your data is used (we are the controller)."] },
   { heading: "What this notice covers", body: ["Your investor account on Anker: finding funds, asking funds to talk, conversations with funds, your investor documents (if available), and being found by funds if you choose."] },
   { heading: "What we collect, and why", body: [
     "- Your account: email address, name, password (kept by our sign-in provider as a hash) and when you accepted the terms. To give you an account (contract).",
@@ -65,10 +65,10 @@ export const NOTICE: Section[] = [
     "A fund receives only what you choose to share when you ask to talk or accept its invitation, your email address when it accepts, and documents only when you share them. Our service providers process data for us: hosting, database, sign-in and email delivery (the current list is on the sub-processors page). We do not send your investor data to AI providers." ] },
   { heading: "Where", body: ["Our database is hosted in the United States (AWS us-east-1, through Neon). [Regions of sign-in and email delivery, and the safeguards for transfers outside the EU, to be completed once confirmed.]"] },
   { heading: "How long we keep it", body: [...policyLines, "- Your account and the data in it: until you delete them.", "- Funds you have dealt with keep their own records, with your name removed if you erase your account, and anything they have already checked in their onboarding, under their own retention."] },
-  { heading: "Your rights", body: ["Access and a copy (Download my data on your profile), correction (edit your profile), erasure (Delete my investor account), withdrawal of consent (switch off being found; take back a shared document), restriction and objection (write to [address]), and complaint to your supervisory authority [name]."] },
+  { heading: "Your rights", body: ["Access and a copy (Download my data on your profile), correction (edit your profile), erasure (Delete my investor account), withdrawal of consent (switch off being found; take back a shared document), restriction and objection (write to privacy@an-ker.de), and complaint to your supervisory authority; if you live in Germany, or if our seat is in Berlin, that is the Berlin Commissioner for Data Protection and Freedom of Information, or the authority of the state where you live. [Counsel to confirm.]"] },
   { heading: "Funds are separate controllers", body: ["Once you ask a fund to talk, the fund also holds the information you gave it and is responsible for it under its own privacy notice. Ask the fund to correct or delete what it holds."] },
   { heading: "Automated decisions", body: ["We rank funds by how well their stated focus matches what you say you look for. This is not advice and not a recommendation, and it is not a decision with legal or similar effect."] },
-  { heading: "Changes", body: ["[How you will be told of changes.]"] },
+  { heading: "Changes", body: ["If we change this notice in a way that matters, we will tell you by email or in the app and, if the change affects your terms, ask you to accept the new version."] },
 ]
 
 const md = (title: string, version: string, sections: Section[]) => [`# ${title}`, ``, `*Version ${version}. Status: ${TERMS_STATUS}.*`, ``, ...sections.flatMap((s) => [`## ${s.heading}`, ``, ...s.body.flatMap((b) => [b, ``])])].join("\n")

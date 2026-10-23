@@ -19,8 +19,8 @@ Verified on production on 2026-10-21 and 2026-10-23: all flags off, no fund list
 2. `01` to `06`: one document per area: what the product does (checked against code and tests), what it does **not** do, the data, the proposed position, the questions.
 3. `07-wording-as-shipped.md`: **every sentence of legal weight the product shows or emails**, generated from `lib/investor/legal.ts`. A test fails if this file and the product differ, and the wording is pinned by hash: if counsel changes a sentence, it is changed in one place and the pack regenerates.
 4. `08-retention-as-configured.md`: the retention periods the daily job runs, generated from the same numbers.
-5. `09-investor-privacy-notice-DRAFT.md` and `10-investor-terms-DRAFT.md`: the investor notice and terms exactly as the pages show them (generated, draft), for counsel to correct. `11-key-management.md`, `12-eu-region-runbook.md` and `13-virus-scanning-runbook.md`: the runbooks that close the technical gaps.
-6. `Anker-investor-side-counsel-pack.docx`: all of the above in one document for sending. It is a snapshot made with `pandoc` from the files in this folder (README, 00 to 13 in order, `--toc`); rebuild it after any change.
+5. `09-investor-privacy-notice-DRAFT.md` and `10-investor-terms-DRAFT.md`: the investor notice and terms exactly as the pages show them (generated, draft), for counsel to correct. `11-key-management.md`, `12-eu-region-runbook.md` and `13-virus-scanning-runbook.md`: the runbooks that close the technical gaps. `14-launch-checklist.md`: what is left, in order, with the supervised run step by step.
+6. `Anker-investor-side-counsel-pack.docx`: all of the above in one document for sending. It is a snapshot made with `pandoc` from the files in this folder (README, 00 to 14 in order, `--toc`); rebuild it after any change.
 
 ## What counsel can rely on, and what they cannot
 - **Verified:** behaviour is covered by automated tests (the investor side has 147 integration and unit tests; the full suite of 2,384 tests passes). Statements marked *(tested)* name the behaviour a test pins.

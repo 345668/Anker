@@ -2,11 +2,11 @@
 
 # Investor privacy notice
 
-*Version 2026-10-23-draft-1. Status: draft.*
+*Version 2026-10-23-draft-2. Status: draft.*
 
 ## Who we are
 
-[Company name, registered office, email, data-protection contact.] We run Anker, a platform for venture funds, founders and investors. For your investor account we decide how and why your data is used (we are the controller).
+Anker AI [legal form and registered office in Berlin, Germany] runs Anker. Contact for anything about your data: privacy@an-ker.de [and the data-protection officer, if one is appointed]. We run Anker, a platform for venture funds, founders and investors. For your investor account we decide how and why your data is used (we are the controller).
 
 ## What this notice covers
 
@@ -60,7 +60,7 @@ Our database is hosted in the United States (AWS us-east-1, through Neon). [Regi
 
 ## Your rights
 
-Access and a copy (Download my data on your profile), correction (edit your profile), erasure (Delete my investor account), withdrawal of consent (switch off being found; take back a shared document), restriction and objection (write to [address]), and complaint to your supervisory authority [name].
+Access and a copy (Download my data on your profile), correction (edit your profile), erasure (Delete my investor account), withdrawal of consent (switch off being found; take back a shared document), restriction and objection (write to privacy@an-ker.de), and complaint to your supervisory authority; if you live in Germany, or if our seat is in Berlin, that is the Berlin Commissioner for Data Protection and Freedom of Information, or the authority of the state where you live. [Counsel to confirm.]
 
 ## Funds are separate controllers
 
@@ -72,4 +72,4 @@ We rank funds by how well their stated focus matches what you say you look for. 
 
 ## Changes
 
-[How you will be told of changes.]
+If we change this notice in a way that matters, we will tell you by email or in the app and, if the change affects your terms, ask you to accept the new version.
