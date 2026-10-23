@@ -16,7 +16,7 @@
 
 **Who receives it.** A fund only receives what you choose to share when you ask to talk or accept its invitation, and your email address when it accepts; documents only when you share them. Our service providers process data for us: [list from `/privacy/subprocessors`: hosting, database, sign-in, email delivery]. We do not send your investor data to AI providers.
 
-**Where.** [Regions; transfers outside the EU and the safeguards, once confirmed.]
+**Where.** Our database is hosted in the United States (AWS us-east-1, via Neon). [Sign-in and email regions: to be read from the providers' dashboards. Transfers outside the EU and the safeguards, once counsel confirms.]
 
 **How long.** See the table [generated from `08`]. In short: pending codes a day; your account and data until you delete them; funds you have dealt with keep their own records, with your name removed if you erase your account; files in a closed conversation a year; passport files 30 days after you archive the entity.
 

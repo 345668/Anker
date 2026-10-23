@@ -24,7 +24,7 @@ Verified on production on 2026-10-21: both flags off, no fund listed, no investo
 ## What counsel can rely on, and what they cannot
 - **Verified:** behaviour is covered by automated tests (the investor side has 147 integration and unit tests; the full suite of 2,366 tests passes). Statements marked *(tested)* name the behaviour a test pins.
 - **Not verified:** nothing has been run end to end with a real person, a real email or a real fund. The pages have not been looked at in a browser by a person. The first supervised run is the step after counsel's answers (see the brief).
-- **Known gaps, stated plainly** (each repeated where it matters): no virus scanner for attachments; no key rotation for the encryption key; the database region is the United States according to the sub-processor register; no formal breach runbook existed before this pack (a draft is in `06`); the retention periods are proposals; the investor terms are the platform's general terms, not investor-specific ones.
+- **Known gaps, stated plainly** (each repeated where it matters): no virus scanner for attachments; no key rotation for the encryption key; the database is in the United States (Neon, AWS us-east-1, confirmed), and sign-in and email are in default provider regions not yet read off; no formal breach runbook existed before this pack (a draft is in `06`); the retention periods are proposals; the investor terms are the platform's general terms, not investor-specific ones.
 
 ## Order of work (suggested)
 1. Counsel answers the *blocking* questions (marked **B** in the brief): sign-up terms and notice, the role of Anker, identity-document handling, the database region.

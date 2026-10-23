@@ -24,7 +24,7 @@ An investor entity keeps the documents a fund's verification asks for, once: for
 ## Data protection points
 - **Special categories.** An ID copy shows a photo and may reveal origin or nationality. Anker does not process it to identify anyone (no biometrics, no reading). Counsel to confirm Article 9 does not apply to storage and transfer in this form.
 - **German identity-card copies.** We understand that copying and passing on an identity card is restricted (purpose limits; the copy must be marked as a copy; the card holder may black out some data). Counsel to say what Anker must do, or must refuse to allow.
-- **Region.** The files are stored in the database, whose provider the sub-processor register records as US-region (inferred). EU residents' identity documents therefore raise a transfer question before launch (question 19).
+- **Region.** The files are stored in the database, hosted by Neon in AWS us-east-1 (US East), confirmed from the connection address on 2026-10-23. EU residents' identity documents therefore raise a transfer question before launch (question 19). Sign-in (Supabase) and email (Resend) use default regions, to be read from their dashboards; neither holds identity documents (Resend carries only the six-digit codes and content-free notices).
 - **Roles.** Passport store: Anker as controller (proposed). A copy in a fund's checklist: the fund as controller, Anker as its processor.
 
 ## Proposed position
