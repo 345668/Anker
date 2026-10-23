@@ -10,6 +10,7 @@
  */
 
 import { PGlite } from "@electric-sql/pglite"
+import { vector } from "@electric-sql/pglite/vector"
 import path from "node:path"
 
 const DATA_DIR = path.resolve(process.cwd(), ".local-db")
@@ -21,7 +22,8 @@ async function getDb(): Promise<PGlite> {
   if (_db) return _db
   if (_ready) return _ready
   _ready = (async () => {
-    const db = new PGlite(DATA_DIR)
+    // The schema has vector columns (embeddings); the extension must be loaded every time the database is opened.
+    const db = new PGlite(DATA_DIR, { extensions: { vector } })
     await db.waitReady
     _db = db
     return db

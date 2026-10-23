@@ -21,7 +21,11 @@
     "clean:db": "node scripts/clean-db.mjs",
     "redaction:check": "node scripts/check-redactions.mjs",
     "redaction:add": "node scripts/check-redactions.mjs add",
-    "docs:whitepaper": "node scripts/build-whitepaper.mjs"
+    "docs:whitepaper": "node scripts/build-whitepaper.mjs",
+    "db:baseline": "node scripts/db/make-baseline.mjs",
+    "db:build-local": "node scripts/db/build-local.mjs",
+    "db:seed-demo": "node scripts/db/seed-demo.mjs",
+    "dev:local": "node scripts/dev-local.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

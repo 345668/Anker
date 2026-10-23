@@ -27,6 +27,14 @@
         "dev"
       ],
       "port": 3100
+    },
+    {
+      "name": "anker-local",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/dev-local.mjs"
+      ],
+      "port": 3100
     }
   ]
 }

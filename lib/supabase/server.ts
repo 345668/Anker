@@ -11,6 +11,9 @@ const LOCAL =
   process.env.LOCAL_DB === "true" ||
   process.env.NEXT_PUBLIC_SUPABASE_URL === "https://stub.supabase.co"
 
+/** Whether the app is running against the local database with local sign-in (docs/architecture/75). Never true on a production deployment. */
+export const isLocalMode = LOCAL && process.env.VERCEL_ENV !== "production"
+
 /**
  * Especially important if using Fluid compute: Don't put this client in a
  * global variable. Always create a new client within each function when using
