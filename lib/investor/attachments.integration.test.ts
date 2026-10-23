@@ -70,6 +70,19 @@ describe("the file checks", () => {
   })
 })
 
+describe("the virus scan on upload", () => {
+  const OLD = { scan: process.env.INVESTOR_SCAN, host: process.env.CLAMAV_HOST }
+  afterAll(() => { for (const [k, v] of [["INVESTOR_SCAN", OLD.scan], ["CLAMAV_HOST", OLD.host]] as const) { if (v === undefined) delete process.env[k]; else process.env[k] = v } })
+  it("refuses a message when scanning is required and no scanner is reachable, and stores nothing; with scanning off it goes through", async () => {
+    process.env.INVESTOR_SCAN = "required"; delete process.env.CLAMAV_HOST
+    await expect(sendMessage("fund", FUND, rel, "x", send, [{ filename: "a.pdf", bytes: PDF() }])).rejects.toMatchObject({ code: "scan_unavailable", status: 503 })
+    expect((await one("SELECT count(*)::int n FROM relationship_messages")).n).toBe(0)
+    expect((await readThread("fund", { fundId: "fund-1" }, rel)).scanning).toBe(false)                                  // and the screen does not claim a scan
+    process.env.INVESTOR_SCAN = "off"
+    await expect(sendMessage("fund", FUND, rel, "x", send, [{ filename: "a.pdf", bytes: PDF() }])).resolves.toMatchObject({ from: "fund" })
+  })
+})
+
 describe("sending and downloading", () => {
   it("stores the file encrypted, lists it without bytes, lets each side download the other's file, and allows a message of only a file", async () => {
     const m = await sendMessage("fund", FUND, rel, "", send, [{ filename: "Terms.pdf", bytes: PDF("terms") }, { filename: "chart.png", bytes: PNG }])

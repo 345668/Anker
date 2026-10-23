@@ -7,7 +7,7 @@
  */
 // Pure on purpose: client components import it, so it uses no Node-only module. The hash that pins it lives in the test.
 
-export const LEGAL_VERSION = "2026-10-21"
+export const LEGAL_VERSION = "2026-10-23"
 
 export type Topic = "sign-up" | "listing" | "requests" | "nda" | "attachments" | "passport" | "discoverability" | "team" | "rights" | "emails"
 export interface LegalText { id: string; topic: Topic; audience: string; where: string; text: string }
@@ -15,7 +15,7 @@ export interface LegalText { id: string; topic: Topic; audience: string; where: 
 const T = (id: string, topic: Topic, audience: string, where: string, text: string): LegalText => ({ id, topic, audience, where, text })
 
 export const TEXTS = {
-  signupConsent: T("signup_consent", "sign-up", "A person creating an investor account", "Sign-up form and 'Create your investor profile' (checkbox label, required)", "I accept the [terms](/terms) and have read the [privacy notice](/privacy)."),
+  signupConsent: T("signup_consent", "sign-up", "A person creating an investor account", "Sign-up form and 'Create your investor profile' (checkbox label, required)", "I accept the [investor terms](/investor/terms) and have read the [investor privacy notice](/investor/privacy)."),
   signupClosedTitle: T("signup_closed_title", "sign-up", "Anyone", "Investor sign-up page while the platform switch is off", "Investor sign-up is not open yet."),
   signupClosedBody: T("signup_closed_body", "sign-up", "Anyone", "Investor sign-up page while the platform switch is off", "We are not accepting investor accounts yet. If you were invited to a fund, use the link you were sent."),
   fitDisclaimer: T("fit_disclaimer", "listing", "An investor browsing funds", "'Funds that fit you' page, above the list", "Funds are ranked by how well their stated focus matches what you say you look for. This is not advice and not a recommendation; check each fund yourself."),
@@ -31,8 +31,10 @@ export const TEXTS = {
   ndaFundRefusal: T("nda_fund_refusal", "nda", "A fund manager", "Shown when the NDA requirement is on without text", "Paste the text of your NDA, or turn the NDA requirement off. Anker records that an investor accepted your text; it does not write one."),
   materialsNote: T("materials_note", "nda", "An investor", "Conversation, under the documents the fund has shared", "The fund can withdraw a document at any time. A copy you have downloaded stays with you."),
   attachmentWarning: T("attachment_warning", "attachments", "Both sides", "Conversation, beside the file picker", "Attach up to 3 files (PDF, JPEG or PNG, 4 MB each). Only open files you expect; Anker checks them but is not a virus scanner."),
+  attachmentWarningScanned: T("attachment_warning_scanned", "attachments", "Both sides", "Conversation, beside the file picker, when the virus scanner is running", "Attach up to 3 files (PDF, JPEG or PNG, 4 MB each). Files are scanned for viruses before they are stored. Still, only open files you expect."),
+  passportClosed: T("passport_closed", "passport", "An investor", "Shown instead of the passport while the platform has not opened it", "The passport is not open yet. Your fund will ask for any documents it needs in its own onboarding."),
   teamNote: T("team_note", "team", "An investor team", "Entity dashboard, Team", "People with a role here see this entity’s requests and conversations. Funds never see the team."),
-  passportIntro: T("passport_intro", "passport", "An investor", "Entity dashboard, Verification passport", "Keep your identity documents here once. Nothing is shared until you choose to share it with one fund; the fund still reviews and decides. Files are encrypted, and no automated system reads them."),
+  passportIntro: T("passport_intro", "passport", "An investor", "Entity dashboard, Verification passport", "Keep your identity documents here once. Nothing is shared until you choose to share it with one fund; the fund still reviews and decides. Files are encrypted, and no automated system reads what they say. If virus scanning is switched on, a scanner we run ourselves checks each file for viruses and keeps nothing."),
   passportShareConsent: T("passport_share_consent", "passport", "An investor", "Passport, beside 'Share a copy with <fund>' (shown before the button)", "By sharing, you give this one fund a copy of the documents you ticked, for its onboarding checks. The fund reviews and decides. You can take a copy back; if the fund has already checked it, the fund keeps it for its legal records and you should ask the fund to remove it."),
   passportTakenDeleted: T("passport_taken_deleted", "passport", "An investor", "Passport, after taking a share back", "Taken back; the fund’s copy was deleted."),
   passportTakenRetained: T("passport_taken_retained", "passport", "An investor", "Passport, after taking a share back", "Taken back. The fund had already checked it and keeps it for its records."),

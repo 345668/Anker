@@ -16,7 +16,7 @@
 
 ## What the product does not do
 - It is not a signing tool for subscriptions beyond doc 60's flow; it moves no money.
-- There is **no virus scanner**; images are accepted on their header; a PDF hiding active content in a way the screen does not look for would pass.
+- **Virus scanning is built but off by default** (`13`): with a ClamAV daemon configured, every file is scanned before storage and an infected file is refused; `required` mode refuses uploads when the scanner is unreachable. Without it, the screen says Anker is not a virus scanner. Images are accepted on their header; a PDF hiding active content in a way the screen does not look for would pass.
 - Messages are stored as plain text in the database (files are encrypted).
 - It does not notify the other side with any message content, file name or document title.
 - No staff read conversations in the ordinary course; platform operators with database access could technically.

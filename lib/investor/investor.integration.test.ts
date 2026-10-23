@@ -12,7 +12,7 @@ vi.mock("@/lib/platform/listings", () => ({
 }))
 
 import { startSignup, verifySignup, CODE_MAX_TRIES, CODE_PER_HOUR, IP_PER_HOUR, type AdminAuth } from "./signup"
-import { createEntity, updateEntity, archiveEntity, listEntities, getProfile, updateProfile, readEntity, isInvestorOnly, MAX_ENTITIES, InvestorError } from "./profile"
+import { createEntity, updateEntity, archiveEntity, listEntities, getProfile, updateProfile, readEntity, isInvestorOnly, MAX_ENTITIES, InvestorError, TERMS_VERSION, termsCurrent, acceptTerms } from "./profile"
 import { readRules, saveListing, getListingState, listedFunds, whoMayInvest, DEFAULT_RULES } from "./listing"
 import { requestToConnect, myRequests, withdraw, inbound, decide, sharedCopy, DEFAULT_SHARE } from "./requests"
 
@@ -168,6 +168,24 @@ describe("the profile and its entities", () => {
     await db.query("INSERT INTO memberships VALUES ('mx', $1, 'org-1', 'member', 'vc')", [a])
     expect(await isInvestorOnly(a)).toBe(false)
     expect(await isInvestorOnly("owner-1")).toBe(false)   // a fund manager with no investor profile
+  })
+})
+
+describe("the investor terms and their versions", () => {
+  it("records the current version at sign-up, asks again when the text changes, and records the new acceptance", async () => {
+    await startSignup({ email: "ann@example.com", name: "Ann Investor", termsAccepted: true, ip: null }, send)
+    const { userId } = await verifySignup({ email: "ann@example.com", code: codeOf(), password: "a-long-password" }, fakeAdmin())
+    expect((await db.query<any>("SELECT terms_version FROM investor_profiles WHERE user_id = $1", [userId])).rows[0].terms_version).toBe(TERMS_VERSION)
+    expect(await termsCurrent(userId)).toBe(true)
+    await db.query("UPDATE investor_profiles SET terms_version = '2026-01-old', terms_accepted_at = now() - interval '9 months' WHERE user_id = $1", [userId])    // the text changed since
+    expect(await termsCurrent(userId)).toBe(false)
+    await expect(acceptTerms(userId, false)).rejects.toMatchObject({ code: "terms" })
+    expect(await termsCurrent(userId)).toBe(false)
+    await acceptTerms(userId, true)
+    expect(await termsCurrent(userId)).toBe(true)
+    expect((await db.query<any>("SELECT terms_version, terms_accepted_at > now() - interval '1 minute' AS fresh FROM investor_profiles WHERE user_id = $1", [userId])).rows[0]).toEqual({ terms_version: TERMS_VERSION, fresh: true })
+    await expect(acceptTerms("nobody", true)).rejects.toMatchObject({ code: "no_profile" })
+    expect(await termsCurrent("nobody")).toBe(false)
   })
 })
 

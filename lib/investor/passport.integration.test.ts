@@ -49,11 +49,12 @@ beforeAll(async () => {
     CREATE TABLE kyc_documents(id text PRIMARY KEY DEFAULT gen_random_uuid()::text, case_id text, doc_type text, status text DEFAULT 'requested', received_at timestamptz);
     CREATE TABLE kyc_document_files(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), doc_id text, sha256 text, superseded boolean DEFAULT false, created_at timestamptz DEFAULT now());
   `)
-  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20e-investor-materials", "2026-10-20f-investor-team", "2026-10-20g-investor-passport", "2026-10-21-investor-legal"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
+  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20e-investor-materials", "2026-10-20f-investor-team", "2026-10-20g-investor-passport", "2026-10-21-investor-legal", "2026-10-23-investor-passport-flag"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8").replace("INSERT INTO platform_flags", "-- INSERT INTO platform_flags"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {
   state.noKey = false; state.recompute.mockReset(); state.audit.mockReset()
+  await db.exec("INSERT INTO platform_flags (key, enabled) VALUES ('investor_passport', true) ON CONFLICT (key) DO UPDATE SET enabled = true")
   await db.exec(`DELETE FROM passport_shares; DELETE FROM passport_documents; DELETE FROM kyc_document_files; DELETE FROM kyc_documents; DELETE FROM lp_verification; DELETE FROM investor_entity_events; DELETE FROM investor_entity_members; DELETE FROM fund_relationships; DELETE FROM fund_lps; DELETE FROM fund_listings; DELETE FROM investor_entities; DELETE FROM investor_profiles; DELETE FROM profiles; DELETE FROM funds;
     INSERT INTO funds(id, name) VALUES ('fund-1','Alpha'), ('fund-2','Beta');
     INSERT INTO profiles VALUES ('owner','owner@example.com','Olga'), ('actor','actor@example.com','Ari'), ('viewer','viewer@example.com','Vic'), ('stranger','stranger@example.com','Sam');
@@ -172,6 +173,17 @@ describe("taking a share back", () => {
     await revokeShare("owner", E, await shareId())
     expect((await all("SELECT action FROM investor_entity_events ORDER BY at")).map((e) => e.action)).toEqual(expect.arrayContaining(["passport_added", "passport_shared", "passport_share_revoked"]))
   })
+})
+
+it("is closed until the platform opens it: nothing can be added or shared, but a stored document can still be removed", async () => {
+  await addDocument("owner", E, "id_document", { filename: "id.pdf", bytes: PDF("id") })
+  await db.exec("UPDATE platform_flags SET enabled = false WHERE key = 'investor_passport'")
+  await expect(addDocument("owner", E, "proof_of_address", { filename: "pa.pdf", bytes: PDF() })).rejects.toMatchObject({ code: "closed", status: 403 })
+  await expect(shareWithFund("owner", E, REL, ["id_document"])).rejects.toMatchObject({ code: "closed" })
+  const v = await passportOf("owner", E)
+  expect(v.open).toBe(false)
+  await removeDocument("owner", E, v.wanted[0].doc!.id)                                                  // removing is always possible
+  expect((await passportOf("owner", E)).wanted.every((w) => !w.doc)).toBe(true)
 })
 
 it("an entity that is not an individual is asked for the entity documents", async () => {

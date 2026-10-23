@@ -1,0 +1,2 @@
+-- The passport (identity documents) gets its own switch, off, so sign-up and conversations can open without it (docs/architecture/74 section 1).
+INSERT INTO platform_flags (key, enabled, rollout_pct, description) VALUES ('investor_passport', false, 100, 'Investors may store identity documents in a passport and share copies with funds (docs/architecture/70, 74). Off until counsel has answered the identity-document and region questions.') ON CONFLICT (key) DO NOTHING;

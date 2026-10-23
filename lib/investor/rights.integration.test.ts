@@ -52,11 +52,12 @@ beforeAll(async () => {
     CREATE TABLE kyc_documents(id text PRIMARY KEY DEFAULT gen_random_uuid()::text, case_id text, doc_type text, status text DEFAULT 'requested', received_at timestamptz);
     CREATE TABLE kyc_document_files(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), doc_id text, sha256 text, superseded boolean DEFAULT false, created_at timestamptz DEFAULT now());
   `)
-  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20d-investor-claim", "2026-10-20e-investor-materials", "2026-10-20f-investor-team", "2026-10-20g-investor-passport", "2026-10-20h-investor-discovery", "2026-10-20i-message-attachments", "2026-10-21-investor-legal"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
+  for (const f of ["2026-10-20-investor-side", "2026-10-20b-investor-talks", "2026-10-20c-investor-bridge", "2026-10-20d-investor-claim", "2026-10-20e-investor-materials", "2026-10-20f-investor-team", "2026-10-20g-investor-passport", "2026-10-20h-investor-discovery", "2026-10-20i-message-attachments", "2026-10-21-investor-legal", "2026-10-23-investor-passport-flag"]) await db.exec(readFileSync(`scripts/migrations/${f}.sql`, "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {
   deleted.length = 0; state.audit.mockReset(); state.recompute.mockReset()
+  await db.exec("INSERT INTO platform_flags (key, enabled) VALUES ('investor_passport', true) ON CONFLICT (key) DO UPDATE SET enabled = true")
   await db.exec(`DELETE FROM investor_claim_codes; DELETE FROM investor_signup_codes; DELETE FROM fund_connect_invites; DELETE FROM relationship_attachments; DELETE FROM relationship_meetings; DELETE FROM relationship_messages; DELETE FROM passport_shares; DELETE FROM passport_documents; DELETE FROM kyc_document_files; DELETE FROM kyc_documents; DELETE FROM lp_verification; DELETE FROM investor_entity_events; DELETE FROM investor_entity_invites; DELETE FROM investor_entity_members; DELETE FROM fund_relationships; DELETE FROM fund_lps; DELETE FROM lp_accounts; DELETE FROM fund_listings; DELETE FROM investor_entities; DELETE FROM investor_profiles; DELETE FROM notifications; DELETE FROM profiles; DELETE FROM memberships; DELETE FROM organizations; DELETE FROM funds;
     INSERT INTO funds(id, name) VALUES ('fund-1','Alpha'), ('fund-2','Beta');
     INSERT INTO organizations VALUES ('org-1','fund','Alpha Partners','fund-1');

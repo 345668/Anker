@@ -24,6 +24,6 @@ Account address and name; profile (display name, country, languages, how to be c
 - Investor terms and an investor notice separate from the founder and fund ones (draft notice: `09`).
 
 ## Open points
-- Investors accept the platform's *general* terms; there are no investor-specific terms yet.
+- Investors now accept **investor-specific terms and notice** (pages `/investor/terms` and `/investor/privacy`, generated from `lib/investor/terms-text.ts`; `10` and `09`), shown with a draft banner until counsel's text replaces them. The version a person accepted and when are stored; a new version asks everyone to accept again *(tested)*.
 - Anker holds the self-declared investor category. It is labelled as self-declared everywhere a fund sees it. Whether recording it creates duties is question 7.
 - The `/privacy` page's retention section is generic ("12 months after closure"); the investor side's actual periods are in `08`. They should be reconciled once counsel confirms.

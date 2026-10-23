@@ -10,7 +10,10 @@ export class InvestorError extends Error { constructor(message: string, readonly
 export const ENTITY_KINDS = ["individual", "company", "trust", "fund", "family_office"] as const
 export type EntityKind = (typeof ENTITY_KINDS)[number]
 export const MAX_ENTITIES = 10
-export const TERMS_VERSION = "2026-10"
+import { INVESTOR_TERMS_VERSION } from "./terms-text"
+import { logAudit } from "@/lib/audit/audit-log"
+/** The version of the investor terms and notice a person accepts when they sign up. Raised when the text changes; everyone is then asked again. */
+export const TERMS_VERSION = INVESTOR_TERMS_VERSION
 
 const text = (v: unknown, max: number): string => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max)
 const strList = (v: unknown, n: number, each: number): string[] =>
@@ -147,4 +150,17 @@ export async function isInvestorOnly(userId: string): Promise<boolean> {
   if (!p) return false
   const [m] = (await sql`SELECT 1 AS x FROM memberships WHERE user_id::text = ${userId} LIMIT 1`) as any[]
   return !m
+}
+
+/** Has this person accepted the current version of the investor terms and notice? */
+export async function termsCurrent(userId: string): Promise<boolean> {
+  const [r] = (await sql`SELECT terms_version FROM investor_profiles WHERE user_id = ${userId} AND erased_at IS NULL`) as any[]
+  return !!r && r.terms_version === TERMS_VERSION
+}
+/** Records acceptance of the current version, with the time. */
+export async function acceptTerms(userId: string, accepted: boolean): Promise<void> {
+  if (!accepted) throw new InvestorError("Accept the terms to continue.", 400, "terms")
+  const rows = (await sql`UPDATE investor_profiles SET terms_version = ${TERMS_VERSION}, terms_accepted_at = now(), updated_at = now() WHERE user_id = ${userId} AND erased_at IS NULL RETURNING user_id`) as any[]
+  if (!rows.length) throw new InvestorError("You do not have an investor profile.", 404, "no_profile")
+  await logAudit({ actorId: userId, action: "investor.terms_accepted", targetType: "investor", targetId: userId, metadata: { version: TERMS_VERSION } })
 }

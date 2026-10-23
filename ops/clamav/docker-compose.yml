@@ -1,0 +1,19 @@
+# ClamAV daemon for the investor side's file scanning (docs/architecture/74 section 2; runbook docs/legal/investor-side/13-virus-scanning-runbook.md).
+# Run it somewhere the application can reach on port 3310 and NOWHERE ELSE: clamd has no authentication, so keep it on a private network or behind a firewall that only the application's egress may use.
+services:
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3310:3310"     # change the left side only if you publish it deliberately to a private interface
+    environment:
+      CLAMD_CONF_StreamMaxLength: "10M"      # larger than the 4 MB file limit
+    volumes:
+      - clamav-db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+volumes:
+  clamav-db:

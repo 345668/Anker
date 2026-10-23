@@ -6,6 +6,7 @@ import { sql } from "@/lib/db"
 import { EMAILS } from "./legal"
 import { InvestorError, relationshipEntityIds, type Need } from "./profile"
 import { checkFiles, MAX_TOTAL_BYTES, type UploadedFile } from "./attachments"
+import { enforceScan, scanningActive } from "./scan"
 import { decryptBytes, encryptBytes } from "@/lib/db/secrets"
 
 export const MESSAGE_MAX = 4000, MESSAGES_PER_HOUR = 30, NOTIFY_EVERY_MIN = 60
@@ -14,7 +15,7 @@ export type Side = "investor" | "fund"
 
 export interface AttachmentView { id: string; filename: string; sizeBytes: number; contentType: string }
 export interface MessageView { id: string; from: Side; body: string; at: string; read: boolean; attachments: AttachmentView[] }
-export interface ThreadView { relationshipId: string; stage: string; writable: boolean; muted: boolean; blocked: boolean; messages: MessageView[] }
+export interface ThreadView { scanning: boolean; relationshipId: string; stage: string; writable: boolean; muted: boolean; blocked: boolean; messages: MessageView[] }
 
 const appUrl = () => (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://www.an-ker.de").replace(/\/$/, "")
 const notFound = () => new InvestorError("That conversation was not found.", 404, "not_found")
@@ -42,7 +43,7 @@ export async function readThread(side: Side, who: { userId?: string; fundId?: st
   const att = (await sql`SELECT id, message_id, filename, size_bytes, content_type FROM relationship_attachments WHERE relationship_id = ${r.id} ORDER BY created_at`) as any[]
   const files = new Map<string, AttachmentView[]>()
   for (const a of att) files.set(String(a.message_id), [...(files.get(String(a.message_id)) ?? []), { id: String(a.id), filename: a.filename, sizeBytes: Number(a.size_bytes), contentType: a.content_type }])
-  return { relationshipId: String(r.id), stage: r.stage, writable: !r.blocked_by && (WRITABLE as readonly string[]).includes(r.stage), muted: mutedBy(side, r), blocked: !!r.blocked_by,
+  return { scanning: scanningActive(), relationshipId: String(r.id), stage: r.stage, writable: !r.blocked_by && (WRITABLE as readonly string[]).includes(r.stage), muted: mutedBy(side, r), blocked: !!r.blocked_by,
     messages: rows.map((m) => ({ id: String(m.id), from: m.sender, body: m.body, at: new Date(m.created_at).toISOString(), read: !!m.read_at, attachments: (files.get(String(m.id)) ?? []) })) }
 }
 
@@ -93,6 +94,7 @@ export async function sendMessage(side: Side, who: { userId?: string; fundId?: s
   const [n] = (await sql`SELECT count(*)::int n FROM relationship_messages WHERE relationship_id = ${r.id} AND sender = ${side} AND created_at > now() - interval '1 hour'`) as any[]
   if (Number(n.n) >= MESSAGES_PER_HOUR) throw new InvestorError("You are sending messages too fast. Try again in a while.", 429, "rate")
   const checked = checkFiles(uploads)
+  await enforceScan(checked)
   if (checked.length) {
     const [used] = (await sql`SELECT COALESCE(sum(size_bytes), 0)::bigint AS n FROM relationship_attachments WHERE relationship_id = ${r.id}`) as any[]
     if (Number(used.n) + checked.reduce((a, f) => a + f.bytes.length, 0) > MAX_TOTAL_BYTES) throw new InvestorError(`This conversation has reached its limit of ${MAX_TOTAL_BYTES / 1024 / 1024} MB of attachments.`, 413, "total")

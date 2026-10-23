@@ -9,6 +9,8 @@ import { REQUIRED_DOCS, recomputeCase } from "@/lib/modules/kyc"
 import { logAudit } from "@/lib/audit/audit-log"
 import { InvestorError, logEvent, requireEntity } from "./profile"
 import { LEGAL_VERSION } from "./legal"
+import { enforceScan } from "./scan"
+import { TEXTS } from "./legal"
 
 export const MAX_FILE_BYTES = 4 * 1024 * 1024
 const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex")
@@ -24,8 +26,15 @@ export function sniff(bytes: Buffer): { contentType: string } | null {
 }
 
 export interface PassportDoc { id: string; type: string; label: string; filename: string; sizeBytes: number; addedAt: string; shares: Array<{ id: string; fundName: string; sharedAt: string; revokedAt: string | null; retained: boolean }> }
+export const FLAG = "investor_passport"
+/** The passport is closed until the platform opens it. Taking things back and deleting always work. */
+export async function passportOpen(): Promise<boolean> {
+  try { const [r] = (await sql`SELECT enabled FROM platform_flags WHERE key = ${FLAG}`) as any[]; return !!r?.enabled } catch { return false }
+}
+const CLOSED = () => new InvestorError(TEXTS.passportClosed.text, 403, "closed")
+
 export interface PassportView {
-  entityId: string; role: string; canEdit: boolean
+  open: boolean; entityId: string; role: string; canEdit: boolean
   wanted: Array<{ type: string; label: string; doc: PassportDoc | null }>
   /** Onboarding relationships this entity could share with. */
   funds: Array<{ relationshipId: string; fundName: string; wants: string[] }>
@@ -48,11 +57,12 @@ export async function passportOf(userId: string, entityId: string): Promise<Pass
     const need = (await sql`SELECT d.doc_type FROM lp_verification v JOIN kyc_documents d ON d.case_id = v.case_id WHERE v.lp_id = ${r.fund_lp_id} AND d.status IN ('requested', 'rejected')`.catch(() => [])) as any[]
     funds.push({ relationshipId: String(r.id), fundName: r.fund_name, wants: need.map((n) => String(n.doc_type)) })
   }
-  return { entityId, role: e.role, canEdit, wanted, funds }
+  return { open: await passportOpen(), entityId, role: e.role, canEdit, wanted, funds }
 }
 
 /** Adds or replaces one document, encrypted. */
 export async function addDocument(userId: string, entityId: string, docType: unknown, file: { filename: string; bytes: Buffer }): Promise<void> {
+  if (!(await passportOpen())) throw CLOSED()
   const e = await requireEntity(userId, entityId, "act")
   const type = String(docType ?? "")
   if (!docTypesFor(e.kind).some((d) => d.type === type)) throw new InvestorError("That is not one of the documents asked for.")
@@ -60,6 +70,7 @@ export async function addDocument(userId: string, entityId: string, docType: unk
   if (file.bytes.length > MAX_FILE_BYTES) throw new InvestorError(`The file is larger than ${MAX_FILE_BYTES / 1024 / 1024} MB. Please send a smaller PDF or photo.`, 413, "too_large")
   const kind = sniff(file.bytes)
   if (!kind) throw new InvestorError("Please send a PDF, JPEG or PNG file.", 415, "type")
+  await enforceScan([file])
   let enc: Buffer
   try { enc = encryptBytes(file.bytes) } catch { throw new InvestorError("Documents cannot be stored securely right now. Please try again later.", 503, "no_key") }
   // The replaced file's bytes are wiped; its record stays so earlier shares keep their history.
@@ -79,6 +90,7 @@ export async function ownCopy(userId: string, entityId: string, docId: string): 
 
 /** Shares chosen documents with one fund that is onboarding this entity. A copy, as if the investor had uploaded it there. */
 export async function shareWithFund(userId: string, entityId: string, relationshipId: string, docTypes: unknown): Promise<{ shared: string[]; skipped: Array<{ type: string; why: string }> }> {
+  if (!(await passportOpen())) throw CLOSED()
   const e = await requireEntity(userId, entityId, "act")
   const types = [...new Set((Array.isArray(docTypes) ? docTypes : []).map(String))]
   if (!types.length) throw new InvestorError("Choose at least one document to share.")

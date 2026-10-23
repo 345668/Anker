@@ -16,9 +16,9 @@ An investor entity keeps the documents a fund's verification asks for, once: for
 
 ## What it does not do
 - **No automated reading** of any document: no AI, no OCR, no index. The only readers are the share action (to copy) and the investor's own download. (Doc 60: "Anker collects and organises; the fund decides.")
-- **No key rotation** yet: one application key encrypts all files. A rotation procedure is a known open item.
+- **Key rotation is built** (`11`): previous keys stay readable; a job re-encrypts files under the new key after checking each fingerprint. It has not been run on production data; the key is an environment variable, not a key-management service.
 - **No retention job for what funds hold**; the passport's own retention is in `08`.
-- **No virus scan** (files are accepted by content type and size).
+- **Virus scanning** is built but off by default (`13`). Note for the wording: with scanning on, a scanner Anker runs reads each file for viruses only; the text says so ("no automated system reads what they say … a scanner we run ourselves checks each file for viruses and keeps nothing").
 - It does not make the fund accept anything; the fund reviews and decides.
 
 ## Data protection points
@@ -33,4 +33,4 @@ Consent per document and per fund, withdrawable, with the retained-by-the-fund r
 ## Open points for counsel
 Questions 17 (permissibility, basis, ID-copy rules), 18 (consent wording and the retained rule), 19 (US-region storage), 20 (key management), 21 (retention).
 
-**Recommendation to the founder:** do not open the passport to real documents until questions 17 and 19 are answered. The rest of the investor side works without it (a fund can still collect documents in its own flow).
+**The passport is behind its own switch, `investor_passport` (off).** Sign-up and conversations can open without it. **Recommendation to the founder:** do not open it until questions 17 and 19 are answered. The rest of the investor side works without it (a fund can still collect documents in its own flow).

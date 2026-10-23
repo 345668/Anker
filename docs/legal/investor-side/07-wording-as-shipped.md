@@ -1,6 +1,6 @@
 # 07. Wording as shipped (generated)
 
-*Generated from `lib/investor/legal.ts`, wording version **2026-10-21**. Do not edit by hand: change the registry, raise the version and regenerate with `npx tsx scripts/legal/gen-investor-pack.ts`. A test fails if this file differs from the registry. Links are written [label](path).*
+*Generated from `lib/investor/legal.ts`, wording version **2026-10-23**. Do not edit by hand: change the registry, raise the version and regenerate with `npx tsx scripts/legal/gen-investor-pack.ts`. A test fails if this file differs from the registry. Links are written [label](path).*
 
 ## Account and sign-up
 
@@ -8,7 +8,7 @@
 *Who sees it:* A person creating an investor account  
 *Where:* Sign-up form and 'Create your investor profile' (checkbox label, required)
 
-> I accept the [terms](/terms) and have read the [privacy notice](/privacy).
+> I accept the [investor terms](/investor/terms) and have read the [investor privacy notice](/investor/privacy).
 
 ### signup_closed_title
 *Who sees it:* Anyone  
@@ -96,6 +96,12 @@
 
 > Attach up to 3 files (PDF, JPEG or PNG, 4 MB each). Only open files you expect; Anker checks them but is not a virus scanner.
 
+### attachment_warning_scanned
+*Who sees it:* Both sides  
+*Where:* Conversation, beside the file picker, when the virus scanner is running
+
+> Attach up to 3 files (PDF, JPEG or PNG, 4 MB each). Files are scanned for viruses before they are stored. Still, only open files you expect.
+
 ## Teams
 
 ### team_note
@@ -106,11 +112,17 @@
 
 ## The verification passport
 
+### passport_closed
+*Who sees it:* An investor  
+*Where:* Shown instead of the passport while the platform has not opened it
+
+> The passport is not open yet. Your fund will ask for any documents it needs in its own onboarding.
+
 ### passport_intro
 *Who sees it:* An investor  
 *Where:* Entity dashboard, Verification passport
 
-> Keep your identity documents here once. Nothing is shared until you choose to share it with one fund; the fund still reviews and decides. Files are encrypted, and no automated system reads them.
+> Keep your identity documents here once. Nothing is shared until you choose to share it with one fund; the fund still reviews and decides. Files are encrypted, and no automated system reads what they say. If virus scanning is switched on, a scanner we run ourselves checks each file for viruses and keeps nothing.
 
 ### passport_share_consent
 *Who sees it:* An investor  

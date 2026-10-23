@@ -1,0 +1,36 @@
+# 74. Build plan: closing the gaps the counsel pack names
+
+Status: **built 2026-10-23; migration applied to production (flag off); see section 6.** Plan as written: The counsel pack (doc 73) states four gaps plainly: where identity documents are stored, attachments are not virus-scanned, the encryption key cannot be rotated, and investors have no terms or notice of their own. This document says what is built to close each, what only the founder can do, and what stays open.
+
+## 1. Region (identity documents in the United States)
+Facts, confirmed 2026-10-23: the database (Neon) is AWS us-east-1; sign-in (Supabase) and email (Resend) run in provider-default regions not yet read off. Moving the database is a production cut-over that needs the founder's Neon and Vercel access and a downtime window; it is **not done here**. Built instead:
+- **A separate switch for the passport**, `investor_passport`, **off**. Sign-up, finding funds, requests, conversations and NDAs can open without identity documents ever being stored; the passport (the only place Anker keeps identity documents for an investor) opens only when counsel and the region question allow. While off, the passport API and the page refuse and say so; the fund's own onboarding (doc 60) is unaffected.
+- **An EU-region runbook** (`docs/legal/investor-side/12-eu-region-runbook.md`): create the EU database, copy, verify, cut over, roll back; the Supabase and Resend region reads; and a check script that prints each provider's region from configuration so the sub-processor register can be updated from facts. The register is updated by the founder from the output.
+- Not built, deliberately: a second file store outside the database. Fund-held copies live in the same database, so it would move only part of the problem and add orphan-file risks. The database move fixes all of it.
+
+## 2. Scanning
+A scan hook that talks to a ClamAV daemon (the `INSTREAM` protocol over TCP), used for message attachments and passport files before anything is stored. Policy by `INVESTOR_SCAN`: `off` (today), `optional` (scan if a scanner is configured; an infected file is always refused; an unreachable scanner lets the file through and is logged), `required` (an unreachable scanner **refuses the upload**; fail closed). A `docker-compose` file and runbook for running ClamAV are provided. Not built: scanning images for hidden payloads beyond the daemon's signatures; any third-party scanning service (it would mean sending identity documents to a third party).
+
+## 3. Key rotation
+- Keys: `SECRET_KEY` is current; `SECRET_KEY_PREVIOUS` (comma separated, newest first) are still accepted for reading.
+- File format: new files are written as version 2 with a 4-byte key id in the header, so the right key is chosen without trial; version 1 files and the existing text secrets (`enc:v1:`) are read by trying the current key and then each previous one. Nothing already stored becomes unreadable.
+- A rotation job (`rotateKeys`, run from a script with a dry run and the usual production guard) re-encrypts, with the current key, every file in the three file tables and the personal-data text columns it knows (owners, tax number, Telegram), **checking each file's stored SHA-256 against the decrypted bytes before replacing it**, row by row, idempotently. It reports rotated, already current, and failed (nothing is replaced on failure).
+- Runbook: generate, deploy with both keys, dry-run, rotate, verify, then retire the old key once the report is clean **and** the text secrets that rotation does not cover (API keys in settings, the privacy-request store) have been re-saved or extended into the job.
+- Not built: automatic scheduled rotation; a key-management service (the key stays an environment variable).
+
+## 4. Investor terms and notice
+- The investor terms and the investor privacy notice become **real pages** (`/investor/terms`, `/investor/privacy`) drawn from one source (`lib/investor/terms-text.ts`), with a version. Their text is a **draft for counsel**: each page carries a visible banner saying so until counsel's text replaces it and the status is changed in that one file.
+- The sign-up consent now links to them instead of the general terms; the pack's `09` and a new `10-investor-terms-DRAFT.md` are generated from the same source.
+- **Re-acceptance:** the version of the terms a person accepted is stored (it already is); when the current version differs, the investor area asks them to accept the new text before continuing.
+- Not built: the content of the legal text itself beyond a careful draft: counsel writes the final.
+
+## 5. Tests
+Rotation: v1 and v2 files and text secrets readable across a rotation; the right key chosen; the rotation job re-encrypts, refuses a file whose fingerprint does not match, is idempotent, and a dry run changes nothing. Scanning: the protocol against a fake daemon (clean, infected with the EICAR test string, unreachable); each policy; attachments and passport uploads honour it. Passport flag: off blocks every passport route and the page. Terms: the pages exist and show the banner while in draft; the consent links to them; a changed version asks for re-acceptance; the generated pack matches.
+
+## 6. What was built, and what was not checked (2026-10-23)
+- **Region:** the `investor_passport` platform switch (off; migration `2026-10-23-investor-passport-flag.sql` applied to production, all three investor switches verified off); `scripts/legal/read-regions.mjs` (prints the database region from its address; reads Resend and Supabase regions when you run it with your own keys); the EU-move runbook (`12`). Confirmed 2026-10-23: the database is AWS us-east-1. **Not done:** the move itself.
+- **Scanning:** `lib/investor/scan.ts` (ClamAV INSTREAM client; policies off / optional / required), wired into message attachments and passport uploads; the conversation screen tells the truth about whether a scan is running; `ops/clamav/docker-compose.yml`; runbook `13`. **Not run against a real ClamAV**; tested against a stand-in daemon, including a file spanning several chunks and the EICAR test string.
+- **Keys:** key ring in `lib/db/secrets.ts` (current + previous keys; version-2 files carry a key id; old files and text secrets still read), `lib/db/key-rotation.ts` and `scripts/oneshot/rotate-keys.ts`, runbook `11`. **Not run on production data** (there is none).
+- **Terms and notice:** `lib/investor/terms-text.ts` (one source; draft status; refuses approval while a placeholder remains), pages `/investor/terms` and `/investor/privacy` with a draft banner, the sign-up consent now links to them, a re-acceptance gate (`/investor/accept-terms`) when the version changes, pack documents `09` and `10` generated from the same source.
+- Tested: 5 key tests, 8 scanner tests, 2 scan-on-upload and passport-switch tests, 6 terms tests, plus the earlier ones; full suite 2,384 passing; `tsc` clean.
+- **Not checked:** the new pages and the accept-terms gate in a browser; a real ClamAV; a real rotation; the move. **Needs the founder or counsel:** the bracketed company, liability, law and contact text in the terms and notice; the scanner host; the Supabase and Resend regions; the move decision.
