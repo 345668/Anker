@@ -38,13 +38,13 @@ export function readRules(raw: any): ListingRules {
 }
 
 /** The rules in the words an investor reads on the fund's page. */
-export function whoMayInvest(r: ListingRules): string {
+export function whoMayInvest(r: ListingRules, currency?: string | null): string {
   const label: Record<string, string> = { professional: "professional investors", semi_professional: "semi-professional investors", other: "other investors", unsure: "investors unsure of their category" }
   const parts: string[] = []
   parts.push(r.professionalOnly ? "Professional investors only" : r.categories.length ? `Open to ${r.categories.map((c) => label[c]).join(", ")}` : "No restriction by investor category is stated")
   if (r.countries.length) parts.push(`from ${r.countries.join(", ")}`)
   if (r.excludedCountries.length) parts.push(`not from ${r.excludedCountries.join(", ")}`)
-  if (r.minTicket) parts.push(`minimum ${r.minTicket.toLocaleString("en-US")}`)
+  if (r.minTicket) parts.push(`minimum ${currency ? currency.toUpperCase() + " " : ""}${r.minTicket.toLocaleString("en-US")}`)
   return parts.join(", ") + "."
 }
 
@@ -77,16 +77,26 @@ export async function buildSnapshot(orgId: string, rules: ListingRules): Promise
     name: String(r.name ?? ""), manager: clip(r.manager, 120), description: clip(r.description, 600), strategy: clip(r.thesis_description, 600),
     stages: String(r.investment_stage ?? "").split(/[,;/]/).map((s) => s.trim()).filter(Boolean).slice(0, 10), sectors: asList(r.sectors).slice(0, 20), geographies: asList(r.geographic_focus).slice(0, 20),
     targetSize: num(r.target_size), currency: clip(r.currency, 6), vintageYear: num(r.vintage_year), status: clip(r.status, 30),
-    minCommitment: num(r.minimum_commitment), termYears: num(r.fund_life), vehicle: clip(r.vehicle_kind, 40), whoMayInvest: whoMayInvest(rules),
+    minCommitment: num(r.minimum_commitment), termYears: num(r.fund_life), vehicle: clip(r.vehicle_kind, 40), whoMayInvest: whoMayInvest(rules, clip(r.currency, 8)),
   }
 }
 
-export interface ListingState { fundId: string | null; name: string | null; listed: boolean; rules: ListingRules | null; snapshot: Snapshot | null; version: number; refreshedAt: string | null; blocked: string | null }
+export interface ListingState { warnings: string[]; fundId: string | null; name: string | null; listed: boolean; rules: ListingRules | null; snapshot: Snapshot | null; version: number; refreshedAt: string | null; blocked: string | null }
+/** Things a manager should look at before (or while) listed: places where what they typed disagrees with itself. */
+export function warningsFor(rules: ListingRules | null, snap: Snapshot | null): string[] {
+  const out: string[] = []
+  if (rules?.minTicket != null && snap?.minCommitment != null && rules.minTicket !== snap.minCommitment)
+    out.push(`Your minimum cheque rule is ${rules.minTicket.toLocaleString("en-US")}, but your fund profile states a minimum commitment of ${snap.minCommitment.toLocaleString("en-US")}. Investors are checked against the rule, and both numbers are shown on your fund page. Make them agree if you meant one minimum.`)
+  if (rules && !rules.categories.length && !rules.countries.length && !rules.professionalOnly && rules.minTicket == null)
+    out.push("Your rules admit everyone: no category, country or minimum is set. If your fund may only be offered to certain investors or in certain countries, set that before listing.")
+  return out
+}
 export async function getListingState(orgId: string): Promise<ListingState> {
   const f = await fundOfOrg(orgId)
-  if (!f) return { fundId: null, name: null, listed: false, rules: null, snapshot: null, version: 0, refreshedAt: null, blocked: "This workspace does not manage a fund yet." }
+  if (!f) return { warnings: [], fundId: null, name: null, listed: false, rules: null, snapshot: null, version: 0, refreshedAt: null, blocked: "This workspace does not manage a fund yet." }
   const [r] = (await sql`SELECT f.listed_for_lps, l.snapshot, l.eligibility, l.version, l.refreshed_at FROM funds f LEFT JOIN fund_listings l ON l.fund_id = f.id WHERE f.id = ${f.fundId}`) as any[]
-  return { fundId: f.fundId, name: f.fundName, listed: !!r?.listed_for_lps, rules: r?.eligibility ? { ...DEFAULT_RULES, ...asObj(r.eligibility) } : null, snapshot: r?.snapshot ? asObj(r.snapshot) : null,
+  const rules = r?.eligibility ? ({ ...DEFAULT_RULES, ...asObj(r.eligibility) } as ListingRules) : null, snapshot = r?.snapshot ? (asObj(r.snapshot) as Snapshot) : null
+  return { warnings: warningsFor(rules, snapshot), fundId: f.fundId, name: f.fundName, listed: !!r?.listed_for_lps, rules, snapshot,
     version: Number(r?.version ?? 0), refreshedAt: r?.refreshed_at ? new Date(r.refreshed_at).toISOString() : null, blocked: f.fundName ? null : "Name the fund before listing it." }
 }
 
@@ -112,7 +122,7 @@ export async function saveListing(scope: { orgId: string; userId: string }, inpu
 
 export interface ListedFund { facts: FundFacts; snapshot: Snapshot; rules: ListingRules; version: number }
 const factsOf = (fundId: string, s: Snapshot, rules: ListingRules): FundFacts => ({
-  fundId, name: s.name, status: s.status, sectors: s.sectors, stages: s.stages, geographies: s.geographies, minCommitment: s.minCommitment, termYears: s.termYears,
+  fundId, name: s.name, status: s.status, sectors: s.sectors, stages: s.stages, geographies: s.geographies, minCommitment: s.minCommitment, termYears: s.termYears, currency: s.currency,
   rules: { categories: rules.categories, countries: rules.countries, excludedCountries: rules.excludedCountries, minTicket: rules.minTicket, professionalOnly: rules.professionalOnly },
 })
 /** Every fund that is switched on and has its rules and snapshot. */

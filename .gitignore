@@ -50,3 +50,4 @@ docs/*.log
 docs/*.aux
 docs/*.out
 docs/whitepaper-assets/_originals/
+.local-outbox.jsonl

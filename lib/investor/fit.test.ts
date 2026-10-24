@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { checkEligibility, fitFor, rankFunds, scoreFit, type EntityFacts, type FundFacts } from "./fit"
+import { checkEligibility, effectiveMinimum, fitFor, money, rankFunds, scoreFit, type EntityFacts, type FundFacts } from "./fit"
 
 type EntityOver = Omit<Partial<EntityFacts>, "interests"> & { interests?: Partial<EntityFacts["interests"]> }
 const entity = (over: EntityOver = {}): EntityFacts => ({
@@ -9,6 +9,23 @@ const entity = (over: EntityOver = {}): EntityFacts => ({
 const fund = (over: Partial<FundFacts> = {}): FundFacts => ({
   fundId: "f1", name: "Alpha Fund", status: "raising", sectors: ["climate tech", "artificial intelligence"], stages: ["seed", "series a"], geographies: ["Europe", "North America"],
   minCommitment: 250_000, termYears: 10, rules: { categories: [], countries: [], excludedCountries: [], minTicket: null, professionalOnly: false }, ...over,
+})
+
+describe("the fund's minimum and its currency", () => {
+  const rules = (minTicket: number | null) => ({ categories: [], countries: [], excludedCountries: [], minTicket, professionalOnly: false })
+  it("the manager's own rule is the minimum when one is set, otherwise the stated minimum commitment", () => {
+    const f = fund({ minCommitment: 250_000, rules: rules(100_000) })
+    expect(effectiveMinimum(f)).toBe(100_000); expect(effectiveMinimum(fund({ minCommitment: 250_000, rules: rules(null) }))).toBe(250_000); expect(effectiveMinimum(fund({ minCommitment: null, rules: rules(100_000) }))).toBe(100_000); expect(effectiveMinimum(fund({ minCommitment: null, rules: rules(null) }))).toBeNull()
+    const e = entity({ interests: { ticketMin: 50_000, ticketMax: 200_000 } })
+    expect(checkEligibility(e, f).status).toBe("eligible")                                                           // the rule says 100K; 200K reaches it
+    expect(checkEligibility(e, fund({ minCommitment: 250_000, rules: rules(null) })).status).toBe("ineligible")
+  })
+  it("amounts are written in the fund's currency, and in dollars only when it states none", () => {
+    expect(money(250_000, "EUR")).toBe("€250K"); expect(money(2_500_000, "GBP")).toBe("£2.5M"); expect(money(1_500_000_000, "CHF")).toBe("CHF 1.5B"); expect(money(250_000, "SEK")).toBe("SEK 250K"); expect(money(250_000)).toBe("$250K")
+    const f = fund({ currency: "EUR", minCommitment: 250_000, rules: rules(null) })
+    expect(checkEligibility(entity({ interests: { ticketMax: 100_000 } }), f).failed[0]).toContain("€250K")
+    expect(fitFor(entity(), f).sentence).toContain("€250K"); expect(fitFor(entity(), f).sentence).not.toContain("$")
+  })
 })
 
 describe("eligibility: the fund's own rules against the entity", () => {

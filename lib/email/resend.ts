@@ -154,8 +154,21 @@ function textToHtml(text: string): string {
     .split(/\n{2,}/).map((p) => `<p style="margin:0 0 12px 0">${p.replace(/\n/g, "<br/>")}</p>`).join("")
 }
 
+/**
+ * Local outbox (docs/architecture/75): with LOCAL_EMAIL_OUTBOX=1 (set only by scripts/dev-local.mjs, never honoured on a production deployment) mail is appended to
+ * .local-outbox.jsonl instead of being sent, so a codes-by-email flow can be walked through on a laptop without any email service.
+ */
+const localOutbox = () => process.env.LOCAL_EMAIL_OUTBOX === "1" && process.env.VERCEL_ENV !== "production"
+
 /** Send.  Returns metadata for the caller to persist. */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+  if (localOutbox()) {
+    const { appendFileSync } = await import("node:fs")
+    const text = input.text ?? stripTags(input.html ?? "")
+    appendFileSync(".local-outbox.jsonl", JSON.stringify({ at: new Date().toISOString(), to: input.to, subject: input.subject, text }) + "\n")
+    const id = randomUUID()
+    return { resendId: `local-${id}`, messageId: `<${id}@local>`, trackingId: id, finalFrom: "local@outbox", finalReplyTo: "local@outbox", finalSubject: input.subject || "(no subject)", finalHtml: input.html ?? "", finalText: text } as unknown as SendEmailResult
+  }
   const trackingId = input.trackingId ?? randomUUID()
   const messageId = input.messageId ?? makeMessageId()
   const finalFrom = input.from ?? senderHeader() ?? FROM_DEFAULT
@@ -293,7 +306,7 @@ function stripTags(html: string): string {
 
 /** True if the env is plausibly configured to actually send. */
 export function isResendConfigured(): boolean {
-  return !!process.env.RESEND_API_KEY
+  return !!process.env.RESEND_API_KEY || localOutbox()
 }
 
 

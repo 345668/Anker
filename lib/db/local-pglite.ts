@@ -15,29 +15,29 @@ import path from "node:path"
 
 const DATA_DIR = path.resolve(process.cwd(), ".local-db")
 
-let _db: PGlite | null = null
-let _ready: Promise<PGlite> | null = null
+// One database per process, held on globalThis: the dev server reloads this module whenever a file changes, and a second PGlite opened on the same directory aborts
+// ("Aborted()") and can corrupt it.
+const G = globalThis as unknown as { __ankerPglite?: { db: PGlite | null; ready: Promise<PGlite> | null; queue: Promise<any> } }
+const state = (G.__ankerPglite ??= { db: null, ready: null, queue: Promise.resolve() })
 
 async function getDb(): Promise<PGlite> {
-  if (_db) return _db
-  if (_ready) return _ready
-  _ready = (async () => {
+  if (state.db) return state.db
+  if (state.ready) return state.ready
+  state.ready = (async () => {
     // The schema has vector columns (embeddings); the extension must be loaded every time the database is opened.
     const db = new PGlite(DATA_DIR, { extensions: { vector } })
     await db.waitReady
-    _db = db
+    state.db = db
     return db
   })()
-  return _ready
+  return state.ready
 }
 
 // PGlite's WASM runtime is single-threaded and crashes on concurrent
 // query() calls. We serialize all queries through a single promise chain.
-let _queue: Promise<any> = Promise.resolve()
-
 function enqueue<T>(fn: () => Promise<T>): Promise<T> {
-  const next = _queue.then(fn, fn)
-  _queue = next.catch(() => {})
+  const next = state.queue.then(fn, fn)
+  state.queue = next.catch(() => {})
   return next
 }
 

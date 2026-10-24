@@ -21,6 +21,8 @@ export interface FundFacts {
   fundId: string; name: string; status: string | null
   sectors: string[]; stages: string[]; geographies: string[]
   minCommitment: number | null; termYears: number | null
+  /** The fund's currency; amounts are compared as numbers and shown in this currency. */
+  currency?: string | null
   rules: Rules
 }
 
@@ -34,7 +36,14 @@ export interface FundFit { fundId: string; name: string; eligibility: Eligibilit
 /** Funds in these stages are not taking new investors. */
 export const NOT_RAISING = new Set(["closed", "harvesting", "liquidated"])
 const WEIGHTS = { sectors: 35, stage: 20, geography: 15, ticket: 20, horizon: 10 } as const
-const money = (n: number) => (n >= 1e9 ? `$${+(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${+(n / 1e6).toFixed(1)}M` : `$${Math.round(n / 1e3)}K`)
+const SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", CHF: "CHF " }
+/** An amount in the fund's currency (a symbol where there is one, the code otherwise; dollars only when the fund states none). */
+export const money = (n: number, currency?: string | null) => {
+  const c = (currency ?? "USD").toUpperCase(), sym = SYMBOL[c] ?? `${c} `
+  return n >= 1e9 ? `${sym}${+(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${sym}${+(n / 1e6).toFixed(1)}M` : `${sym}${Math.round(n / 1e3)}K`
+}
+/** The smallest amount the fund takes for eligibility: the manager's own rule when one is set (it is the manager's explicit choice), otherwise the fund's stated minimum commitment. */
+export const effectiveMinimum = (f: Pick<FundFacts, "rules" | "minCommitment">): number | null => { const m = f.rules.minTicket ?? f.minCommitment ?? 0; return m > 0 ? m : null }
 const list = (xs: string[]) => (xs.length <= 1 ? xs.join("") : xs.length === 2 ? xs.join(" and ") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`)
 const sectorIds = (xs: string[]) => [...new Set(xs.map((s) => sectorGroupOf(s)?.id).filter((x): x is string => !!x))]
 const iso = (...t: (string | null)[]) => resolveGeo(...t).country
@@ -60,11 +69,11 @@ export function checkEligibility(e: EntityFacts, f: FundFacts): EligibilityResul
       else if (r.countries.length && !r.countries.includes(code)) failed.push(`The fund takes investors from ${list(r.countries.map((c) => countryName(c) ?? c))}, and your country is ${name}.`)
     }
   }
-  const min = r.minTicket ?? f.minCommitment
+  const min = effectiveMinimum(f)
   if (min != null && min > 0) {
     const max = e.interests.ticketMax
-    if (max == null) unclear.push(`The fund's minimum is ${money(min)}, and you have not said how much you could invest.`)
-    else if (max < min) failed.push(`The fund's minimum is ${money(min)}, above the most you say you could invest (${money(max)}).`)
+    if (max == null) unclear.push(`The fund's minimum is ${money(min, f.currency)}, and you have not said how much you could invest.`)
+    else if (max < min) failed.push(`The fund's minimum is ${money(min, f.currency)}, above the most you say you could invest (${money(max, f.currency)}).`)
   }
   return { status: failed.length ? "ineligible" : unclear.length ? "unclear" : "eligible", failed, unclear }
 }
@@ -110,12 +119,12 @@ export function scoreFit(e: EntityFacts, f: FundFacts): FitResult {
   } else { add("geography", "Geography", 0, false, ""); gaps.push(wantsGeo ? "The fund does not state where it invests" : "You have not said where you want to be exposed") }
 
   // Ticket: your range against the fund's minimum.
-  const min = f.rules.minTicket ?? f.minCommitment
+  const min = effectiveMinimum(f)
   if (min != null && min > 0 && i.ticketMax != null) {
     const lo = i.ticketMin ?? i.ticketMax
     const share = i.ticketMax < min ? 0 : lo >= min ? 1 : 0.7
-    add("ticket", "Cheque size", share, true, share === 1 ? `The minimum, ${money(min)}, is within your range.` : share > 0 ? `The minimum, ${money(min)}, is at the top of your range.` : `The minimum, ${money(min)}, is above your range.`)
-    if (share > 0) reasons.push(`The ${money(min)} minimum fits your range`)
+    add("ticket", "Cheque size", share, true, share === 1 ? `The minimum, ${money(min, f.currency)}, is within your range.` : share > 0 ? `The minimum, ${money(min, f.currency)}, is at the top of your range.` : `The minimum, ${money(min, f.currency)}, is above your range.`)
+    if (share > 0) reasons.push(`The ${money(min, f.currency)} minimum fits your range`)
   } else { add("ticket", "Cheque size", 0, false, ""); gaps.push(i.ticketMax == null ? "You have not said how much you could invest" : "The fund does not state a minimum") }
 
   // Horizon: how long you can wait against how long the fund runs.

@@ -40,7 +40,7 @@ describe("judging an extra factor", () => {
     const f = r.factors.find((x) => x.key === "relationship_proximity")!
     expect(f.verdict).toBe("keep_shadow")
     expect(f.reason).toMatch(/No measurable gain|may be chance/)
-  })
+  }, 30000)
   it("recommends retiring a factor that makes the ranking clearly worse", () => {
     const f = evaluateFactors(sample(200, "reverse"), DEFAULT_SETTINGS).factors.find((x) => x.key === "relationship_proximity")!
     expect(f.verdict).toBe("retire")

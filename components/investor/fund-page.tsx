@@ -28,7 +28,7 @@ export function FundPage({ fundId }: { fundId: string }) {
         .map(([k, v]) => <div key={k as string}><dt className="text-muted-foreground">{k}</dt><dd>{v || "Not stated"}</dd></div>)}
     </dl>
     <section className="max-w-3xl rounded-lg border p-4 text-sm"><label className="block max-w-sm">How it fits<select className={field} value={entityId} onChange={(e) => setEntityId(e.target.value)}>{entities.map((e) => <option key={e.id} value={e.id}>{e.legalName}</option>)}</select></label>
-      {fit && <div className="mt-3 space-y-1"><p>{fit.sentence}</p>
+      {fit && <div className="mt-3 space-y-1">{fit.fit.reasons.length === 0 && fit.eligibility.failed.length === 0 && <p>{fit.sentence}</p>}
         {fit.fit.reasons.map((r: string) => <p key={r} className="text-muted-foreground">+ {r}</p>)}
         {fit.eligibility.failed.map((r: string) => <p key={r} className="text-red-700">✕ {r}</p>)}
         {fit.fit.gaps.length > 0 && <p className="text-xs text-muted-foreground">Not judged: {fit.fit.gaps.join("; ")}</p>}</div>}</section>

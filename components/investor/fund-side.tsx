@@ -28,6 +28,7 @@ function Listing() {
       <label className="inline-flex items-center gap-1.5 text-sm"><input type="checkbox" checked={r.ndaRequired} onChange={(e) => setR({ ...r, ndaRequired: e.target.checked })} />An NDA is needed before documents are opened</label>
       {r.ndaRequired && <label className="text-sm sm:col-span-2">{TEXTS.ndaFundLabel.text}<textarea className={field} rows={6} maxLength={20000} value={r.ndaText} onChange={(e) => setR({ ...r, ndaText: e.target.value })} /></label>}
     </div>
+    {(s.warnings ?? []).map((w: string) => <p key={w} role="note" className="max-w-3xl rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">{w}</p>)}
     {s.snapshot && <p className="text-sm text-muted-foreground">Investors read: “{s.snapshot.whoMayInvest}” · version {s.version}</p>}
     {err && <p role="alert" className="text-sm text-red-600">{err}</p>}{ok && <p role="status" className="text-sm">{ok}</p>}
     <div className="flex gap-2"><button className={btnGhost} disabled={busy} onClick={() => save()}>Save and refresh</button>
@@ -76,4 +77,9 @@ function Discovery() {
     {d.invites.length > 0 && <div className="text-sm"><p className="font-medium">Your invitations</p><ul className="space-y-1">{d.invites.map((i: any) => <li key={i.id} className="flex items-center justify-between gap-2"><span>{i.card.kind.replace("_", " ")}{i.card.country ? ` · ${i.card.country}` : ""} <span className="text-muted-foreground">· {i.status}</span></span>
       {i.status === "sent" && <button className={btnGhost} onClick={() => call(`/api/fund/investor-discovery?inviteId=${i.id}`, { method: "DELETE" }).then(load).catch((e) => setErr(e.message))}>Withdraw</button>}</li>)}</ul></div>}</section>
 }
-export function InvestorSide() { return <div className="space-y-10"><div><h1 className="text-xl font-semibold">Investors</h1><p className="mt-1 text-sm text-muted-foreground">Let investors find this fund and ask to talk. You decide who sees it, and you answer each request.</p></div><Queue /><Discovery /><Listing /></div> }
+export function InvestorSide() {
+  const [ready, setReady] = useState<"loading" | "ok" | "nofund">("loading")
+  useEffect(() => { call("/api/fund/investor-listing").then(() => setReady("ok")).catch((e) => setReady(/does not manage a fund/i.test(String(e?.message)) ? "nofund" : "ok")) }, [])
+  if (ready === "nofund") return <div className="max-w-xl space-y-3"><h1 className="text-xl font-semibold">Investors</h1><p className="text-sm">This workspace does not have a fund yet, so there is nothing to show to investors.</p><p className="text-sm text-muted-foreground">Set up the fund first (name, strategy, size and who it is for), then come back here to choose who may see it.</p><a className={btn} href="/dashboard/portfolio/fund">Set up your fund</a></div>
+  if (ready === "loading") return <p role="status" className="text-sm">Loading…</p>
+  return <div className="space-y-10"><div><h1 className="text-xl font-semibold">Investors</h1><p className="mt-1 text-sm text-muted-foreground">Let investors find this fund and ask to talk. You decide who sees it, and you answer each request.</p></div><Queue /><Discovery /><Listing /></div> }

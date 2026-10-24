@@ -212,7 +212,7 @@ describe("a fund's listing", () => {
   it("takes a snapshot of the fund and its manager's profile, lists it, refreshes it, and unlists it", async () => {
     const s = await saveListing(scope, { rules: { professionalOnly: true, countries: ["DE"], minTicket: 250000 }, listed: true }, ctx)
     expect(s).toMatchObject({ listed: true, version: 1, snapshot: { name: "Alpha Climate Fund I", manager: "Alpha Partners", sectors: ["climate", "AI"], stages: ["seed", "series a"], geographies: ["Europe"], minCommitment: 250000, termYears: 10, status: "fundraising" } })
-    expect(s.snapshot!.whoMayInvest).toBe("Professional investors only, from DE, minimum 250,000.")
+    expect(s.snapshot!.whoMayInvest).toBe("Professional investors only, from DE, minimum USD 250,000.")
     const [f] = await listedFunds()
     expect(f.facts).toMatchObject({ fundId: "fund-1", name: "Alpha Climate Fund I", rules: { professionalOnly: true, countries: ["DE"], minTicket: 250000 } })
     await db.exec("UPDATE fund_profiles SET minimum_commitment = 500000 WHERE id = 'p1'")
@@ -221,6 +221,12 @@ describe("a fund's listing", () => {
     expect(r.version).toBe(2); expect((await listedFunds())[0].facts.minCommitment).toBe(500000)
     expect((await saveListing(scope, { listed: false }, ctx)).listed).toBe(false)
     expect(await listedFunds()).toEqual([])                                       // a delisted fund disappears
+  })
+  it("warns the manager when the rules disagree with the fund profile, or admit everyone", async () => {
+    expect((await saveListing(scope, { rules: { minTicket: 250000, countries: ["DE"] } }, ctx)).warnings).toEqual([])                          // the same minimum as the profile: nothing to say
+    const w = (await saveListing(scope, { rules: { minTicket: 100000, countries: ["DE"] } }, ctx)).warnings
+    expect(w).toHaveLength(1); expect(w[0]).toMatch(/100,000.*250,000/)
+    expect((await saveListing(scope, { rules: {} }, ctx)).warnings.join(" ")).toMatch(/admit everyone/)
   })
   it("will not list a fund that says nothing about itself, or a workspace that manages no fund", async () => {
     await db.exec("UPDATE fund_profiles SET sectors = '[]', thesis_description = NULL WHERE id = 'p1'")
