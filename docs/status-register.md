@@ -4,6 +4,9 @@ Kept by hand at the end of a piece of work. **Verified live** means it was run a
 
 **The one finding that outranks every row:** no design partner or customer has used any of these modules (doc 37, G0). Summit Venture Studio and Winner Capital have 0 contacts and 0 investors. The 8 investors in the original fund are demo records. Everything below is infrastructure waiting for a first real user.
 
+## 0a. Partners on the website (doc 76, 2026-10-26)
+Built: a `/partners` page, a homepage strip, footer and About links, and a typed data file (13 partners in four groups); 15 tests; viewed in a browser on the local sandbox. **Needs the founder:** the Residency/Altman interview (no link or file was supplied; the block stays hidden until one exists); a sentence for Makershome and Pioneerclub (not found online); confirmation of every description and of each partner's permission to be named (all `checked: false`); not on production until deployed.
+
 ## 0. Local sandbox and baseline (doc 75, 2026-10-24)
 Built: a schema baseline from production (361 tables), a from-scratch build compared with it in every test run, a local sandbox that cannot reach production, a seeded demo, and a local mail outbox. Closes doc 59 R2. **Verified in a browser on the sandbox:** the investor-side journey up to the fund's onboarding portal, and all founder and fund-manager pages load without a server error; eight defects found and fixed (doc 75 section 2). **Not verified:** anything on production; the passport, attachments, teams, discoverability and erasure screens (tests only); a visual review of the main dashboards.
 

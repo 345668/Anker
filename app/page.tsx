@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
 import { EditorialPlatform } from "@/components/landing/editorial-platform";
+import { PartnersStrip } from "@/components/landing/partners-section";
 import e from "@/components/landing/editorial.module.css";
 import s from "@/components/landing/home-editorial.module.css";
 
@@ -136,6 +137,7 @@ export default function Home() {
         </div>
       </section>
       <EditorialPlatform />
+      <PartnersStrip />
       <section className={e.section}>
         <div className={`${e.container} ${e.split}`}>
           <div>

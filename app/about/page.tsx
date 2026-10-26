@@ -131,6 +131,12 @@ export default function AboutPage() {
             Meet the founder
             <ArrowRight size={18} aria-hidden="true" />
           </Link>
+          <p style={{ marginTop: "1.5rem" }}>
+            <Link href="/partners" className={e.textLink}>
+              The partners we have worked with
+              <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+          </p>
         </div>
       </section>
       <EditorialCta />

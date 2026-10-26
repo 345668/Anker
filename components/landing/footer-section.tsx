@@ -55,6 +55,7 @@ const COLUMNS: {
     heading: "Company",
     links: [
       { name: "About", href: "/about" },
+      { name: "Partners", href: "/partners" },
       { name: "Careers", href: "/careers", badge: "Hiring" },
       { name: "Vision", href: "/vision" },
       { name: "Security", href: "/security" },
