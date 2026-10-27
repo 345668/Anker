@@ -4,6 +4,7 @@ import { requireWorkspace, workspaceError } from "@/lib/auth/workspace-context"
 import { resolveAiPrincipal } from "@/lib/assistant/principal"
 import { withAiContext } from "@/lib/assistant/context"
 import { HalyardError, ownedSession, type SessionRow } from "./sessions"
+import { viewableSession } from "./sharing"
 
 /** The signed-in person in their active workspace. Halyard is for people who work in a workspace, not for investors or LPs outside one. */
 export async function halyardContext(write = true) {
@@ -13,6 +14,11 @@ export async function halyardContext(write = true) {
 export async function sessionContext(id: string) {
   const c = await halyardContext(), s = await ownedSession(id, c.orgId, c.userId)
   return { ...c, session: s }
+}
+/** The owner, or a colleague the finished call was shared with (read only). */
+export async function viewContext(id: string) {
+  const c = await halyardContext(false), v = await viewableSession(id, c.orgId, c.userId)
+  return { ...c, ...v }
 }
 /** Runs model work attributed to the workspace (ai_calls, the allowance, the data policy). */
 export async function inWorkspaceAi<T>(c: { userId: string; orgId: string }, signal: AbortSignal | undefined, run: () => Promise<T>): Promise<T> {

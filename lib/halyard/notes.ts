@@ -3,20 +3,20 @@ import { sql } from "@/lib/db"
 import { encryptSecret, decryptSecret } from "@/lib/db/secrets"
 import { assertCan } from "@/lib/metering/allowance"
 import { generateDetailed } from "@/lib/ai/provider"
-import { extractNoteFigures, generateNotes, generateEmail, splitTranscript, NoteGenerationError, type ModelFn, type Notes, bodyFor } from "./core"
+import { extractNoteFigures, generateNotes, generateEmail, splitTranscript, mergeLists, NoteGenerationError, type ModelFn, type Notes } from "./core"
 import { HalyardError, listTurns, type SessionRow } from "./sessions"
 import { skillFor, prepFor } from "./brain"
 
 /** Notes and the drafts (docs/architecture/62 section 9). Notes are versioned rows; a person's edit is never overwritten by a later AI draft: the draft is returned beside it. */
 export interface Figure { value: string; context: string; who: string }
-export interface NotesBody extends Notes { figures: Figure[]; email: string }
+export interface NotesBody extends Notes { figures: Figure[]; email: string; /** Set by live updates: the last turn the notes cover. */ uptoSeq?: number }
 export interface StoredNotes { version: number; by: "user" | "ai"; createdAt: string; body: NotesBody }
 const MAX_ITEMS = 200, MAX_ITEM = 2000
 
 const list = (v: unknown): string[] => (Array.isArray(v) ? v : []).map((x) => String(x ?? "").trim().slice(0, MAX_ITEM)).filter(Boolean).slice(0, MAX_ITEMS)
 export function cleanBody(raw: any): NotesBody {
   const figures: Figure[] = (Array.isArray(raw?.figures) ? raw.figures : []).slice(0, 100).map((f: any) => ({ value: String(f?.value ?? "").slice(0, 80), context: String(f?.context ?? "").slice(0, 600), who: String(f?.who ?? "").slice(0, 20) })).filter((f: Figure) => f.value)
-  return { summary: String(raw?.summary ?? "").trim().slice(0, 4000), keyPoints: list(raw?.keyPoints), decisions: list(raw?.decisions), actionItems: list(raw?.actionItems), followUp: list(raw?.followUp), figures, email: String(raw?.email ?? "").slice(0, 8000) }
+  return { summary: String(raw?.summary ?? "").trim().slice(0, 4000), keyPoints: list(raw?.keyPoints), decisions: list(raw?.decisions), actionItems: list(raw?.actionItems), followUp: list(raw?.followUp), figures, email: String(raw?.email ?? "").slice(0, 8000), ...(Number.isInteger(raw?.uptoSeq) && raw.uptoSeq >= 0 ? { uptoSeq: raw.uptoSeq } : {}) }
 }
 
 export async function latestNotes(sessionId: string): Promise<StoredNotes | null> {
@@ -83,4 +83,29 @@ export async function draftEmailFromNotes(s: SessionRow, model: ModelFn = defaul
   await assertCan(s.org_id, "chat").catch((e) => { throw new HalyardError(e.message, 402, "allowance") })
   const { email } = await generateEmail(model, { title: s.title || "Call", ...cur.body }, await emailContext(s)).catch(asHalyard)
   return saveNotes(s, { ...cur.body, email }, cur.by)
+}
+
+export const LIVE_MIN_NEW_TURNS = 8, LIVE_MIN_INTERVAL_MS = 60_000, LIVE_MAX_CHARS = 45_000
+export type LiveResult = { updated: true; notes: StoredNotes } | { updated: false; reason: "not_live" | "too_few" | "too_soon" | "edited" }
+/**
+ * Notes that keep up with the call (docs/architecture/62 section 9). Called by the open room every so often; the server decides whether anything is due, so a busy client cannot cost
+ * more than one update a minute. Incremental: only the turns since the last update go to the model, the lists are merged in code (order kept, duplicates dropped, capped), the summary
+ * is the latest stretch's, and the figures are re-read by code from the whole transcript. A person's own edit is never touched: once they have edited, live updates stop for good
+ * (the end-of-call draft is then shown beside their version, not over it). The end-of-call draft covers the whole call and replaces an automatic version.
+ */
+export async function refreshLiveNotes(s: SessionRow, model: ModelFn = defaultNotesModel, now = Date.now()): Promise<LiveResult> {
+  if (s.state !== "live") return { updated: false, reason: "not_live" }
+  const cur = await latestNotes(s.id)
+  if (cur?.by === "user") return { updated: false, reason: "edited" }
+  if (cur && now - new Date(cur.createdAt).getTime() < LIVE_MIN_INTERVAL_MS) return { updated: false, reason: "too_soon" }
+  const fresh = await listTurns(s.id, { afterSeq: cur?.body.uptoSeq ?? -1, limit: 20000 })
+  if (fresh.length < LIVE_MIN_NEW_TURNS) return { updated: false, reason: "too_few" }
+  await assertCan(s.org_id, "chat").catch((e) => { throw new HalyardError(e.message, 402, "allowance") })
+  const label = (t: (typeof fresh)[number]) => `${stamp(t.startedMs)}${t.channel === "you" ? "You: " : t.channel === "them" ? "Them: " : "Speaker: "}${t.text}`
+  let text = fresh.map(label).join("\n"); if (text.length > LIVE_MAX_CHARS) text = text.slice(-LIVE_MAX_CHARS)
+  const part = await generateNotes(model, text, await notesContext(s)).catch(asHalyard)
+  const prev = cur?.body, merged = mergeLists([prev ?? { summary: "", keyPoints: [], decisions: [], actionItems: [], followUp: [] }, part])
+  const figures = extractNoteFigures(await compileTranscript(s.id))
+  const saved = await saveNotes(s, { summary: part.summary || prev?.summary || "", ...merged, figures, email: prev?.email ?? "", uptoSeq: fresh[fresh.length - 1].seq }, "ai")
+  return { updated: true, notes: saved }
 }

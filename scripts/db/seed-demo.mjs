@@ -31,6 +31,9 @@ const org = async (user, kind, name, slug, persona) => {
   return id
 }
 const co = await org(founder, "company", "Demo Startup GmbH", "demo-startup", "founder")
+// A colleague in the founder's workspace (teammate@demo.test), so sharing a Halyard call can be walked.
+const mate = await person("teammate@demo.test", "Tess Teammate", "founder")
+await db.query("INSERT INTO memberships (id, user_id, org_id, org_role, persona) VALUES ($1,$2,$3,'member','founder') ON CONFLICT (user_id, org_id) DO NOTHING", [randomUUID(), mate, co])
 const fo = await org(vc, "fund", "Demo Ventures", "demo-ventures", "vc")
 // A fund workspace always has its fund (lib/org/provision.ts creates both); so does the demo one.
 await db.query("INSERT INTO funds (id, slug, name, currency, status, vintage_year) VALUES ($1,$2,$3,'EUR','fundraising',2026) ON CONFLICT (id) DO NOTHING", ["demo-fund", "demo-fund", "Demo Ventures Fund I"])

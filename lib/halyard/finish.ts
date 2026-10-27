@@ -32,7 +32,7 @@ export async function finishSession(s: SessionRow, scope: CallScope, deps: Finis
       const inCall = transcript.length > MAX_TRANSCRIPT ? transcript.slice(0, MAX_TRANSCRIPT - TRUNCATION_MARKER.length) + TRUNCATION_MARKER : transcript
       res.truncatedInCall = inCall !== transcript
       const { call } = await saveCall(scope, { title: s.title || "Halyard call", transcript: inCall, crmEntryId: s.crm_entry_id, occurredAt: new Date(s.started_at).toISOString(), externalId: s.id, consent: true }, "halyard-web")
-      res.callId = call.id
+      res.callId = call.id; res.session = { ...ended, call_id: call.id }
       await sql`UPDATE halyard_sessions SET call_id = ${call.id} WHERE id = ${s.id}`
     } catch (e: any) { warnings.push(`The call record could not be created: ${e?.message ?? "unknown error"}`) }
   }
@@ -54,6 +54,7 @@ export async function finishSession(s: SessionRow, scope: CallScope, deps: Finis
         const make = deps.proposeAction ?? propose, ctx = { runId: `halyard:${s.id}`, trust: "untrusted" as const }
         const stage = STAGE[a.recommendedStage]
         if (stage) try { await make(scope, "crm_update_stage", { entryId: s.crm_entry_id, stage }, ctx); res.proposals++ } catch (e: any) { warnings.push(`A stage change could not be proposed: ${e?.message}`) }
+        if (a.draftFollowup?.trim() && res.callId) try { await make(scope, "call_save_followup", { callId: res.callId, draft: a.draftFollowup }, ctx); res.proposals++ } catch (e: any) { warnings.push(`A follow-up draft could not be proposed: ${e?.message}`) }
         for (const step of a.nextSteps.slice(0, 5)) try { await make(scope, "crm_add_task", { title: step, entryId: s.crm_entry_id }, ctx); res.proposals++ } catch (e: any) { warnings.push(`A task could not be proposed: ${e?.message}`) }
       }
     } catch (e: any) {
@@ -62,4 +63,17 @@ export async function finishSession(s: SessionRow, scope: CallScope, deps: Finis
     }
   }
   return res
+}
+
+/** Proposes saving the notes' follow-up email as an outreach draft (R1): a person approves it in the actions inbox; nothing is saved or sent until then. */
+export async function proposeFollowupDraft(s: SessionRow, scope: CallScope, proposeAction: typeof propose = propose): Promise<{ proposalId: string; alreadyPending: boolean }> {
+  if (scope.persona === "lp") throw new HalyardError("Follow-up drafts are not available for this workspace role.", 403, "role")
+  if (!s.call_id) throw new HalyardError("End the session first; the follow-up is saved against the call record.", 409, "no_call")
+  if (!s.crm_entry_id) throw new HalyardError("Link a contact to the session before saving a follow-up draft.", 409, "no_contact")
+  const notes = await latestNotes(s.id)
+  if (!notes?.body.email.trim()) throw new HalyardError("Draft the email first.", 422, "no_email")
+  try {
+    const r = await proposeAction(scope, "call_save_followup", { callId: s.call_id, draft: notes.body.email }, { runId: `halyard-email:${s.id}:${notes.version}`, trust: "untrusted" })
+    return { proposalId: r.proposal.id, alreadyPending: r.existing }
+  } catch (e: any) { throw new HalyardError(e?.message ?? "The follow-up could not be proposed.", 422, "propose") }
 }

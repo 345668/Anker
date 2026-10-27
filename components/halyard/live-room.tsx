@@ -9,6 +9,7 @@ import { indexedDbStore } from "@/lib/halyard/client/queue-store"
 import { browserFacts, checkBrowser } from "@/lib/halyard/client/browser-check"
 import { createSseParser } from "@/lib/halyard/client/sse"
 import { NotesPanel, type NotesRecord } from "./notes-panel"
+import { SharePanel } from "./share-panel"
 
 type Turn = { seq: number; channel: string; text: string }
 type Sug = { id: string; action: string; text: string; ms?: number }
@@ -22,11 +23,17 @@ export function LiveRoom({ id }: { id: string }) {
   const [state, setState] = useState<string>("loading"), [title, setTitle] = useState(""), [turns, setTurns] = useState<Turn[]>([]), [sugs, setSugs] = useState<Sug[]>([])
   const [listening, setListening] = useState(false), [tabOn, setTabOn] = useState(false), [speaking, setSpeaking] = useState(false), [muted, setMuted] = useState(false), [level, setLevel] = useState(0)
   const [notice, setNotice] = useState<string | null>(null), [pending, setPending] = useState(0), [retrying, setRetrying] = useState(false), [online, setOnline] = useState(true)
-  const [notes, setNotes] = useState<NotesRecord>(null), [endInfo, setEndInfo] = useState<any>(null)
+  const [viewer, setViewer] = useState<string | null>(null), [autoNotes, setAutoNotes] = useState(false), [notes, setNotes] = useState<NotesRecord>(null), [endInfo, setEndInfo] = useState<any>(null)
   const [asking, setAsking] = useState(""), [busy, setBusy] = useState<string | null>(null), [win, setWin] = useState<Window | null>(null), [check, setCheck] = useState<ReturnType<typeof checkBrowser> | null>(null)
   const mic = useRef<Capture | null>(null), tab = useRef<Capture | null>(null), tabFlag = useRef(false), seq = useRef(0), t0 = useRef(0), wake = useRef<any>(null)
   const queue = useRef<ReturnType<typeof createUploadQueue> | null>(null), store = useRef<ReturnType<typeof indexedDbStore> | null>(null), endRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { setCheck(checkBrowser(browserFacts())); setOnline(navigator.onLine) }, [])
+  useEffect(() => { setCheck(checkBrowser(browserFacts())); setOnline(navigator.onLine); try { setAutoNotes(localStorage.getItem("halyard-auto-notes") === "1") } catch { /* storage may be blocked */ } }, [])
+  // Live notes: opt-in, because each update uses the workspace's AI allowance. The server decides whether one is due; asking more often than it needs costs nothing.
+  useEffect(() => {
+    if (!autoNotes || !listening || state !== "live") return
+    const tick = async () => { const r = await fetch(`/api/halyard/sessions/${id}/notes/live`, { method: "POST" }).catch(() => null); const d = await r?.json().catch(() => null); if (d?.updated) setNotes(d.notes); else if (r && !r.ok && d?.error) setNotice(d.error) }
+    const t = setInterval(tick, 30000); return () => clearInterval(t)
+  }, [autoNotes, listening, state, id])
 
   const ensureQueue = useCallback(() => {
     if (queue.current) return queue.current
@@ -48,9 +55,9 @@ export function LiveRoom({ id }: { id: string }) {
   const load = useCallback(async () => {
     const r = await fetch(`/api/halyard/sessions/${id}`), d = await r.json().catch(() => ({}))
     if (!r.ok) { setNotice(d.error ?? "That session could not be opened."); setState("error"); return }
-    setState(d.session.state); setTitle(d.session.title ?? ""); setTurns(d.turns ?? []); seq.current = (d.lastSeq ?? -1) + 1; setNotes(d.notes ?? null)
+    setState(d.session.state); setTitle(d.session.title ?? ""); setTurns(d.turns ?? []); seq.current = (d.lastSeq ?? -1) + 1; setNotes(d.notes ?? null); setViewer(d.viewer ? d.ownerName : null)
     setSugs((d.suggestions ?? []).map((s: any) => ({ id: s.id, action: s.action, text: s.text, ms: s.ms })))
-    if (d.session.state === "live") {   // audio an earlier page left unsent (a reload, a crash) goes up first, and new numbers continue after it
+    if (d.session.state === "live" && !d.viewer) {   // audio an earlier page left unsent (a reload, a crash) goes up first, and new numbers continue after it
       const left = await ensureQueue().restore()
       if (left.length) { seq.current = Math.max(seq.current, ...left.map((u) => u.seq + 1)); setNotice(`${left.length} piece${left.length > 1 ? "s" : ""} of audio from before the reload ${left.length > 1 ? "are" : "is"} being sent.`) }
     }
@@ -133,7 +140,15 @@ export function LiveRoom({ id }: { id: string }) {
 
   if (state === "loading") return <p role="status" className="p-8">Opening session…</p>
   if (state === "error") return <div className="p-8 space-y-3"><p role="alert">{notice}</p><a className="underline" href="/dashboard/halyard">Back to Halyard</a></div>
-  const live = state === "live"
+  const live = state === "live" && !viewer
+  if (viewer) return (
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8 space-y-4">
+      <header className="border-b border-border pb-4"><p className="text-xs uppercase tracking-widest text-muted-foreground">Halyard · shared with you by {viewer}</p><h1 className="text-2xl">{title || "Call"}</h1><p className="mt-1 text-xs text-muted-foreground">You can read this call and its notes. You cannot change anything, and it may be withdrawn at any time.</p></header>
+      <section aria-labelledby="tr" className="rounded-md border border-border"><h2 id="tr" className="border-b border-border px-3 py-2 text-sm font-medium">Transcript</h2>
+        <ol className="max-h-[55vh] space-y-2 overflow-y-auto p-3 text-sm">{turns.length === 0 ? <li className="text-muted-foreground">No transcript.</li> : turns.map((t) => <li key={t.seq}>{LABEL[t.channel] ? <strong className="mr-1">{LABEL[t.channel]}:</strong> : null}{t.text}</li>)}</ol></section>
+      <NotesPanel id={id} initial={notes} canDraft={false} readOnly />
+    </div>
+  )
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-8 space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
@@ -153,6 +168,7 @@ export function LiveRoom({ id }: { id: string }) {
           <button className={btn} onClick={() => { mic.current?.setMuted(!muted); setMuted(!muted) }}>{muted ? "Unmute microphone" : "Mute microphone"}</button>
           <button className={btn} onClick={stopListening}>Stop listening</button></>}
         {!win && <button className={btn} onClick={popOut}>Pop out the panel</button>}
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={autoNotes} onChange={(e) => { setAutoNotes(e.target.checked); try { localStorage.setItem("halyard-auto-notes", e.target.checked ? "1" : "0") } catch { /* not saved */ } }} />Keep the notes up to date as we go</label>
         <button className={btn} onClick={end}>End session</button>
       </div>}
       <div className={win ? "" : "grid gap-4 lg:grid-cols-2"}>
@@ -164,7 +180,8 @@ export function LiveRoom({ id }: { id: string }) {
       {endInfo && <div role="status" className="rounded-md border border-border p-3 text-sm space-y-1"><p><strong>The call is saved.</strong>{endInfo.callId ? <> It is in your <a className="underline" href="/dashboard/calls">call library</a>{endInfo.analysis ? ", analysed" : ""}.</> : null}{endInfo.proposals ? <> {endInfo.proposals} suggested change{endInfo.proposals > 1 ? "s are" : " is"} waiting for you in the <a className="underline" href="/dashboard/actions">actions inbox</a>; nothing has been changed.</> : null}</p>
         {endInfo.truncatedInCall && <p className="text-muted-foreground">The call was longer than the call library keeps, so the library holds the first part; the whole transcript is here and in the exports.</p>}
         {endInfo.warnings?.map((w: string) => <p key={w} className="text-destructive">{w}</p>)}</div>}
-      {state !== "abandoned" && <NotesPanel id={id} initial={notes} canDraft={turns.length > 0 && busy !== "end"} />}
+      {state !== "abandoned" && <NotesPanel id={id} initial={notes} canDraft={turns.length > 0 && busy !== "end"} ended={state === "ended"} />}
+      {state === "ended" && <SharePanel id={id} />}
       <footer className="flex justify-between border-t border-border pt-3 text-xs text-muted-foreground"><span>Only suggestions are made here; nothing is sent or changed for you.</span><button className="underline" onClick={remove}>Delete this session</button></footer>
     </div>
   )

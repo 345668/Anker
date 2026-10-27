@@ -11,8 +11,8 @@ const field = "mt-1 w-full rounded-md border border-border bg-background px-3 py
 export function HalyardHome() {
   const router = useRouter()
   const [mode, setMode] = useState("general"), [title, setTitle] = useState(""), [attested, setAttested] = useState(false), [informed, setInformed] = useState(false)
-  const [q, setQ] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [rows, setRows] = useState<Row[]>([]), [problem, setProblem] = useState<string | null>(null)
-  useEffect(() => { setProblem(browserProblem()); fetch("/api/halyard/sessions").then((r) => r.json()).then((d) => setRows(d.sessions ?? [])).catch(() => {}) }, [])
+  const [shared, setShared] = useState<Array<Row & { ownerName: string }>>([]), [q, setQ] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [rows, setRows] = useState<Row[]>([]), [problem, setProblem] = useState<string | null>(null)
+  useEffect(() => { setProblem(browserProblem()); fetch("/api/halyard/shared").then((r) => r.json()).then((d) => setShared(d.sessions ?? [])).catch(() => {}); fetch("/api/halyard/sessions").then((r) => r.json()).then((d) => setRows(d.sessions ?? [])).catch(() => {}) }, [])
   useEffect(() => { const t = setTimeout(() => { fetch(`/api/halyard/library?q=${encodeURIComponent(q)}`).then((r) => r.json()).then((d) => setRows(d.sessions ?? [])).catch(() => {}) }, q ? 250 : 0); return () => clearTimeout(t) }, [q])
   const open = rows.find((r) => r.state === "live" || r.state === "paused")
 
@@ -45,6 +45,7 @@ export function HalyardHome() {
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <button className="rounded-md bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50" disabled={!attested || busy || !!problem} onClick={start}>{busy ? "Starting…" : "Start session"}</button>
       </section>
+      {shared.length > 0 && <section aria-labelledby="shared" className="space-y-3"><h2 id="shared" className="text-xl">Shared with you</h2><ul className="divide-y divide-border rounded-md border border-border">{shared.map((r) => <li key={r.id} className="flex justify-between gap-4 p-3 text-sm"><Link className="underline" href={`/dashboard/halyard/${r.id}`}>{r.title || "Call"}</Link><span className="text-muted-foreground">from {r.ownerName} · {new Date(r.startedAt).toLocaleDateString()}</span></li>)}</ul></section>}
       {(rows.length > 0 || q) && <section aria-labelledby="recent" className="space-y-3"><div className="flex flex-wrap items-end justify-between gap-3"><h2 id="recent" className="text-xl">Your calls</h2><label className="text-sm">Search<input className={field + " sm:w-64"} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, summary or what was said" /></label></div>
         {rows.length === 0 && <p className="text-sm text-muted-foreground">No call matches that.</p>}
         <ul className="divide-y divide-border rounded-md border border-border">{rows.map((r) => <li key={r.id} className="flex justify-between gap-4 p-3 text-sm"><Link className="underline" href={`/dashboard/halyard/${r.id}`}>{r.title || MODES.find((m) => m[0] === r.mode)?.[1] || "Session"}</Link><span className="text-muted-foreground">{new Date(r.startedAt).toLocaleString()} · {r.state} · {Math.round(r.audioSeconds / 60)} min</span></li>)}</ul></section>}

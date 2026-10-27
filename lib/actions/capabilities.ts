@@ -235,6 +235,54 @@ const saveDrafts: Capability = {
 }
 
 /**
+ * Save a call's follow-up email as an outreach DRAFT (docs/architecture/62 section 9). R1: it writes a message a person will read and may send, so it is proposed, never applied
+ * by itself, and an untrusted run (a call transcript) cannot auto-commit it. It never sends: sending stays behind the campaign engine's own gates. The draft travels in the
+ * proposal, so what is approved is exactly what is saved. One follow-up per call; undo removes it only while it is still an unedited draft.
+ */
+const callFollowup: Capability = {
+  name: "call_save_followup",
+  risk: "R1",
+  check(input) {
+    const callId = String(input?.callId ?? "").trim(), draft = String(input?.draft ?? "").trim()
+    if (!callId) throw new ActionError("callId is required.")
+    if (draft.length < 1 || draft.length > 12000) throw new ActionError("draft must be 1 to 12000 characters.")
+    return { callId, draft }
+  },
+  async plan(scope, input) {
+    const { callId, draft } = this.check(input)
+    const [c] = (await sql`SELECT c.title, c.outreach_message_id, c.crm_entry_id, e.display_name FROM investor_calls c LEFT JOIN crm_entries e ON e.id = c.crm_entry_id AND e.org_id = c.org_id
+      WHERE c.id = ${callId} AND c.org_id = ${scope.orgId} AND c.user_id = ${scope.userId} AND c.deleted_at IS NULL`) as any[]
+    if (!c) throw new ActionError("Call not found in this workspace.")
+    if (!c.crm_entry_id) throw new ActionError("Link a workspace CRM contact to the call before saving a follow-up draft.")
+    if (c.outreach_message_id) throw new ActionError("This call already has a follow-up draft.")
+    const name = c.display_name ?? "the contact"
+    return {
+      summary: `Save a follow-up email draft to ${name} after "${c.title ?? "the call"}"`,
+      diff: [{ label: `${name}: follow-up email`, before: null, after: draft.length > 400 ? draft.slice(0, 400) + "…" : draft }],
+      evidence: { records: [{ type: "investor_call", id: callId, label: c.title ?? "Call" }], note: "Saved as a draft only. Nothing is sent." },
+    }
+  },
+  async apply(scope, input) {
+    const { callId, draft } = this.check(input)
+    const [c] = (await sql`SELECT persona FROM investor_calls WHERE id = ${callId} AND org_id = ${scope.orgId} AND user_id = ${scope.userId} AND deleted_at IS NULL`) as any[]
+    if (!c) throw new ActionError("The call no longer exists in this workspace.")
+    const { createCallFollowup } = await import("@/lib/calls/records")
+    const { CallError } = await import("@/lib/calls/access")
+    try {
+      const r = await createCallFollowup({ userId: scope.userId, orgId: scope.orgId, persona: c.persona, writable: true, workspace: "" } as any, callId, draft)
+      if (r.duplicate) throw new ActionError("This call already has a follow-up draft.")
+      return { undo: { callId, messageId: r.outreachMessageId, draft }, message: "Follow-up email saved as a draft. Nothing was sent." }
+    } catch (e) { if (e instanceof CallError) throw new ActionError(e.message); throw e }
+  },
+  async undo(scope, _input, u) {
+    const rows = (await sql`DELETE FROM outreach_messages WHERE id::text = ${String(u.messageId)} AND user_id = ${scope.userId} AND status = 'draft' AND body = ${String(u.draft)} RETURNING id`) as any[]
+    if (!rows.length) throw new ActionError("Not undone: the draft was edited or sent since, and undo will not overwrite later work.")
+    await sql`UPDATE investor_calls SET outreach_message_id = NULL, updated_at = now() WHERE id = ${String(u.callId)} AND org_id = ${scope.orgId}`
+    return "Removed the follow-up draft."
+  },
+}
+
+/**
  * Send a batch of outreach emails: the R2 capability (docs/architecture/46 §6). The proposal is only a preview of exactly which messages go to whom from which mailbox;
  * approving it (a signed-in person, who must be the sender) authorizes that batch and the send executor carries it out within the caps. It never auto-commits, an
  * untrusted run cannot create it, an agent has no ceiling that allows it, and "Approve all" never covers it. Sent mail cannot be recalled: undo stops what has not gone.
@@ -397,7 +445,7 @@ const lpMatchAddToCrm: Capability = {
   },
 }
 
-export const CAPABILITIES: Record<string, Capability> = { lp_match_to_crm: lpMatchAddToCrm, lp_request_followup: lpRequestFollowup, crm_update_stage: stageMove, crm_add_task: addTask, memory_remember: remember, outreach_save_drafts: saveDrafts, outreach_send_batch: sendBatch }
+export const CAPABILITIES: Record<string, Capability> = { lp_match_to_crm: lpMatchAddToCrm, lp_request_followup: lpRequestFollowup, crm_update_stage: stageMove, crm_add_task: addTask, memory_remember: remember, outreach_save_drafts: saveDrafts, call_save_followup: callFollowup, outreach_send_batch: sendBatch }
 /** Capabilities only the platform itself proposes (an investor's request): the assistant can never name them. */
 const INTERNAL_ONLY = new Set(["lp_request_followup"])
 export const isProposeCapability = (name: string) => Object.hasOwn(CAPABILITIES, name) && !INTERNAL_ONLY.has(name)
