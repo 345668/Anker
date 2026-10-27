@@ -21,6 +21,8 @@ export async function buildDatabase(dir = "memory", log = () => {}) {
   log(`baseline ${date} loaded`)
   const manifest = JSON.parse(readFileSync("lib/migrations/manifest.json", "utf8"))
   const files = Object.values(manifest).find(Array.isArray) ?? []
+  // The dump ends with an empty search_path; migrations written for production assume the default one.
+  await db.exec("SET search_path TO public")
   const newer = files.filter((f) => !ledger.has(f) && existsSync(path.join("scripts/migrations", f)))
   const failed = []
   for (const f of newer) {
