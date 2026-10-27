@@ -39,12 +39,13 @@ export const parseCallback = (data: string | undefined): { decision: "approve" |
   return m ? { decision: m[1] === "a" ? "approve" : m[1] === "r" ? "reject" : "undo", id: m[2] } : null
 }
 
-/** The buttons under a held voice note or document: save it as a call note, ask Anker about it, or throw it away. */
-export const parseNoteCallback = (data: string | undefined): { action: "save" | "ask" | "drop"; id: string } | null => {
-  const m = /^([nqx]):([0-9a-f-]{36})$/i.exec(data ?? "")
-  return m ? { action: m[1] === "n" ? "save" : m[1] === "q" ? "ask" : "drop", id: m[2] } : null
+/** The buttons under a held voice note: ask Anker about it, or throw it away. (`n:` was "save as a call note": retired, docs/architecture/62 H0.) */
+export const parseNoteCallback = (data: string | undefined): { action: "ask" | "drop"; id: string } | null => {
+  const m = /^([qx]):([0-9a-f-]{36})$/i.exec(data ?? "")
+  return m ? { action: m[1] === "q" ? "ask" : "drop", id: m[2] } : null
 }
-export function noteButtons(id: string, canSave: boolean, withAsk: boolean, appUrl: string): Markup {
-  const row = [...(canSave ? [{ text: "Save as note", callback_data: `n:${id}` }] : []), ...(withAsk ? [{ text: "Ask Anker", callback_data: `q:${id}` }] : []), { text: "Discard", callback_data: `x:${id}` }]
-  return { inline_keyboard: [row, ...(canSave ? [] : [[{ text: "Allow changes in Anker", url: `${appUrl}/dashboard/channels` }]])] }
+/** A tap on a button from before the retirement of saving notes from Telegram. */
+export const isRetiredNoteCallback = (data: string | undefined) => /^n:[0-9a-f-]{36}$/i.test(data ?? "")
+export function noteButtons(id: string): Markup {
+  return { inline_keyboard: [[{ text: "Ask Anker", callback_data: `q:${id}` }, { text: "Discard", callback_data: `x:${id}` }]] }
 }

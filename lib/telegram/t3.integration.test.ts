@@ -24,7 +24,7 @@ vi.mock("./audio", async (orig) => ({ ...(await orig() as object), speakAnswer: 
 process.env.SECRET_KEY = "t3-test-secret"; process.env.TELEGRAM_PRODUCT_BOT_TOKEN = "8615616511:AAFX1VFIA4eoTmIKAr7Y5Evap_FZncGSjak"
 import { createLinkCode, consumeLinkCode, confirmLink, setMode, linkByTelegramUser } from "./links"
 import { handleUpdate, MSG, type Deps, type TgUpdate } from "./handler"
-import { stashPending, readPending, dropPending, saveAsCallNote, sweepPending } from "./notes"
+import { stashPending, readPending, dropPending, sweepPending } from "./pending"
 import { allow, DAILY_LIMIT, enqueue, realMedia, ask, voiceReply, sendFileFor, forgetChat } from "./runtime"
 import { productBot } from "./api"
 
@@ -38,7 +38,7 @@ const deps = (o: Partial<Deps> = {}): Deps => ({
   gate: async () => null, ask: async (_l, t, _h, a) => { asks.push({ t, a }); return { answer: "Here you go.", runId: null } }, newProposals: async () => [], pending: async () => [], decide: async () => { throw new Error("unused") },
   today: async () => ({ pending: 0, tasksToday: 0, overdue: 0, replies24h: 0 }), shown: async () => {},
   media: { voice: async () => "I met Katja Weber today. She wants the deck by Friday.", file: async (_l, f) => ({ text: `Document "${f.name}": quarterly report text that is long enough`, refs: [], names: [f.name] }) },
-  voiceReply: async () => null, sendFile: async () => false, forget: async () => 0, remember: async () => {}, allow: async () => null, stash: async (l, k, t, x) => { stashed.push({ k, t, x }); return stashPending(l, k, t, x) }, readPending, dropPending, saveNote: saveAsCallNote, appUrl: "https://app.test", now: () => Date.UTC(2026, 9, 17, 10, 0, 0), ...o,
+  voiceReply: async () => null, sendFile: async () => false, forget: async () => 0, remember: async () => {}, allow: async () => null, stash: async (l, k, t, x) => { stashed.push({ k, t, x }); return stashPending(l, k, t, x) }, readPending, dropPending, appUrl: "https://app.test", now: () => Date.UTC(2026, 9, 17, 10, 0, 0), ...o,
 })
 let uid = 20000
 const upd = (m: Record<string, unknown>): TgUpdate => ({ update_id: ++uid, message: { message_id: uid, from: { id: TG, username: "rick" }, chat: { id: CHAT, type: "private" }, ...m } as any })
@@ -63,8 +63,8 @@ describe("a voice note", () => {
   it("is transcribed and shown back, with Save, Ask and Discard, before anything is done with it", async () => {
     await link("write")
     await handleUpdate(upd({ voice: { file_id: "v1", duration: 20, file_size: 40_000 } }), deps())
-    expect(sent[0].html).toContain("<b>Heard:</b> I met Katja Weber today."); expect(sent[0].html).toContain("What should I do with it?")
-    expect(sent[0].markup.inline_keyboard[0].map((b: any) => b.text)).toEqual(["Save as note", "Ask Anker", "Discard"])
+    expect(sent[0].html).toContain("<b>Heard:</b> I met Katja Weber today."); expect(sent[0].html).toContain("Shall I answer it?")
+    expect(sent[0].markup.inline_keyboard[0].map((b: any) => b.text)).toEqual(["Ask Anker", "Discard"]); expect(sent[0].markup.inline_keyboard).toHaveLength(1)
     expect(asks).toHaveLength(0); expect(st.saved).toHaveLength(0)
   })
   it("the held transcript is encrypted in the database and belongs to the device that sent it", async () => {
@@ -73,9 +73,9 @@ describe("a voice note", () => {
     expect(raw.text_enc).not.toContain("Katja"); expect(raw).toMatchObject({ link_id: l.id, kind: "voice" })
     expect(await readPending({ ...l, id: "another-device" } as any, idOf(sent[0]))).toBeNull()
   })
-  it("a read-only device is offered Ask and Discard only, and told how to allow notes", async () => {
+  it("a read-only device is offered the same two buttons, with no mention of saving notes", async () => {
     await link("read"); await handleUpdate(upd({ voice: { file_id: "v1", duration: 5 } }), deps())
-    expect(sent[0].markup.inline_keyboard[0].map((b: any) => b.text)).toEqual(["Ask Anker", "Discard"]); expect(sent[0].html).toContain("Allow changes"); expect(sent[0].markup.inline_keyboard[1][0].url).toContain("/dashboard/channels")
+    expect(sent[0].markup.inline_keyboard[0].map((b: any) => b.text)).toEqual(["Ask Anker", "Discard"]); expect(sent[0].html).not.toMatch(/Allow changes|Saving notes/)
   })
   it("a voice note over 45 minutes or 20 MB, or other audio over five minutes or 7 MB, is refused before it is downloaded", async () => {
     await link("write"); let called = false
@@ -98,26 +98,18 @@ describe("a voice note", () => {
   })
 })
 
-describe("the three buttons", () => {
+describe("the two buttons", () => {
   const start = async (mode: "read" | "write" = "write") => { const l = await link(mode); await handleUpdate(upd({ voice: { file_id: "v1", duration: 20 } }), deps()); return { l, id: idOf(sent[0]) } }
-  it("Save as note stores it in the call notes library as a Telegram note, once, with the person as owner, and removes the held copy", async () => {
+  it("nothing is ever saved as a call note from Telegram: the old Save button does nothing but say where notes come from, and no held copy is kept or changed", async () => {
     const { id } = await start()
     await handleUpdate(tap(`n:${id}`), deps())
-    expect(st.saved).toHaveLength(1); expect(st.saved[0]).toMatchObject({ source: "telegram", input: { externalId: id, consent: true, transcript: expect.stringContaining("Katja Weber"), title: "Voice note, 17 Oct 2026" }, scope: { userId: "u1", orgId: "o1", persona: "founder", writable: true } })
-    expect(edits[0].h).toContain("Saved to your call notes"); expect(edits[0].m.inline_keyboard[0][0].url).toBe("https://app.test/dashboard/calls"); expect(answers[0].t).toBe("Saved")
-    expect(await rows("SELECT id FROM telegram_pending")).toHaveLength(0)
+    expect(answers[0].t).toContain("no longer available"); expect(answers[0].t).toContain("Halyard")
+    expect(st.saved).toHaveLength(0); expect(await rows("SELECT id FROM telegram_pending")).toHaveLength(1)           // still there to ask about or discard
+    expect(typeof (await import("./pending") as any).saveAsCallNote).toBe("undefined")
   })
-  it("Save is refused for a read-only device and for a person who cannot write, and the held note stays so it can be saved after allowing changes", async () => {
-    const { l, id } = await start("read")
-    await handleUpdate(tap(`n:${id}`), deps()); expect(answers[0].t).toContain("read-only"); expect(st.saved).toHaveLength(0)
-    await setMode(l.id, "u1", "write"); st.canWrite = false
-    await handleUpdate(tap(`n:${id}`), deps()); expect(answers[1].t).toContain("can't save notes"); expect(await rows("SELECT id FROM telegram_pending")).toHaveLength(1)
-    st.canWrite = true; await handleUpdate(tap(`n:${id}`), deps()); expect(st.saved).toHaveLength(1)
-  })
-  it("a note that is too short or too long to be a note says so", async () => {
-    const l = await link("write")
-    const short = await stashPending(l, "voice", "t", "too short"); await expect(saveAsCallNote(l, short)).rejects.toMatchObject({ plain: true, message: expect.stringContaining("too short") })
-    const long = await stashPending(l, "file", "big.txt", "x".repeat(61_000)); await expect(saveAsCallNote(l, long)).rejects.toMatchObject({ message: expect.stringContaining("longer than a note can be") })
+  it("a document is answered as a question and never offered as a note; no text of it is held", async () => {
+    await link("write"); await handleUpdate(upd({ document: { file_id: "d1", file_name: "notes.txt", mime_type: "text/plain", file_size: 1000 }, caption: "What is in this?" }), deps({ media: { voice: async () => "x", file: async () => ({ text: "A long enough text of a document to have been offered as a note before.", refs: [], names: ["notes.txt"] }) } }))
+    expect(asks).toHaveLength(1); expect(sent.map((m) => m.html).join(" ")).not.toMatch(/call note|Keep the text/i); expect(await rows("SELECT id FROM telegram_pending")).toHaveLength(0)
   })
   it("Ask Anker runs the transcript as a question, labelled as a voice note in the workspace's chat, and removes the buttons", async () => {
     const { id } = await start("read")
@@ -130,7 +122,6 @@ describe("the three buttons", () => {
     const { id } = await start()
     await handleUpdate(tap(`x:${id}`), deps()); expect(edits[0].h).toBe(MSG.discarded); expect(await rows("SELECT id FROM telegram_pending")).toHaveLength(0)
     await handleUpdate(tap(`q:${id}`), deps()); expect(answers.at(-1).t).toBe(MSG.expired)
-    await handleUpdate(tap(`n:${id}`), deps()); expect(answers.at(-1).t).toContain("expired")
     const l = (await linkByTelegramUser(TG))!; const old = await stashPending(l, "voice", "t", "an old held voice note with enough text"); await db.query("UPDATE telegram_pending SET expires_at = now() - interval '1 minute'")
     expect(await readPending(l, old)).toBeNull(); expect(await sweepPending()).toBe(1)
   })
@@ -142,11 +133,11 @@ describe("the three buttons", () => {
 
 describe("a file or a photo", () => {
   const photo = (caption?: string) => upd({ photo: [{ file_id: "s", file_size: 1000 }, { file_id: "big", file_size: 90_000 }], ...(caption ? { caption } : {}) })
-  it("with a caption, the caption is the question and the file is context; the attachment is named in the chat; the offer to keep its text follows", async () => {
+  it("with a caption, the caption is the question and the file is context; the attachment is named in the chat; nothing else is offered", async () => {
     await link("write")
     await handleUpdate(upd({ document: { file_id: "d1", file_name: "term-sheet.pdf", mime_type: "application/pdf", file_size: 400_000 }, caption: "What is the valuation cap?" }), deps())
     expect(asks[0].t).toBe("What is the valuation cap?"); expect(asks[0].a.names).toEqual(["term-sheet.pdf"]); expect(sent[0].html).toBe("Here you go.")
-    expect(sent[1].html).toContain("Keep the text of this file as a call note"); expect(sent[1].markup.inline_keyboard[0].map((b: any) => b.text)).toEqual(["Save as note", "Discard"])
+    expect(sent).toHaveLength(1)                                                                                   // the answer only: no offer to keep the text as a note
     expect((await rows("SELECT messages FROM anker_chats"))[0].messages[0].content).toBe("[attached: term-sheet.pdf] What is the valuation cap?")
   })
   it("with no caption it is summarised, and a photo is read through its largest size", async () => {
@@ -165,10 +156,6 @@ describe("a file or a photo", () => {
     const plain: any = new Error("Could not read this PDF. Try exporting it again."); plain.plain = true
     await handleUpdate(upd({ document: { file_id: "d", file_name: "a.pdf", file_size: 1000 } }), deps({ media: { voice: async () => "", file: async () => { throw plain } } })); expect(sent[3].html).toContain("Could not read this PDF")
     expect(asks).toHaveLength(0)
-  })
-  it("a file's text can be kept as a call note with the file name as its title", async () => {
-    await link("write"); await handleUpdate(upd({ document: { file_id: "d", file_name: "board-notes.docx", file_size: 5000 } }), deps())
-    await handleUpdate(tap(`n:${idOf(sent[1])}`), deps()); expect(st.saved[0].input).toMatchObject({ title: "board-notes.docx", transcript: expect.stringContaining("board-notes.docx") })
   })
 })
 

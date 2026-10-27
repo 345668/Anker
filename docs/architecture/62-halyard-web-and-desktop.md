@@ -162,7 +162,7 @@ A SAIL page **Halyard**: per workspace the sessions, audio minutes, suggestions,
 - **Live run** (as for the investor leg and the Telegram channel): a real browser, a real call with a colleague who knows, the founder's hands, the result recorded in `docs/status-register.md`.
 
 ## 17. Build order
-- **H0 (about 1 day): retire the Telegram note-taker.** Remove the save-as-note step, `lib/telegram/notes.ts` and its callbacks, the T5b note items; keep voice-as-question; update doc 57. *Acceptance:* a voice note is answered or discarded, nothing is saved as a call, the tests and the doc agree.
+- **H0 (about 1 day): retire the Telegram note-taker. BUILT 2026-10-27 (see doc 57 section 22).** Remove the save-as-note step, `lib/telegram/notes.ts` and its callbacks, the T5b note items; keep voice-as-question; update doc 57. *Acceptance:* a voice note is answered or discarded, nothing is saved as a call, the tests and the doc agree.
 - **H1 (about 3 days): the shared core.** Port the pure modules and the skills to TypeScript in the Anker repo with their tests and the differential test; no UI. *Acceptance:* all ported tests pass on the desktop's fixtures.
 - **H2 (about 4 days): sessions backend.** Tables, create and end, segments, the `act` stream with skills, brief fold, figures, metering, entitlement, data policy, retention. *Acceptance:* a scripted 90-minute transcript produces suggestions, a bounded brief that keeps the figures, and a complete call row; the allowance and the policy refuse correctly.
 - **H3 (about 4 days): the web live room, microphone only.** Capture, VAD worker, server transcription, the panel and the five actions. *Acceptance:* in Chrome, a real person speaking gets a suggestion inside the latency target; a reload resumes.

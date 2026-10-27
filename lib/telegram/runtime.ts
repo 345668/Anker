@@ -13,7 +13,7 @@ import { readRouterConfig } from "@/lib/ai/runtime-config"
 import { maxRunCostFor } from "@/lib/ai/model-router"
 import * as bot from "./api"
 import { handleUpdate, ensureChat, type Api, type Attachments, type Deps, type Media, type OutFile, type TgUpdate, type TodayView } from "./handler"
-import { stashPending, readPending, dropPending, saveAsCallNote, sweepPending } from "./notes"
+import { stashPending, readPending, dropPending, sweepPending } from "./pending"
 import { isOgg, oggInfo, splitOggOpus } from "./ogg"
 import { speakAnswer } from "./audio"
 import { assistantUploads } from "@/lib/assistant/uploads"
@@ -214,7 +214,7 @@ export async function rememberIncoming(link: LinkRow, chatId: number, messageId:
   await sql`INSERT INTO telegram_sent (bot_id, chat_id, message_id, org_id, kind) VALUES (${link.bot_id ?? 'platform'}, ${chatId}, ${messageId}, ${link.org_id}, 'incoming') ON CONFLICT DO NOTHING`
 }
 
-export function realDeps(b: bot.ProductBot): Deps { return { botId: b.id, api: realApi(b), gate, ask, newProposals, pending, decide, today, shown, media: realMedia(b), allow, stash: stashPending, readPending, dropPending, saveNote: saveAsCallNote, voiceReply, sendFile: (l, c, f) => sendFileFor(b, l, c, f), forget: (l, c) => forgetChat(b, l, c), remember: rememberIncoming, appUrl: appUrl() } }
+export function realDeps(b: bot.ProductBot): Deps { return { botId: b.id, api: realApi(b), gate, ask, newProposals, pending, decide, today, shown, media: realMedia(b), allow, stash: stashPending, readPending, dropPending, voiceReply, sendFile: (l, c, f) => sendFileFor(b, l, c, f), forget: (l, c) => forgetChat(b, l, c), remember: rememberIncoming, appUrl: appUrl() } }
 
 // ───────────── the queue: received updates are stored, acknowledged, then processed ─────────────
 const STALE_RUNNING_MS = 5 * 60_000

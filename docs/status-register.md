@@ -52,7 +52,7 @@ Counsel review of the privacy notice and the legitimate-interest assessment (doc
 | Open | Add real addresses and run one fund's first real investor end to end |
 
 ## 4a. Halyard (doc 62)
-Spec only. The desktop app (`~/Call-Intelligence`) is built and has never synced a call to Anker: `investor_calls` has 0 rows and `call_sync_devices` 0 rows. The Telegram note-taker (doc 57 T3) is built, never run, and **scrapped by decision of 2026-10-18**; removal is slice H0.
+**H0 built 2026-10-27** (the Telegram note-taker is removed: a voice note is answered or discarded, a file is answered, nothing is saved as a call). H1 to H8 not built. Otherwise spec only. The desktop app (`~/Call-Intelligence`) is built and has never synced a call to Anker: `investor_calls` has 0 rows and `call_sync_devices` 0 rows. The Telegram note-taker (doc 57 T3) is built, never run, and **scrapped by decision of 2026-10-18**; removal is slice H0.
 
 ## 5. Investor profiles and relationships (doc 61)
 Spec only. Nothing built.

@@ -3,7 +3,7 @@ import { sql } from "@/lib/db"
 import { answerToParts, esc } from "./format"
 import { consumeLinkCode, linkByTelegramUser, revokeByTelegramUser, touchLink, type LinkRow } from "./links"
 import type { Markup } from "./api"
-import { renderProposal, renderDecision, chatDecidable, parseCallback, parseNoteCallback, noteButtons, UNDO_WINDOW_MIN, type PView } from "./proposals"
+import { renderProposal, renderDecision, chatDecidable, parseCallback, parseNoteCallback, isRetiredNoteCallback, noteButtons, UNDO_WINDOW_MIN, type PView } from "./proposals"
 
 /**
  * What the bot does with one update (docs/architecture/57, T1: link, and ask in read-only mode). Dependencies are injected, so the rules below are tested without Telegram or a model.
@@ -56,10 +56,9 @@ export interface Deps {
   media: Media
   /** Daily limits per device for voice notes and files; a refusal in words, or null. */
   allow(link: LinkRow, kind: "voice" | "file", qty?: number): Promise<string | null>
-  stash(link: LinkRow, kind: "voice" | "file", title: string, text: string): Promise<string>
-  readPending(link: LinkRow, id: string): Promise<{ id: string; kind: "voice" | "file"; title: string; text: string } | null>
+  stash(link: LinkRow, kind: "voice", title: string, text: string): Promise<string>
+  readPending(link: LinkRow, id: string): Promise<{ id: string; kind: "voice"; title: string; text: string } | null>
   dropPending(link: LinkRow, id: string): Promise<void>
-  saveNote(link: LinkRow, id: string): Promise<{ title: string; duplicate: boolean }>
   /** Remembers that a proposal was shown in the chat, so a notification does not repeat it. */
   shown(link: LinkRow, proposalIds: string[]): Promise<void>
   appUrl: string
@@ -210,7 +209,7 @@ async function handleMedia(m: TgMessage, link: LinkRow, deps: Deps): Promise<voi
     if (!text) { await reply(deps, chatId, MSG.noSpeech); return }
     const id = await deps.stash(link, "voice", `Voice note, ${stamp((deps.now ?? Date.now)())}`, text)
     // The transcript is shown before anything is done with it: speech recognition is wrong exactly where it matters (names, amounts, dates).
-    await deps.api.sendMessage(chatId, `<b>Heard:</b> ${esc(preview(text))}\n\nWhat should I do with it?${link.mode === "write" ? "" : "\n(Saving notes needs \"Allow changes\" on this device.)"}`, noteButtons(id, link.mode === "write", true, deps.appUrl))
+    await deps.api.sendMessage(chatId, `<b>Heard:</b> ${esc(preview(text))}\n\nShall I answer it?`, noteButtons(id))
     return
   }
 
@@ -223,24 +222,14 @@ async function handleMedia(m: TgMessage, link: LinkRow, deps: Deps): Promise<voi
   try { att = await deps.media.file(link, { fileId: doc!.file_id, name, mime }) } catch (e) { await reply(deps, chatId, failureText(e)); return }
   const question = (m.caption ?? "").trim() || DEFAULT_FILE_PROMPT
   await answerQuestion(link, chatId, question, deps, att, `[attached: ${name}]`)
-  // Keeping the text of a file is the person's choice, offered once.
-  if (att.text.trim().length >= 20) {
-    const id = await deps.stash(link, "file", name, att.text)
-    await deps.api.sendMessage(chatId, "Keep the text of this file as a call note in Anker?", noteButtons(id, link.mode === "write", false, deps.appUrl))
-  }
 }
 
-/** A tap under a held voice note or file: save it as a note, ask Anker about it, or discard it. */
-async function handleNoteTap(cq: NonNullable<TgUpdate["callback_query"]>, link: LinkRow, note: { action: "save" | "ask" | "drop"; id: string }, deps: Deps): Promise<void> {
+/** A tap under a held voice note: ask Anker about it, or discard it. */
+async function handleNoteTap(cq: NonNullable<TgUpdate["callback_query"]>, link: LinkRow, note: { action: "ask" | "drop"; id: string }, deps: Deps): Promise<void> {
   const chat = cq.message!.chat, mid = cq.message!.message_id
   const answer = (t: string, alert = true) => deps.api.answerCallback(cq.id, t, alert)
   try {
     if (note.action === "drop") { await deps.dropPending(link, note.id); await deps.api.editMessage(chat.id, mid, esc(MSG.discarded), null); await answer("Discarded", false); return }
-    if (note.action === "save") {
-      const r = await deps.saveNote(link, note.id)
-      await deps.api.editMessage(chat.id, mid, `✅ Saved to your call notes: ${esc(r.title)}${r.duplicate ? " (it was already saved)" : ""}.\nReview it, and analyse it if you like, in Anker.`, { inline_keyboard: [[{ text: "Open call notes", url: `${deps.appUrl}/dashboard/calls` }]] })
-      await answer("Saved", false); return
-    }
     const p = await deps.readPending(link, note.id)
     if (!p) { await answer(MSG.expired); return }
     await deps.dropPending(link, note.id)
@@ -265,6 +254,7 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>, deps:
   if (!chat || chat.type !== "private" || !cq.from) { await answer("This only works in a private chat."); return }
   const link = await linkByTelegramUser(cq.from.id, deps.botId ?? "platform")
   if (!link || link.status !== "active") { await answer("This device is not connected. Connect it again from Anker."); return }
+  if (isRetiredNoteCallback(cq.data)) { await answer("Saving notes from Telegram is no longer available. Record calls with Halyard, or add notes in Call notes in Anker."); return }
   const note = parseNoteCallback(cq.data)
   if (note && cq.message) { const g = await deps.gate(link); if (g) { await answer(g); return } await handleNoteTap(cq, link, note, deps); return }
   if (link.mode !== "write") { await answer(MSG.readOnly); return }
