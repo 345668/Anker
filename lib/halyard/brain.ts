@@ -58,10 +58,13 @@ export async function act(s: SessionRow, action: Action, input: { question?: str
   await assertCan(s.org_id, "chat").catch((e) => { throw new HalyardError(e.message, 402, "allowance") })
   const started = Date.now()
   const brief = await latestBrief(s.id)
-  const turns = (await listTurns(s.id, { afterSeq: brief ? brief.uptoSeq : -1 })) as Array<Turn & { seq: number }>
+  const rawTurns = await listTurns(s.id, { afterSeq: brief ? brief.uptoSeq : -1 })
+  // One microphone hears everybody, the user included; the formatters know only You and Them, so the room's words are shown as Them and the model is told why.
+  const roomOnly = rawTurns.some((t) => t.channel === "room")
+  const turns = rawTurns.map((t) => (t.channel === "room" ? { ...t, channel: "them" } : t)) as Array<Turn & { seq: number }>
   const win = action === "recap" ? turns : turns.slice(-WINDOW[action])
   const figures = [...new Set([...(brief?.figures ?? []), ...extractFigures(win)])].slice(0, 40)
-  const block = [formatBrief(brief?.brief), figures.length ? `Figures and quantities said on this call (use exactly as stated; never round, merge or drop them):\n${figures.map((f) => `- ${f}`).join("\n")}` : ""].filter(Boolean).join("\n\n") || null
+  const block = [roomOnly ? "This is a single-microphone recording of the whole room. Speakers are not separated, so the user's own words also appear under Them; work out who said what from the content." : "", formatBrief(brief?.brief), figures.length ? `Figures and quantities said on this call (use exactly as stated; never round, merge or drop them):\n${figures.map((f) => `- ${f}`).join("\n")}` : ""].filter(Boolean).join("\n\n") || null
   const skill = skillFor(s.mode), skillText = skill ? bodyFor(skill, action === "ask" ? "ask" : action) : ""
   const prep = await prepFor(s)
   const prev = (await sql`SELECT text_enc FROM halyard_suggestions WHERE session_id = ${s.id} AND action = ${action} ORDER BY requested_at DESC LIMIT 4`) as any[]
@@ -87,7 +90,7 @@ export async function foldIfDue(s: SessionRow, model: ModelCall = defaultModel):
   const evictable = all.slice(0, Math.max(0, all.length - WINDOW.followup))
   if (!shouldFold(evictable)) return { folded: false }
   await assertCan(s.org_id, "chat").catch((e) => { throw new HalyardError(e.message, 402, "allowance") })
-  const res = await model(buildFoldPrompt(brief?.brief ?? "", evictable), { task: "halyard_fold", maxTokens: 700 })
+  const res = await model(buildFoldPrompt(brief?.brief ?? "", evictable.map((t) => (t.channel === "room" ? { ...t, channel: "them" } : t))), { task: "halyard_fold", maxTokens: 700 })
   const text = applyFold(res.text)
   if (!text) return { folded: false }
   const figures = [...new Set([...(brief?.figures ?? []), ...extractFigures(evictable)])].slice(0, 40)

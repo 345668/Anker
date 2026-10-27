@@ -13,8 +13,9 @@ export async function GET(req: NextRequest, { params }: P) {
     const after = Number(req.nextUrl.searchParams.get("after") ?? -1)
     const turns = await listTurns(session.id, { afterSeq: Number.isFinite(after) ? after : -1, limit: 500 })
     const brief = await latestBrief(session.id)
+    const [{ last }] = (await sql`SELECT COALESCE(max(seq), -1)::int AS last FROM halyard_segments WHERE session_id = ${session.id}`) as any[]
     const sug = (await sql`SELECT id, action, requested_at, total_ms, text_enc, used, rating FROM halyard_suggestions WHERE session_id = ${session.id} ORDER BY requested_at`) as any[]
-    return NextResponse.json({ session: publicSession(session), turns, brief: brief ? { version: brief.version, text: brief.brief, figures: brief.figures } : null,
+    return NextResponse.json({ session: publicSession(session), lastSeq: last, turns, brief: brief ? { version: brief.version, text: brief.brief, figures: brief.figures } : null,
       suggestions: sug.map((r) => ({ id: r.id, action: r.action, at: r.requested_at, ms: r.total_ms, text: decryptSecret(r.text_enc), used: r.used, rating: r.rating })) })
   } catch (e) { return halyardFailure(e) }
 }

@@ -36,7 +36,7 @@ const fo = await org(vc, "fund", "Demo Ventures", "demo-ventures", "vc")
 await db.query("INSERT INTO funds (id, slug, name, currency, status, vintage_year) VALUES ($1,$2,$3,'EUR','fundraising',2026) ON CONFLICT (id) DO NOTHING", ["demo-fund", "demo-fund", "Demo Ventures Fund I"])
 await db.query("UPDATE organizations SET fund_id = 'demo-fund' WHERE id = $1 AND fund_id IS NULL", [fo])
 // The investor side is closed by flags in production. The sandbox opens sign-up and the passport so the whole journey can be walked (discoverability stays off).
-for (const k of ["investor_signup", "investor_passport"]) await db.query("INSERT INTO platform_flags (key, enabled) VALUES ($1, true) ON CONFLICT (key) DO UPDATE SET enabled = true", [k])
+for (const k of ["investor_signup", "investor_passport", "halyard_web"]) await db.query("INSERT INTO platform_flags (key, enabled) VALUES ($1, true) ON CONFLICT (key) DO UPDATE SET enabled = true", [k])
 await db.query("INSERT INTO platform_flags (key, enabled) VALUES ('investor_discoverability', false) ON CONFLICT (key) DO NOTHING")
 // What a fund manager has typed into the fund profile, so the fund has something to show.
 const [hasProfile] = (await db.query("SELECT 1 AS x FROM fund_profiles WHERE org_id = $1", [fo])).rows

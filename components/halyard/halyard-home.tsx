@@ -1,0 +1,51 @@
+"use client"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { browserProblem } from "./audio-capture"
+
+const MODES: Array<[string, string]> = [["general", "General"], ["sales-call", "Sales call"], ["founder-investor-call", "Investor call (I am the founder)"], ["vc-investor-call", "Investor call (I am the investor)"]]
+type Row = { id: string; title: string | null; mode: string; state: string; startedAt: string; audioSeconds: number }
+const field = "mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+
+export function HalyardHome() {
+  const router = useRouter()
+  const [mode, setMode] = useState("general"), [title, setTitle] = useState(""), [attested, setAttested] = useState(false), [informed, setInformed] = useState(false)
+  const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [rows, setRows] = useState<Row[]>([]), [problem, setProblem] = useState<string | null>(null)
+  useEffect(() => { setProblem(browserProblem()); fetch("/api/halyard/sessions").then((r) => r.json()).then((d) => setRows(d.sessions ?? [])).catch(() => {}) }, [])
+  const open = rows.find((r) => r.state === "live" || r.state === "paused")
+
+  async function start() {
+    setBusy(true); setError(null)
+    const r = await fetch("/api/halyard/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode, title, consentAttested: attested, participantsInformed: informed }) })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) { setError(d.error ?? "The session could not be started."); setBusy(false); return }
+    router.push(`/dashboard/halyard/${d.session.id}`)
+  }
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-8 space-y-8">
+      <header className="border-b border-border pb-6">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">Halyard · private to you</p>
+        <h1 className="mt-3 text-3xl">A silent copilot for your live calls.</h1>
+        <p className="mt-3 text-muted-foreground">It listens through your microphone, writes the conversation down, and suggests what to say. It only suggests: nothing is sent or changed on your behalf.</p>
+      </header>
+      {open && <p role="status" className="rounded-md border border-border p-4 text-sm">You have a session open. <Link className="underline" href={`/dashboard/halyard/${open.id}`}>Go back to it</Link>.</p>}
+      <section aria-labelledby="start" className="space-y-4">
+        <h2 id="start" className="text-xl">Start a session</h2>
+        <div className="rounded-md border border-border p-4 text-sm space-y-2">
+          <p><strong>What is heard, and where it goes.</strong> Your microphone is turned into short pieces of speech. Each piece is sent to a speech-to-text service chosen by your workspace's data policy, and the words are stored encrypted with your workspace. The audio is not kept.</p>
+          <p>With one microphone, Halyard hears everyone it can hear, you included. It cannot tell the speakers apart. Use headphones if you want to keep the other side out of the microphone.</p>
+        </div>
+        {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
+        <label className="block text-sm">Call type<select className={field} value={mode} onChange={(e) => setMode(e.target.value)}>{MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+        <label className="block text-sm">Title (optional)<input className={field} value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} placeholder="Call with …" /></label>
+        <label className="flex gap-3 text-sm"><input type="checkbox" checked={attested} onChange={(e) => setAttested(e.target.checked)} className="mt-1" /><span>I have the permission I need to transcribe this conversation. In many countries and some US states that means everyone on the call has agreed.</span></label>
+        <label className="flex gap-3 text-sm"><input type="checkbox" checked={informed} onChange={(e) => setInformed(e.target.checked)} className="mt-1" /><span>I have told the other participants it is being transcribed. (Recommended.)</span></label>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <button className="rounded-md bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50" disabled={!attested || busy || !!problem} onClick={start}>{busy ? "Starting…" : "Start session"}</button>
+      </section>
+      {rows.length > 0 && <section aria-labelledby="recent" className="space-y-3"><h2 id="recent" className="text-xl">Recent sessions</h2>
+        <ul className="divide-y divide-border rounded-md border border-border">{rows.map((r) => <li key={r.id} className="flex justify-between gap-4 p-3 text-sm"><Link className="underline" href={`/dashboard/halyard/${r.id}`}>{r.title || MODES.find((m) => m[0] === r.mode)?.[1] || "Session"}</Link><span className="text-muted-foreground">{new Date(r.startedAt).toLocaleString()} · {r.state} · {Math.round(r.audioSeconds / 60)} min</span></li>)}</ul></section>}
+    </div>
+  )
+}

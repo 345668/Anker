@@ -15,6 +15,7 @@ vi.mock("@/lib/ai/data-policy", () => ({ assertProviderAllowed: async () => { if
 vi.mock("@/lib/ai/provider", () => ({ generateDetailed: async () => ({ text: "", model: null, error: "no model in tests" }) }))
 
 import { createSession, addSegment, listTurns, latestBrief, endSession, deleteSession, sweepSessions, setState, ownedSession, MAX_TRANSCRIPT_CHARS, type SessionRow } from "./sessions"
+import { ingestUtterance, _resetRate, MAX_UTTERANCE_BYTES } from "./utterance"
 import { act, foldIfDue, WINDOW, savePrep, type ModelCall } from "./brain"
 
 let db: PGlite
@@ -168,5 +169,45 @@ describe("retention and deletion", () => {
   it("only the owner in the workspace can open a session", async () => {
     const s = await start()
     await expect(ownedSession(s.id, ORG, "someone-else")).rejects.toMatchObject({ status: 404 }); await expect(ownedSession(s.id, "other-org", USER)).rejects.toMatchObject({ status: 404 })
+  })
+})
+
+describe("utterance upload", () => {
+  const wav = Buffer.from("RIFF....WAVEfmt fake audio")
+  const mk = (seq: number, over: Record<string, unknown> = {}) => ({ seq, channel: "room" as const, startedMs: 0, endedMs: 4000, bytes: wav, mime: "audio/wav", ...over })
+  beforeEach(() => _resetRate())
+  it("transcribes once, stores the words encrypted, meters the seconds, and answers a repeated seq without transcribing again", async () => {
+    const s = await start(); const calls: any[] = []
+    const t = async (b: Buffer, name: string, m: any) => { calls.push({ name, m }); return "We closed the round at five million dollars." }
+    expect(await ingestUtterance(s, mk(0), t)).toEqual({ stored: true, text: "We closed the round at five million dollars." })
+    expect(await ingestUtterance(s, mk(0), t)).toEqual({ stored: false, reason: "duplicate_seq" })
+    expect(calls).toHaveLength(1); expect(calls[0]).toMatchObject({ name: "u.wav", m: { owner: ORG, seconds: 4, source: "halyard" } })
+    expect((await one("SELECT audio_seconds, chars FROM halyard_sessions WHERE id=$1", [s.id]))).toMatchObject({ audio_seconds: 4 })
+    expect((await listTurns(s.id))[0]).toMatchObject({ channel: "room", text: "We closed the round at five million dollars." })
+  })
+  it("treats no recognisable speech as a normal outcome, a failing provider as a retryable 503, and bad input as refused before any cost", async () => {
+    const s = await start(); const calls: any[] = []; let clock = 0; const ingest = (x: any, y: any, z?: any) => ingestUtterance(x, y, z, (clock += 1000))
+    expect(await ingest(s, mk(0), async () => { throw Object.assign(new Error("none"), { status: 422 }) })).toEqual({ stored: false, reason: "no_speech" })
+    await expect(ingest(s, mk(1), async () => { throw Object.assign(new Error("secret provider detail"), { status: 504 }) })).rejects.toMatchObject({ status: 503, code: "asr", message: expect.not.stringContaining("secret") })
+    const t = async () => { calls.push(1); return "x y z" }
+    await expect(ingest(s, mk(2, { mime: "video/mp4" }), t)).rejects.toMatchObject({ status: 415 })
+    await expect(ingest(s, mk(3, { bytes: Buffer.alloc(0) }), t)).rejects.toMatchObject({ code: "bad_audio" })
+    await expect(ingest(s, mk(4, { bytes: Buffer.alloc(MAX_UTTERANCE_BYTES + 1) }), t)).rejects.toMatchObject({ status: 413 })
+    await expect(ingest(s, mk(5, { startedMs: 5000, endedMs: 1000 }), t)).rejects.toMatchObject({ code: "bad_times" })
+    await expect(ingest(s, mk(6, { endedMs: 40_000 }), t)).rejects.toMatchObject({ code: "bad_times" })
+    await expect(ingest({ ...s, state: "paused" }, mk(7), t)).rejects.toMatchObject({ code: "paused" })
+    st.allowance = "Allowance used."; await expect(ingest(s, mk(8), t)).rejects.toMatchObject({ code: "allowance", status: 402 })
+    expect(calls).toHaveLength(0)
+  })
+  it("limits uploads to six a second per session", async () => {
+    const s = await start(), t = async () => "one two three four five six seven"
+    const out = []; for (let i = 0; i < 8; i++) out.push(await ingestUtterance(s, mk(i, { startedMs: i * 1000, endedMs: i * 1000 + 1000 }), t, 1000).catch((e) => e.code))
+    expect(out.filter((x) => x === "rate")).toHaveLength(2)
+  })
+  it("a room-only call reaches the model as Them with the reason, and is folded the same way", async () => {
+    const s = await start(), log: string[] = []
+    await addSegment(s, { seq: 0, channel: "room", text: "Our price is two million dollars a year." })
+    await act(s, "say", {}, scripted(log))
+    expect(log[0]).toContain("single-microphone recording"); expect(log[0]).toContain("Them: Our price is two million dollars a year.")
   })
 })
