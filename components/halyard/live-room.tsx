@@ -23,7 +23,7 @@ export function LiveRoom({ id }: { id: string }) {
   const [state, setState] = useState<string>("loading"), [title, setTitle] = useState(""), [turns, setTurns] = useState<Turn[]>([]), [sugs, setSugs] = useState<Sug[]>([])
   const [listening, setListening] = useState(false), [tabOn, setTabOn] = useState(false), [speaking, setSpeaking] = useState(false), [muted, setMuted] = useState(false), [level, setLevel] = useState(0)
   const [notice, setNotice] = useState<string | null>(null), [pending, setPending] = useState(0), [retrying, setRetrying] = useState(false), [online, setOnline] = useState(true)
-  const [viewer, setViewer] = useState<string | null>(null), [autoNotes, setAutoNotes] = useState(false), [notes, setNotes] = useState<NotesRecord>(null), [endInfo, setEndInfo] = useState<any>(null)
+  const [informed, setInformed] = useState(true), [reminderOff, setReminderOff] = useState(false), [viewer, setViewer] = useState<string | null>(null), [autoNotes, setAutoNotes] = useState(false), [notes, setNotes] = useState<NotesRecord>(null), [endInfo, setEndInfo] = useState<any>(null)
   const [asking, setAsking] = useState(""), [busy, setBusy] = useState<string | null>(null), [win, setWin] = useState<Window | null>(null), [check, setCheck] = useState<ReturnType<typeof checkBrowser> | null>(null)
   const mic = useRef<Capture | null>(null), tab = useRef<Capture | null>(null), tabFlag = useRef(false), seq = useRef(0), t0 = useRef(0), wake = useRef<any>(null)
   const queue = useRef<ReturnType<typeof createUploadQueue> | null>(null), store = useRef<ReturnType<typeof indexedDbStore> | null>(null), endRef = useRef<HTMLDivElement>(null)
@@ -55,7 +55,7 @@ export function LiveRoom({ id }: { id: string }) {
   const load = useCallback(async () => {
     const r = await fetch(`/api/halyard/sessions/${id}`), d = await r.json().catch(() => ({}))
     if (!r.ok) { setNotice(d.error ?? "That session could not be opened."); setState("error"); return }
-    setState(d.session.state); setTitle(d.session.title ?? ""); setTurns(d.turns ?? []); seq.current = (d.lastSeq ?? -1) + 1; setNotes(d.notes ?? null); setViewer(d.viewer ? d.ownerName : null)
+    setState(d.session.state); setTitle(d.session.title ?? ""); setTurns(d.turns ?? []); seq.current = (d.lastSeq ?? -1) + 1; setNotes(d.notes ?? null); setViewer(d.viewer ? d.ownerName : null); setInformed(d.session.participantsInformed !== false)
     setSugs((d.suggestions ?? []).map((s: any) => ({ id: s.id, action: s.action, text: s.text, ms: s.ms })))
     if (d.session.state === "live" && !d.viewer) {   // audio an earlier page left unsent (a reload, a crash) goes up first, and new numbers continue after it
       const left = await ensureQueue().restore()
@@ -159,6 +159,7 @@ export function LiveRoom({ id }: { id: string }) {
           {!online ? <span className="text-destructive">Offline · audio is kept and sent when you are back{pending ? ` (${pending} waiting)` : ""}</span> : retrying ? <span className="text-destructive">Reconnecting… {pending} waiting</span> : pending > 0 ? <span className="text-muted-foreground">{pending} sending</span> : null}
         </div>
       </header>
+      {live && listening && !informed && !reminderOff && <p role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted p-3 text-sm"><span>Remember to tell everyone on the call that it is being transcribed.</span><span className="flex gap-2"><button className={btn} onClick={async () => { setReminderOff(true); await fetch(`/api/halyard/sessions/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ informed: true }) }).catch(() => {}); setInformed(true) }}>I have told them</button><button className={btn} onClick={() => setReminderOff(true)}>Dismiss</button></span></p>}
       {notice && <p role="alert" className="rounded-md border border-border p-3 text-sm text-destructive">{notice}</p>}
       {live && check && !check.canListen && <p role="alert" className="text-sm text-destructive">{check.problem}</p>}
       {live && check?.canListen && !listening && <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">{check.notes.map((n) => <li key={n}>{n}</li>)}</ul>}

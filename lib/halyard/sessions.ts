@@ -24,6 +24,30 @@ export interface SessionRow {
   crm_entry_id: string | null; call_id: string | null; stt: "server" | "local" | "wasm"; audio_seconds: number; chars: number; folded_upto: number; delete_after: string | null
 }
 
+/** The kill switch (docs/architecture/62 section 15): the platform flag, or the workspace's own feature turned off by an operator, stops every live action at once. Reading, exporting and deleting your own calls are never stopped. */
+export async function assertOn(orgId: string): Promise<void> {
+  if (!(await isFlagOn("halyard_web", orgId))) throw new HalyardError("Halyard has been switched off. Your calls are still yours: you can read, export and delete them.", 403, "off")
+  if (!(await getEffective(orgId)).features.halyard) throw new HalyardError("Halyard is not available on your plan right now. Your calls are still yours: you can read, export and delete them.", 403, "plan")
+}
+export const CONSENT_VERSION = "v1"
+
+export interface Settings { retentionMonths: number; requireInformed: boolean }
+export async function getSettings(orgId: string): Promise<Settings> {
+  const [r] = (await sql`SELECT retention_months, require_informed FROM halyard_settings WHERE org_id = ${orgId}`) as any[]
+  return { retentionMonths: r?.retention_months ?? DEFAULT_RETENTION_MONTHS, requireInformed: !!r?.require_informed }
+}
+/** A workspace owner or admin's choice. Changing the retention period applies to calls already finished (their deletion date moves to end + months), so shortening it takes effect at once. */
+export async function saveSettings(orgId: string, input: { retentionMonths?: unknown; requireInformed?: unknown }): Promise<Settings> {
+  const cur = await getSettings(orgId)
+  const months = input.retentionMonths === undefined ? cur.retentionMonths : Number(input.retentionMonths)
+  if (!Number.isInteger(months) || months < 1 || months > 120) throw new HalyardError("Retention is a whole number of months from 1 to 120.", 400, "bad_retention")
+  const req = input.requireInformed === undefined ? cur.requireInformed : input.requireInformed === true
+  await sql`INSERT INTO halyard_settings (org_id, retention_months, require_informed, updated_at) VALUES (${orgId}, ${months}, ${req}, now())
+    ON CONFLICT (org_id) DO UPDATE SET retention_months = EXCLUDED.retention_months, require_informed = EXCLUDED.require_informed, updated_at = now()`
+  if (months !== cur.retentionMonths) await sql`UPDATE halyard_sessions SET delete_after = (ended_at + make_interval(months => ${months})) WHERE org_id = ${orgId} AND ended_at IS NOT NULL`
+  return { retentionMonths: months, requireInformed: req }
+}
+
 const clean = (s: unknown, max: number) => String(s ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, max)
 
 export interface CreateInput {
@@ -38,6 +62,7 @@ export async function createSession(i: CreateInput, now = new Date()): Promise<S
   if (!(await isFlagOn("halyard_web", i.orgId))) throw new HalyardError("Halyard is not switched on yet.", 403, "off")
   const eff = await getEffective(i.orgId)
   if (!(eff.features as any).halyard) throw new HalyardError("Your plan does not include Halyard.", 402, "plan")
+  if ((await getSettings(i.orgId)).requireInformed && i.participantsInformed !== true) throw new HalyardError("Your workspace requires you to tell the other participants the call is being transcribed. Confirm that you have.", 400, "inform_required")
   const mode = (MODES as readonly string[]).includes(String(i.mode)) ? String(i.mode) : "general"
   const stt = i.stt ?? "server"
   // Server transcription sends speech to the transcription provider; a workspace policy that forbids it refuses here with its own words, not later mid-call.
@@ -49,8 +74,8 @@ export async function createSession(i: CreateInput, now = new Date()): Promise<S
   const live = (await limitOf(i.orgId, "halyard_sessions_live" as any)) ?? 1
   const [{ n }] = (await sql`SELECT count(*)::int AS n FROM halyard_sessions WHERE user_id = ${i.userId} AND state IN ('live','paused')`) as any[]
   if (n >= Math.max(1, live)) throw new HalyardError("You already have a Halyard session open. End it before starting another.", 409, "one_live")
-  const [row] = (await sql`INSERT INTO halyard_sessions (org_id, user_id, source, mode, title, language, consent_attested_at, participants_informed, crm_entry_id, stt, device_id, started_at)
-    VALUES (${i.orgId}, ${i.userId}, ${i.source ?? "web"}, ${mode}, ${clean(i.title, 200) || null}, ${clean(i.language, 12) || null}, ${now.toISOString()}, ${i.participantsInformed === true}, ${i.crmEntryId ? clean(i.crmEntryId, 80) : null}, ${stt}, ${i.deviceId ? clean(i.deviceId, 80) : null}, ${now.toISOString()})
+  const [row] = (await sql`INSERT INTO halyard_sessions (org_id, user_id, source, mode, title, language, consent_version, consent_attested_at, participants_informed, crm_entry_id, stt, device_id, started_at)
+    VALUES (${i.orgId}, ${i.userId}, ${i.source ?? "web"}, ${mode}, ${clean(i.title, 200) || null}, ${clean(i.language, 12) || null}, ${CONSENT_VERSION}, ${now.toISOString()}, ${i.participantsInformed === true}, ${i.crmEntryId ? clean(i.crmEntryId, 80) : null}, ${stt}, ${i.deviceId ? clean(i.deviceId, 80) : null}, ${now.toISOString()})
     RETURNING *`) as any[]
   return row
 }
@@ -86,6 +111,7 @@ export interface SegmentInput { seq: number; channel: "you" | "them" | "room"; t
 /** Stores one segment. Idempotent on seq; near-duplicates of overlapping utterances are dropped; the session's size and length caps hold. */
 export async function addSegment(s: SessionRow, g: SegmentInput, now = Date.now()): Promise<{ stored: boolean; reason?: "duplicate_seq" | "repeat" | "empty" | "echo" }> {
   if (s.state !== "live") throw new HalyardError(s.state === "paused" ? "The session is paused." : "That session has ended.", 409, s.state)
+  await assertOn(s.org_id)
   if (expired(s, now)) throw new HalyardError("A session lasts at most four hours. Start a new one.", 409, "too_long")
   if (!Number.isInteger(g.seq) || g.seq < 0) throw new HalyardError("Segment numbers are whole numbers from 0.", 400, "bad_seq")
   if (!["you", "them", "room"].includes(g.channel)) throw new HalyardError("Unknown channel.", 400, "bad_channel")
@@ -139,9 +165,20 @@ export async function endSession(s: SessionRow, now = new Date()): Promise<Sessi
   return r
 }
 
-/** Deletes everything of the session. Children go with it (cascade); the linked call is removed too when this session made it. */
+/**
+ * Deletes everything of the session and what was made from it (docs/architecture/62 section 13). The text, brief, notes, suggestions and shares go with the session (cascade); the call record
+ * goes; a follow-up draft made from the call goes if it is still an unsent draft (a message already sent is a record of what went out: it stays, unlinked); proposals made from the call are
+ * removed while pending, and where already decided their content is blanked (the audit line stays, saying only that a decision was made). Usage and cost rows carry no content and stay.
+ */
 export async function deleteSession(s: SessionRow): Promise<void> {
-  if (s.call_id) await sql`DELETE FROM investor_calls WHERE id = ${s.call_id} AND org_id = ${s.org_id}`
+  const runs = [`halyard:${s.id}`, `halyard-email:${s.id}:%`]
+  if (s.call_id) {
+    await sql`DELETE FROM outreach_messages WHERE call_id = ${s.call_id} AND status = 'draft'`.catch(() => {})
+    await sql`UPDATE outreach_messages SET call_id = NULL WHERE call_id = ${s.call_id}`.catch(() => {})
+    await sql`DELETE FROM investor_calls WHERE id = ${s.call_id} AND org_id = ${s.org_id}`
+  }
+  await sql`DELETE FROM action_proposals WHERE org_id = ${s.org_id} AND status = 'pending' AND (run_id = ${runs[0]} OR run_id LIKE ${runs[1]})`.catch(() => {})
+  await sql`UPDATE action_proposals SET input = '{}'::jsonb, diff = '[]'::jsonb, evidence = '{}'::jsonb, summary = 'Removed with the call it came from' WHERE org_id = ${s.org_id} AND (run_id = ${runs[0]} OR run_id LIKE ${runs[1]})`.catch(() => {})
   await sql`DELETE FROM halyard_sessions WHERE id = ${s.id} AND org_id = ${s.org_id}`
 }
 
@@ -154,5 +191,6 @@ export async function sweepSessions(now = new Date()): Promise<{ abandoned: numb
     await sql`UPDATE halyard_sessions SET delete_after = ${del.toISOString()} WHERE id = ${r.id}`
   }
   const d = (await sql`DELETE FROM halyard_sessions WHERE delete_after IS NOT NULL AND delete_after < ${now.toISOString()} RETURNING id`) as any[]
+  await sql`DELETE FROM halyard_uploads WHERE created_at < ${new Date(now.getTime() - 90 * 86_400_000).toISOString()}`.catch(() => {})   // health counts are kept for 90 days
   return { abandoned: a.length, deleted: d.length }
 }

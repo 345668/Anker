@@ -8,7 +8,7 @@ import type { TaskTag } from "@/lib/ai/model-router"
 import {
   CALL_MODES, applyFold, buildFoldPrompt, extractFigures, formatBrief, shouldFold, loadSkillFiles, bodyFor, formatTranscript, type ActionName, type Turn, type SkillRecord,
 } from "./core"
-import { HalyardError, listTurns, latestBrief, type SessionRow } from "./sessions"
+import { HalyardError, assertOn, listTurns, latestBrief, type SessionRow } from "./sessions"
 
 /**
  * The live brain (docs/architecture/62 section 8): a window of recent turns, a bounded running brief that is rewritten (never appended), figures kept by code,
@@ -55,6 +55,7 @@ export async function act(s: SessionRow, action: Action, input: { question?: str
   if (!ACTIONS.includes(action)) throw new HalyardError("Unknown action.", 400, "bad_action")
   if (action === "ask" && !String(input.question ?? "").trim()) throw new HalyardError("Type a question to ask.", 400, "no_question")
   if (s.state === "abandoned") throw new HalyardError("That session was closed.", 409, "ended")
+  await assertOn(s.org_id)
   await assertCan(s.org_id, "chat").catch((e) => { throw new HalyardError(e.message, 402, "allowance") })
   const started = Date.now()
   const brief = await latestBrief(s.id)

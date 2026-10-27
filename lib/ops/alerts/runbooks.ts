@@ -63,6 +63,16 @@ export const RUNBOOKS: Record<RuleKey, Runbook> = {
     check: "The file names in this alert. `pnpm migrate:verify` lists every migration against the database, so you can see whether the file is really missing or only unrecorded.",
     fix: "Apply the named file: `node scripts/oneshot/run-migration.mjs scripts/migrations/<file> --yes-production`. If `migrate:verify` says the objects already exist, run `pnpm migrate:verify --record`. The incident clears by itself once the ledger has the file.",
   },
+  halyard_latency: {
+    means: "People using Halyard on a live call are waiting too long for suggestions (the slowest 5% took over four seconds).",
+    check: "SAIL, Halyard: the 95th percentile and the suggestion count for the last 15 minutes. SAIL, AI usage: whether the model provider is slow or failing (the AI failure rule may also be open). Vercel function logs for the act route.",
+    fix: "If one provider is slow, move the Halyard tasks to another lane in AI configuration. If it is the model tier, a faster tier for the live actions helps. Nothing is lost meanwhile: suggestions arrive late, the transcript is unaffected.",
+  },
+  halyard_stt_failing: {
+    means: "Audio from live calls is failing to turn into text, so parts of conversations are missing from the transcript. The browser keeps unsent audio and retries.",
+    check: "SAIL, Halyard: the failure share and the count. SAIL, Platform keys: the Qwen key on the standard lane (speech is not served on the plan lane). Vercel function logs for the utterances route.",
+    fix: "Fix the key or the provider (the transcription service rejecting credentials is the usual cause). People with a call open will see their audio waiting and sent when it works again; calls that already ended cannot be re-transcribed because audio is never stored.",
+  },
   smoke_failed: {
     means: "The automatic check that runs after each deploy found a problem: a public page did not load, the database or the migrations were not as the code expects, or a deep check failed. The deploy is live, so customers may be affected.",
     check: "The failures named in this alert. The GitHub Actions run called Post-deploy smoke has the full log. `/api/health` shows the database and migration state; Vercel's function logs show the failing route.",

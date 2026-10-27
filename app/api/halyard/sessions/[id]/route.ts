@@ -22,10 +22,11 @@ export async function GET(req: NextRequest, { params }: P) {
       suggestions: sug.map((r) => ({ id: r.id, action: r.action, at: r.requested_at, ms: r.total_ms, text: decryptSecret(r.text_enc), used: r.used, rating: r.rating })) })
   } catch (e) { return halyardFailure(e) }
 }
-/** { state: "paused" | "live" } */
+/** { state: "paused" | "live" } or { informed: true } (the person has told the other participants). */
 export async function PATCH(req: NextRequest, { params }: P) {
   try {
     const { session } = await sessionContext((await params).id), b = await req.json()
+    if (b?.informed === true && b?.state === undefined) { await sql`UPDATE halyard_sessions SET participants_informed = true WHERE id = ${session.id}`; return NextResponse.json({ session: publicSession({ ...session, participants_informed: true }) }) }
     if (b?.state !== "paused" && b?.state !== "live") return NextResponse.json({ error: "state must be paused or live." }, { status: 400 })
     return NextResponse.json({ session: publicSession(await setState(session, b.state)) })
   } catch (e) { return halyardFailure(e) }

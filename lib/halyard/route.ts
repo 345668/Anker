@@ -32,5 +32,5 @@ export function halyardFailure(e: unknown) {
 }
 export const publicSession = (s: SessionRow) => ({
   id: s.id, mode: s.mode, title: s.title, language: s.language, state: s.state, source: s.source, startedAt: s.started_at, endedAt: s.ended_at,
-  stt: s.stt, audioSeconds: s.audio_seconds, chars: s.chars, callId: s.call_id, crmEntryId: s.crm_entry_id,
+  stt: s.stt, participantsInformed: s.participants_informed, consentAttestedAt: s.consent_attested_at, audioSeconds: s.audio_seconds, chars: s.chars, callId: s.call_id, crmEntryId: s.crm_entry_id,
 })

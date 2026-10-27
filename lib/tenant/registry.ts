@@ -149,6 +149,8 @@ export const RULES: Rule[] = [
   { scope: O, table: "halyard_sessions", where: "org_id::text = $1" },
   { scope: O, table: "halyard_prep", where: "org_id::text = $1", secret: ["context_enc"] },
   { scope: O, table: "halyard_settings", where: "org_id::text = $1" },
+  // Upload attempts: counts and timings only, no content; they go with the workspace.
+  { scope: O, table: "halyard_uploads", where: "org_id::text = $1" },
   { scope: O, table: "investor_updates", where: "org_id::text = $1" },
   { scope: O, table: "private_artifacts", where: "org_id::text = $1" },
   { scope: O, table: "document_extractions", where: "org_id::text = $1" },

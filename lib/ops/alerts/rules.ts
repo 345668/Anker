@@ -6,8 +6,8 @@ import { CRON_MAX_AGE_MIN, type DepCheck } from "@/lib/ops/dependencies"
 
 export type Severity = 1 | 2 | 3
 export interface Finding { rule: RuleKey; subject: string; severity: Severity; summary: string; evidence: Record<string, unknown> }
-export type RuleKey = "cron_stale" | "cron_stuck" | "cron_failing" | "dependency_down" | "dependency_degraded" | "ai_failure_rate" | "privacy_request_due" | "telegram_queue" | "cost_coverage" | "unpriced_model" | "workspace_at_limit" | "schema_behind" | "smoke_failed" | "alerter_stale"
-export const RULE_KEYS: RuleKey[] = ["cron_stale", "cron_stuck", "cron_failing", "dependency_down", "dependency_degraded", "ai_failure_rate", "privacy_request_due", "telegram_queue", "cost_coverage", "unpriced_model", "workspace_at_limit", "schema_behind", "smoke_failed", "alerter_stale"]
+export type RuleKey = "cron_stale" | "cron_stuck" | "cron_failing" | "dependency_down" | "dependency_degraded" | "ai_failure_rate" | "privacy_request_due" | "telegram_queue" | "cost_coverage" | "unpriced_model" | "workspace_at_limit" | "schema_behind" | "smoke_failed" | "halyard_latency" | "halyard_stt_failing" | "alerter_stale"
+export const RULE_KEYS: RuleKey[] = ["cron_stale", "cron_stuck", "cron_failing", "dependency_down", "dependency_degraded", "ai_failure_rate", "privacy_request_due", "telegram_queue", "cost_coverage", "unpriced_model", "workspace_at_limit", "schema_behind", "smoke_failed", "halyard_latency", "halyard_stt_failing", "alerter_stale"]
 /** What each rule is for, shown on the SAIL rules page. */
 export const RULE_INFO: Record<RuleKey, { label: string; text: string; defaultSeverity: Severity }> = {
   cron_stale: { label: "A scheduled job has stopped", text: "A job has not completed successfully for twice its interval.", defaultSeverity: 2 },
@@ -23,6 +23,8 @@ export const RULE_INFO: Record<RuleKey, { label: string; text: string; defaultSe
   workspace_at_limit: { label: "A workspace has used its AI allowance", text: "A workspace passed 100% of its monthly AI allowance in the last day. Its AI features are paused until the month resets or you raise the limit. Digest only.", defaultSeverity: 3 },
   schema_behind: { label: "The database is behind the deployed code", text: "The running version expects database migrations that have not been applied. Features that use them are broken until they are.", defaultSeverity: 2 },
   smoke_failed: { label: "The post-deploy check failed", text: "After the last deploy, a page or a deep check failed. The newest check in the last day did not pass; a later passing run clears this.", defaultSeverity: 2 },
+  halyard_latency: { label: "Halyard suggestions are slow", text: "Over the last 15 minutes, with at least 20 suggestions, the slowest 5% took longer than 4 seconds. People on a live call are waiting too long.", defaultSeverity: 3 },
+  halyard_stt_failing: { label: "Halyard transcription is failing", text: "More than 10% of audio uploads failed to transcribe over the last 15 minutes (with at least 10 uploads): people's words are not being captured.", defaultSeverity: 3 },
   alerter_stale: { label: "The alert evaluator has stopped", text: "No successful evaluation for 30 minutes. Raised by the watchdog.", defaultSeverity: 1 },
 }
 export interface Thresholds { ai_failure_rate?: { rate?: number; minCalls?: number; windowMin?: number } }
@@ -57,7 +59,10 @@ export interface Snapshot {
   schemaBehind?: string[]
   /** The newest post-deploy smoke run from the last day, if it failed (docs/architecture/59 R6). */
   smoke?: { sha: string | null; failures: string[] }
+  /** The last 15 minutes of Halyard: counts and timings only, never content (docs/architecture/62 section 15). */
+  halyard?: { suggestions: number; p95Ms: number | null; uploads: number; failed: number }
 }
+export const HALYARD_LIMITS = { p95Ms: 4000, minSuggestions: 20, failRate: 0.1, minUploads: 10 }
 
 const min = (ms: number) => Math.round(ms / 60000)
 
@@ -168,7 +173,18 @@ export function smokeFailed(s: Snapshot): Finding[] {
   return [{ rule: "smoke_failed", subject: "post-deploy-smoke", severity: 2, summary: `The check after the last deploy${m.sha ? ` (${m.sha.slice(0, 7)})` : ""} failed: ${m.failures.slice(0, 3).join("; ")}${m.failures.length > 3 ? "; …" : ""}.`, evidence: { commit: m.sha, failures: m.failures.slice(0, 10) } }]
 }
 
+export function halyardLatency(s: Snapshot): Finding[] {
+  const h = s.halyard
+  if (!h || h.suggestions < HALYARD_LIMITS.minSuggestions || h.p95Ms === null || h.p95Ms <= HALYARD_LIMITS.p95Ms) return []
+  return [{ rule: "halyard_latency", subject: "halyard-latency", severity: 3, summary: `Halyard: the slowest 5% of suggestions took ${(h.p95Ms / 1000).toFixed(1)} s over the last 15 minutes (${h.suggestions} suggestions).`, evidence: { p95Seconds: Math.round(h.p95Ms / 100) / 10, suggestions: h.suggestions } }]
+}
+export function halyardSttFailing(s: Snapshot): Finding[] {
+  const h = s.halyard
+  if (!h || h.uploads < HALYARD_LIMITS.minUploads || h.failed / h.uploads <= HALYARD_LIMITS.failRate) return []
+  return [{ rule: "halyard_stt_failing", subject: "halyard-stt", severity: 3, summary: `Halyard: ${h.failed} of ${h.uploads} audio uploads failed to transcribe in the last 15 minutes (${Math.round((100 * h.failed) / h.uploads)}%).`, evidence: { failed: h.failed, uploads: h.uploads } }]
+}
+
 export function evaluate(s: Snapshot, t: Thresholds = {}): Finding[] {
   const stuck = cronStuck(s)
-  return [...stuck, ...cronStale(s, new Set(stuck.map((f) => f.subject))), ...cronFailing(s), ...dependencyDown(s), ...dependencyDegraded(s), ...aiFailureRate(s, t), ...privacyRequestDue(s), ...telegramQueue(s), ...costCoverage(s), ...unpricedModel(s), ...workspaceAtLimit(s), ...schemaBehind(s), ...smokeFailed(s)]
+  return [...stuck, ...cronStale(s, new Set(stuck.map((f) => f.subject))), ...cronFailing(s), ...dependencyDown(s), ...dependencyDegraded(s), ...aiFailureRate(s, t), ...privacyRequestDue(s), ...telegramQueue(s), ...costCoverage(s), ...unpricedModel(s), ...workspaceAtLimit(s), ...schemaBehind(s), ...smokeFailed(s), ...halyardLatency(s), ...halyardSttFailing(s)]
 }

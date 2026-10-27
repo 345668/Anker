@@ -1,7 +1,8 @@
 import "server-only"
 import { transcribeAudio } from "@/lib/assistant/transcribe"
 import { assertCan } from "@/lib/metering/allowance"
-import { addSegment, HalyardError, type SessionRow } from "./sessions"
+import { sql } from "@/lib/db"
+import { addSegment, assertOn, HalyardError, type SessionRow } from "./sessions"
 
 /** One uploaded utterance (docs/architecture/62 sections 7 and 11): at most 1 MB, WAV/WebM/Ogg/MP3/M4A, at most six a second per session. */
 export const MAX_UTTERANCE_BYTES = 1_000_000
@@ -30,6 +31,7 @@ export type UtteranceResult = { stored: true; text: string } | { stored: false; 
  */
 export async function ingestUtterance(s: SessionRow, u: UtteranceInput, transcribe: Transcribe = defaultTranscribe, now = Date.now()): Promise<UtteranceResult> {
   if (s.state !== "live") throw new HalyardError(s.state === "paused" ? "The session is paused." : "That session has ended.", 409, s.state)
+  await assertOn(s.org_id)
   if (!rateOk(s.id, now)) throw new HalyardError("Too many audio uploads at once. Slow down.", 429, "rate")
   const ext = EXT[u.mime.split(";")[0].trim().toLowerCase()]
   if (!ext) throw new HalyardError("Unsupported audio format.", 415, "bad_audio")
@@ -42,8 +44,10 @@ export async function ingestUtterance(s: SessionRow, u: UtteranceInput, transcri
   if (seen) return { stored: false, reason: "duplicate_seq" }
   await assertCan(s.org_id, "speech_in", seconds).catch((e) => { throw new HalyardError(e.message, 402, "allowance") })
   let text: string
-  try { text = await transcribe(u.bytes, `u.${ext}`, { owner: s.org_id, seconds, source: "halyard" }) } catch (e: any) {
-    if (e?.status === 422) return { stored: false, reason: "no_speech" }
+  const t0 = Date.now(), log = (ok: boolean, reason: string | null) => sql`INSERT INTO halyard_uploads (org_id, ok, reason, ms) VALUES (${s.org_id}, ${ok}, ${reason}, ${Date.now() - t0})`.catch(() => {})
+  try { text = await transcribe(u.bytes, `u.${ext}`, { owner: s.org_id, seconds, source: "halyard" }); await log(true, null) } catch (e: any) {
+    if (e?.status === 422) { await log(true, "no_speech"); return { stored: false, reason: "no_speech" } }
+    await log(false, `http_${e?.status ?? "error"}`)
     throw new HalyardError(e?.status && e.status < 500 ? String(e.message) : "Transcription is not available just now. Your audio is kept on this device and retried.", e?.status === 413 ? 413 : 503, "asr")
   }
   const r = await addSegment(s, { seq: u.seq, channel: u.channel, text, startedMs: u.startedMs, endedMs: u.endedMs, audioSeconds: seconds })

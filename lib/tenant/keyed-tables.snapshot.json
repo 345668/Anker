@@ -150,6 +150,7 @@
     "halyard_sessions",
     "halyard_settings",
     "halyard_suggestions",
+    "halyard_uploads",
     "halyard_viewers",
     "ic_memos",
     "ic_votes",
@@ -557,6 +558,9 @@
       "org_id"
     ],
     "halyard_settings": [
+      "org_id"
+    ],
+    "halyard_uploads": [
       "org_id"
     ],
     "impersonation_grants": [

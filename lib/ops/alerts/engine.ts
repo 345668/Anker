@@ -80,6 +80,11 @@ export async function gatherMore(snap: Snapshot, thresholds: Thresholds): Promis
     const [m] = (await sql`SELECT ok, sha, failures FROM smoke_runs WHERE created_at > now() - interval '24 hours' ORDER BY id DESC LIMIT 1`) as any[]
     if (m && !m.ok) snap.smoke = { sha: m.sha ?? null, failures: (Array.isArray(m.failures) ? m.failures : []).map((f: any) => `${f.name}: ${f.error ?? 'failed'}`) }
   } catch { /* the smoke table is not there yet */ }
+  try {
+    const [h] = (await sql`SELECT count(*)::int AS n, percentile_cont(0.95) WITHIN GROUP (ORDER BY total_ms) AS p95 FROM halyard_suggestions WHERE requested_at > now() - interval '15 minutes' AND total_ms IS NOT NULL`) as any[]
+    const [u] = (await sql`SELECT count(*)::int AS n, count(*) FILTER (WHERE NOT ok)::int AS failed FROM halyard_uploads WHERE created_at > now() - interval '15 minutes'`) as any[]
+    snap.halyard = { suggestions: Number(h?.n ?? 0), p95Ms: h?.p95 == null ? null : Number(h.p95), uploads: Number(u?.n ?? 0), failed: Number(u?.failed ?? 0) }
+  } catch { /* Halyard's tables are not there yet */ }
   try { snap.schemaBehind = (await schemaBehind(true)).slice(0, 50) } catch { /* the ledger could not be read: no finding either way */ }
   try {
     const [c] = (await sql`SELECT count(*) FILTER (WHERE cost_state IN ('exact', 'estimated'))::int AS costed, count(*) FILTER (WHERE cost_state = 'unpriced')::int AS unpriced FROM ai_calls WHERE created_at > now() - interval '24 hours'`) as any[]

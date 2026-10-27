@@ -50,6 +50,7 @@ beforeAll(async () => {
       generated_by text, outreach_message_id text, analyzed_at timestamptz, analysis_error text, deleted_at timestamptz, updated_at timestamptz DEFAULT now());
     CREATE UNIQUE INDEX ON investor_calls(user_id, org_id, external_id) WHERE external_id IS NOT NULL;`)
   await db.exec(readFileSync("scripts/migrations/2026-10-27-halyard-sessions.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-28-halyard-governance.sql", "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => { st.allowance = null; await db.exec("DELETE FROM halyard_sessions; DELETE FROM investor_calls; DELETE FROM crm_entries; DELETE FROM halyard_prep; DELETE FROM outreach_messages; DELETE FROM memberships; DELETE FROM profiles") })

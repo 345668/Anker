@@ -180,6 +180,7 @@
     "2026-10-21-investor-legal.sql",
     "2026-10-23-investor-passport-flag.sql",
     "2026-10-27-halyard-sessions.sql",
+    "2026-10-28-halyard-governance.sql",
     "2026_06_02_email_oauth_accounts.sql"
   ]
 }

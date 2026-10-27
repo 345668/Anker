@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { telegramQueue, evaluate, cronStale, cronStuck, cronFailing, dependencyDown, dependencyDegraded, aiFailureRate, privacyRequestDue, alerterStale, SEV1_JOBS, RULE_KEYS, RULE_INFO, type Snapshot } from "./rules"
+import { halyardLatency, halyardSttFailing, telegramQueue, evaluate, cronStale, cronStuck, cronFailing, dependencyDown, dependencyDegraded, aiFailureRate, privacyRequestDue, alerterStale, SEV1_JOBS, RULE_KEYS, RULE_INFO, type Snapshot } from "./rules"
 import { RUNBOOKS } from "./runbooks"
 import { CRON_MAX_AGE_MIN } from "@/lib/ops/dependencies"
 
@@ -122,4 +122,17 @@ describe("schema_behind (docs/architecture/59)", () => {
     expect(f).toHaveLength(1); expect(f[0]).toMatchObject({ rule: "schema_behind", severity: 2, evidence: { count: 2 } }); expect(f[0].summary).toContain("2026-10-17-a.sql")
     expect(schemaBehindRule({ ...base, schemaBehind: [] })).toEqual([]); expect(schemaBehindRule(base)).toEqual([])
   })
+})
+
+describe("Halyard rules (docs/architecture/62 section 15)", () => {
+  const snap = (h: any) => ({ now: 0, latest: {}, lastOk: {}, recent: {}, deps: [], halyard: h }) as any
+  it("latency: p95 above 4 s with at least 20 suggestions, severity 3, facts only", () => {
+    expect(halyardLatency(snap({ suggestions: 20, p95Ms: 4500, uploads: 0, failed: 0 }))).toMatchObject([{ rule: "halyard_latency", severity: 3, evidence: { p95Seconds: 4.5, suggestions: 20 } }])
+    expect(halyardLatency(snap({ suggestions: 19, p95Ms: 9000, uploads: 0, failed: 0 }))).toEqual([]); expect(halyardLatency(snap({ suggestions: 50, p95Ms: 4000, uploads: 0, failed: 0 }))).toEqual([]); expect(halyardLatency(snap({ suggestions: 50, p95Ms: null, uploads: 0, failed: 0 }))).toEqual([]); expect(halyardLatency({ now: 0 } as any)).toEqual([])
+  })
+  it("transcription: more than 10% of at least 10 uploads failing, severity 3", () => {
+    expect(halyardSttFailing(snap({ suggestions: 0, p95Ms: null, uploads: 20, failed: 3 }))).toMatchObject([{ rule: "halyard_stt_failing", severity: 3, evidence: { failed: 3, uploads: 20 } }])
+    expect(halyardSttFailing(snap({ suggestions: 0, p95Ms: null, uploads: 20, failed: 2 }))).toEqual([]); expect(halyardSttFailing(snap({ suggestions: 0, p95Ms: null, uploads: 9, failed: 9 }))).toEqual([])
+  })
+  it("both are part of the evaluation", () => { expect(evaluate(snap({ suggestions: 30, p95Ms: 6000, uploads: 30, failed: 30 })).map((f) => f.rule)).toEqual(expect.arrayContaining(["halyard_latency", "halyard_stt_failing"])) })
 })

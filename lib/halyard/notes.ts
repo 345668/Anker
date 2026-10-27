@@ -4,7 +4,7 @@ import { encryptSecret, decryptSecret } from "@/lib/db/secrets"
 import { assertCan } from "@/lib/metering/allowance"
 import { generateDetailed } from "@/lib/ai/provider"
 import { extractNoteFigures, generateNotes, generateEmail, splitTranscript, mergeLists, NoteGenerationError, type ModelFn, type Notes } from "./core"
-import { HalyardError, listTurns, type SessionRow } from "./sessions"
+import { HalyardError, assertOn, listTurns, type SessionRow } from "./sessions"
 import { skillFor, prepFor } from "./brain"
 
 /** Notes and the drafts (docs/architecture/62 section 9). Notes are versioned rows; a person's edit is never overwritten by a later AI draft: the draft is returned beside it. */
@@ -67,6 +67,7 @@ export type DraftResult = { saved: true; notes: StoredNotes } | { saved: false; 
  * beside the current version for them to compare and apply.
  */
 export async function draftNotes(s: SessionRow, model: ModelFn = defaultNotesModel, onProgress?: (p: number, of: number) => void): Promise<DraftResult> {
+  await assertOn(s.org_id)
   const transcript = await compileTranscript(s.id)
   if (!transcript.trim()) throw new HalyardError("There is no transcript to draft notes from yet.", 422, "no_transcript")
   await assertCan(s.org_id, "chat", splitTranscript(transcript).length + 1).catch((e) => { throw new HalyardError(e.message, 402, "allowance") })
@@ -78,6 +79,7 @@ export async function draftNotes(s: SessionRow, model: ModelFn = defaultNotesMod
 }
 /** A follow-up email from the saved notes only. It is a draft: sending is a person's act under the existing send rules. */
 export async function draftEmailFromNotes(s: SessionRow, model: ModelFn = defaultNotesModel): Promise<StoredNotes> {
+  await assertOn(s.org_id)
   const cur = await latestNotes(s.id)
   if (!cur || !(cur.body.summary || cur.body.keyPoints.length || cur.body.decisions.length || cur.body.actionItems.length || cur.body.followUp.length)) throw new HalyardError("Write or draft the notes first; the email is written from them.", 422, "no_notes")
   await assertCan(s.org_id, "chat").catch((e) => { throw new HalyardError(e.message, 402, "allowance") })
@@ -95,6 +97,7 @@ export type LiveResult = { updated: true; notes: StoredNotes } | { updated: fals
  */
 export async function refreshLiveNotes(s: SessionRow, model: ModelFn = defaultNotesModel, now = Date.now()): Promise<LiveResult> {
   if (s.state !== "live") return { updated: false, reason: "not_live" }
+  await assertOn(s.org_id)
   const cur = await latestNotes(s.id)
   if (cur?.by === "user") return { updated: false, reason: "edited" }
   if (cur && now - new Date(cur.createdAt).getTime() < LIVE_MIN_INTERVAL_MS) return { updated: false, reason: "too_soon" }
