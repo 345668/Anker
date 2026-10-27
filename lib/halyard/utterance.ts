@@ -22,7 +22,7 @@ function rateOk(sessionId: string, now: number): boolean {
 export const _resetRate = () => recent.clear()
 
 export interface UtteranceInput { seq: number; channel: "you" | "them" | "room"; startedMs: number; endedMs: number; bytes: Buffer; mime: string; language?: string }
-export type UtteranceResult = { stored: true; text: string } | { stored: false; reason: "duplicate_seq" | "repeat" | "empty" | "no_speech" }
+export type UtteranceResult = { stored: true; text: string } | { stored: false; reason: "duplicate_seq" | "repeat" | "empty" | "no_speech" | "echo" }
 
 /**
  * Transcribes and stores one utterance. A repeated seq is answered without transcribing again (no second cost); a stretch with no recognisable speech (the voice detector

@@ -211,3 +211,22 @@ describe("utterance upload", () => {
     expect(log[0]).toContain("single-microphone recording"); expect(log[0]).toContain("Them: Our price is two million dollars a year.")
   })
 })
+
+describe("two channels and echo", () => {
+  it("drops a you-utterance that is the speakers' copy of a them-utterance that just ended, and keeps a real reply, a short answer and a late repeat", async () => {
+    const s = await start()
+    const them = "Our enterprise pipeline is five LOIs worth two point five million dollars annual contract value"
+    expect(await addSegment(s, { seq: 0, channel: "them", text: them, startedMs: 0, endedMs: 6000 })).toEqual({ stored: true })
+    expect(await addSegment(s, { seq: 1, channel: "you", text: "enterprise pipeline is five LOIs worth two point five million dollars annual contract", startedMs: 6200, endedMs: 11000 })).toEqual({ stored: false, reason: "echo" })
+    expect(await addSegment(s, { seq: 2, channel: "you", text: "That sounds strong, when do the first two convert?", startedMs: 12000, endedMs: 15000 })).toEqual({ stored: true })
+    expect(await addSegment(s, { seq: 3, channel: "you", text: "yes that is right", startedMs: 16000, endedMs: 17000 })).toEqual({ stored: true })
+    expect(await addSegment(s, { seq: 4, channel: "you", text: "Our enterprise pipeline is five LOIs worth two point five million dollars annual contract value", startedMs: 60000, endedMs: 66000 })).toEqual({ stored: true })   // outside the window: a person repeating them is real
+    expect((await listTurns(s.id)).map((t) => t.channel)).toEqual(["them", "you", "you", "you"])
+  })
+  it("a them-utterance is never treated as echo, and the room channel is not filtered", async () => {
+    const s = await start(), t = "Our enterprise pipeline is five LOIs worth two point five million dollars annual contract value"
+    await addSegment(s, { seq: 0, channel: "you", text: t, startedMs: 0, endedMs: 5000 })
+    expect((await addSegment(s, { seq: 1, channel: "them", text: t, startedMs: 5100, endedMs: 9000 })).stored).toBe(true)
+    expect((await addSegment(s, { seq: 2, channel: "room", text: t.replace("Our", "The"), startedMs: 9100, endedMs: 12000 })).stored).toBe(true)
+  })
+})

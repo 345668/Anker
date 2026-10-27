@@ -4,7 +4,7 @@ import { encryptSecret, decryptSecret } from "@/lib/db/secrets"
 import { isFlagOn, getEffective, limitOf } from "@/lib/entitlements"
 import { assertCan } from "@/lib/metering/allowance"
 import { assertProviderAllowed } from "@/lib/ai/data-policy"
-import { createRepeatFilter, type Turn } from "./core"
+import { createRepeatFilter, createEchoFilter, type Turn } from "./core"
 
 /** Halyard sessions (docs/architecture/62 sections 10, 11, 13, 14). Text is encrypted by the application; audio is never stored. */
 export class HalyardError extends Error {
@@ -84,7 +84,7 @@ const expired = (s: SessionRow, now: number) => now - new Date(s.started_at).get
 export interface SegmentInput { seq: number; channel: "you" | "them" | "room"; text: string; startedMs?: number; endedMs?: number; confidence?: number; audioSeconds?: number }
 
 /** Stores one segment. Idempotent on seq; near-duplicates of overlapping utterances are dropped; the session's size and length caps hold. */
-export async function addSegment(s: SessionRow, g: SegmentInput, now = Date.now()): Promise<{ stored: boolean; reason?: "duplicate_seq" | "repeat" | "empty" }> {
+export async function addSegment(s: SessionRow, g: SegmentInput, now = Date.now()): Promise<{ stored: boolean; reason?: "duplicate_seq" | "repeat" | "empty" | "echo" }> {
   if (s.state !== "live") throw new HalyardError(s.state === "paused" ? "The session is paused." : "That session has ended.", 409, s.state)
   if (expired(s, now)) throw new HalyardError("A session lasts at most four hours. Start a new one.", 409, "too_long")
   if (!Number.isInteger(g.seq) || g.seq < 0) throw new HalyardError("Segment numbers are whole numbers from 0.", 400, "bad_seq")
@@ -98,6 +98,14 @@ export async function addSegment(s: SessionRow, g: SegmentInput, now = Date.now(
   const recent = (await sql`SELECT channel, text_enc, started_ms FROM halyard_segments WHERE session_id = ${s.id} ORDER BY seq DESC LIMIT 6`) as any[]
   for (const r of recent.reverse()) filter.isRepeat(r.channel, decryptSecret(r.text_enc) ?? "", r.started_ms ?? 0)
   if (filter.isRepeat(g.channel, text, g.startedMs ?? 0)) return { stored: false, reason: "repeat" }
+  // Without headphones the microphone hears the other side. A "you" utterance whose words are a degraded copy of a "them" utterance that just ended is that echo (the desktop's
+  // echo-filter, run on text). The channels upload in order, so the "them" turn is stored before its echo arrives.
+  if (g.channel === "you") {
+    const echo = createEchoFilter()
+    const them = (await sql`SELECT text_enc, started_ms, ended_ms FROM halyard_segments WHERE session_id = ${s.id} AND channel = 'them' ORDER BY seq DESC LIMIT 12`) as any[]
+    for (const r of them.reverse()) echo.noteRemote(decryptSecret(r.text_enc) ?? "", r.ended_ms ?? r.started_ms ?? 0)
+    if (echo.isEcho(text, g.startedMs ?? 0)) return { stored: false, reason: "echo" }
+  }
   const inserted = (await sql`INSERT INTO halyard_segments (session_id, seq, channel, started_ms, ended_ms, text_enc, confidence)
     VALUES (${s.id}, ${g.seq}, ${g.channel}, ${g.startedMs ?? null}, ${g.endedMs ?? null}, ${encryptSecret(text)}, ${g.confidence ?? null})
     ON CONFLICT (session_id, seq) DO NOTHING RETURNING seq`) as any[]
