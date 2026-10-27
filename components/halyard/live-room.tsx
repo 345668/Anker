@@ -78,6 +78,16 @@ export function LiveRoom({ id }: { id: string }) {
     document.addEventListener("visibilitychange", again); return () => document.removeEventListener("visibilitychange", again)
   }, [listening])
   useEffect(() => () => { mic.current?.stop(); tab.current?.stop(); queue.current?.stop(); wake.current?.release?.().catch?.(() => {}) }, [])
+  // Follow along: a colleague (or the owner on a second device) sees the live turns and notes. The stream is short-lived on purpose; the browser reconnects with the last turn it saw.
+  useEffect(() => {
+    if (!viewer || (state !== "live" && state !== "paused")) return
+    const es = new EventSource(`/api/halyard/sessions/${id}/stream?after=${seq.current - 1}`)
+    es.addEventListener("turn", (e) => { const t = JSON.parse((e as MessageEvent).data); setTurns((cur) => (cur.some((x) => x.seq === t.seq) ? cur : [...cur, t])) })
+    es.addEventListener("notes", (e) => setNotes(JSON.parse((e as MessageEvent).data)))
+    es.addEventListener("state", (e) => { const d = JSON.parse((e as MessageEvent).data); if (d.state === "ended" || d.state === "abandoned" || d.state === "deleted") { setState(d.state === "deleted" ? "error" : d.state); es.close() } else setState(d.state) })
+    es.addEventListener("revoked", () => { es.close(); setNotice("The owner stopped sharing this call."); setState("error") })
+    return () => es.close()
+  }, [viewer, state, id])
   useEffect(() => { if (!win) return; const gone = () => setWin(null); win.addEventListener("pagehide", gone); return () => win.removeEventListener("pagehide", gone) }, [win])
 
   const events = (channelOf: () => "you" | "them" | "room", onEnded: (m: string) => void) => ({
@@ -143,9 +153,9 @@ export function LiveRoom({ id }: { id: string }) {
   const live = state === "live" && !viewer
   if (viewer) return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8 space-y-4">
-      <header className="border-b border-border pb-4"><p className="text-xs uppercase tracking-widest text-muted-foreground">Halyard · shared with you by {viewer}</p><h1 className="text-2xl">{title || "Call"}</h1><p className="mt-1 text-xs text-muted-foreground">You can read this call and its notes. You cannot change anything, and it may be withdrawn at any time.</p></header>
+      <header className="border-b border-border pb-4"><p className="text-xs uppercase tracking-widest text-muted-foreground">Halyard · shared with you by {viewer}{state === "live" || state === "paused" ? <span className="ml-2 inline-flex items-center gap-1 text-foreground"><span className="inline-block h-2 w-2 rounded-full bg-red-500" aria-hidden />Following live</span> : null}</p><h1 className="text-2xl">{title || "Call"}</h1><p className="mt-1 text-xs text-muted-foreground">You can read this call and its notes. You cannot change anything, and it may be withdrawn at any time.</p></header>
       <section aria-labelledby="tr" className="rounded-md border border-border"><h2 id="tr" className="border-b border-border px-3 py-2 text-sm font-medium">Transcript</h2>
-        <ol className="max-h-[55vh] space-y-2 overflow-y-auto p-3 text-sm">{turns.length === 0 ? <li className="text-muted-foreground">No transcript.</li> : turns.map((t) => <li key={t.seq}>{LABEL[t.channel] ? <strong className="mr-1">{LABEL[t.channel]}:</strong> : null}{t.text}</li>)}</ol></section>
+        <ol className="max-h-[55vh] space-y-2 overflow-y-auto p-3 text-sm" aria-live="polite">{turns.length === 0 ? <li className="text-muted-foreground">{state === "live" ? "Waiting for the first words…" : "No transcript."}</li> : turns.map((t) => <li key={t.seq}>{LABEL[t.channel] ? <strong className="mr-1">{LABEL[t.channel]}:</strong> : null}{t.text}</li>)}</ol></section>
       <NotesPanel id={id} initial={notes} canDraft={false} readOnly />
     </div>
   )
@@ -182,7 +192,7 @@ export function LiveRoom({ id }: { id: string }) {
         {endInfo.truncatedInCall && <p className="text-muted-foreground">The call was longer than the call library keeps, so the library holds the first part; the whole transcript is here and in the exports.</p>}
         {endInfo.warnings?.map((w: string) => <p key={w} className="text-destructive">{w}</p>)}</div>}
       {state !== "abandoned" && <NotesPanel id={id} initial={notes} canDraft={turns.length > 0 && busy !== "end"} ended={state === "ended"} />}
-      {state === "ended" && <SharePanel id={id} />}
+      {(state === "ended" || state === "live" || state === "paused") && <SharePanel id={id} />}
       <footer className="flex justify-between border-t border-border pt-3 text-xs text-muted-foreground"><span>Only suggestions are made here; nothing is sent or changed for you.</span><button className="underline" onClick={remove}>Delete this session</button></footer>
     </div>
   )

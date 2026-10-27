@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, { params }: P) {
     const turns = await listTurns(session.id, { afterSeq: Number.isFinite(after) ? after : -1, limit: 500 })
     const brief = await latestBrief(session.id), notes = await latestNotes(session.id)
     const b = brief ? { version: brief.version, text: brief.brief, figures: brief.figures } : null
-    if (role === "viewer") return NextResponse.json({ viewer: true, ownerName, session: publicSession(session), turns, brief: b, notes: notes && { ...notes, body: { ...notes.body, email: "" } }, suggestions: [] })   // read only; no suggestions, no email draft
+    if (role === "viewer") return NextResponse.json({ viewer: true, ownerName, session: publicSession(session), lastSeq: turns.length ? turns[turns.length - 1].seq : -1, turns, brief: b, notes: notes && { ...notes, body: { ...notes.body, email: "" } }, suggestions: [] })   // read only; no suggestions, no email draft
     const [{ last }] = (await sql`SELECT COALESCE(max(seq), -1)::int AS last FROM halyard_segments WHERE session_id = ${session.id}`) as any[]
     const sug = (await sql`SELECT id, action, requested_at, total_ms, text_enc, used, rating FROM halyard_suggestions WHERE session_id = ${session.id} ORDER BY requested_at`) as any[]
     return NextResponse.json({ viewer: false, session: publicSession(session), lastSeq: last, notes, turns, brief: b,

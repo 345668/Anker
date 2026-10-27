@@ -196,9 +196,10 @@ describe("saving the follow-up email as a draft", () => {
 
 describe("sharing a finished call", () => {
   const people = async () => { for (const [id, n] of [["user-1", "Owner"], ["mate", "Teammate"], ["outsider", "Outsider"]]) await db.query("INSERT INTO profiles (id, email, full_name) VALUES ($1, $2, $3)", [id, `${id}@x.test`, n]); await db.query("INSERT INTO memberships (user_id, org_id, org_role) VALUES ('user-1', $1, 'workspace_owner'), ('mate', $1, 'member'), ('outsider', 'other-org', 'member')", [ORG]) }
-  it("only an ended call, only a member of the workspace, read-only, withdrawable, and gone when the person leaves", async () => {
+  it("only a member of the workspace, read-only, withdrawable, and gone when the person leaves", async () => {
     await people(); const s = await start(); await fill(s, 10)
-    await expect(shareSession(s, "mate")).rejects.toMatchObject({ code: "not_ended" })
+    await shareSession(s, "mate")                       // a live call can be shared too: the colleague follows along
+    expect((await viewableSession(s.id, ORG, "mate")).role).toBe("viewer"); await unshareSession(s, "mate")
     const ended = await endSession(s)
     await expect(shareSession(ended, "outsider")).rejects.toMatchObject({ code: "not_member" }); await expect(shareSession(ended, USER)).rejects.toMatchObject({ code: "bad_target" })
     expect((await listMembers(ORG, USER)).map((m) => m.userId)).toEqual(["mate"])

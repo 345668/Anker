@@ -3,13 +3,32 @@ import { NextResponse } from "next/server"
 import { requireWorkspace, workspaceError } from "@/lib/auth/workspace-context"
 import { resolveAiPrincipal } from "@/lib/assistant/principal"
 import { withAiContext } from "@/lib/assistant/context"
+import { headers } from "next/headers"
+import { authenticateDevice } from "@/lib/calls/devices"
+import { CallError } from "@/lib/calls/access"
 import { HalyardError, ownedSession, type SessionRow } from "./sessions"
 import { viewableSession } from "./sharing"
 
-/** The signed-in person in their active workspace. Halyard is for people who work in a workspace, not for investors or LPs outside one. */
-export async function halyardContext(write = true) {
+/**
+ * Who is calling: a signed-in person in their active workspace, or a paired desktop app presenting its device key (`Authorization: Bearer anker_call_...`, the same credential the call
+ * sync uses; membership is checked on every request, and a revoked or expired key stops working at once). A device acts as its owner in the workspace it was paired with, on the person's
+ * own sessions only; it cannot change workspace settings (the role is reported as a plain member) or share a call.
+ */
+export async function halyardWho(write = true) {
+  const auth = (await headers()).get("authorization")
+  if (auth && /^Bearer anker_call_/.test(auth)) {
+    try {
+      const d = await authenticateDevice(auth)
+      return { userId: d.userId, orgId: d.orgId, persona: d.persona as string, name: d.workspace, role: "member", via: "device" as const, deviceId: d.deviceId ?? null }
+    } catch (e) { if (e instanceof CallError) throw new HalyardError(e.message, e.status, "device"); throw e }
+  }
   const s = await requireWorkspace(write)
-  return { userId: s.userId, orgId: s.orgId, persona: s.persona }
+  return { userId: s.userId, orgId: s.orgId, persona: s.persona as string, name: s.name, role: String(s.role), via: "browser" as const, deviceId: null }
+}
+/** The person in their workspace (browser or paired desktop). */
+export async function halyardContext(write = true) {
+  const w = await halyardWho(write)
+  return { userId: w.userId, orgId: w.orgId, persona: w.persona, via: w.via, deviceId: w.deviceId }
 }
 export async function sessionContext(id: string) {
   const c = await halyardContext(), s = await ownedSession(id, c.orgId, c.userId)

@@ -31,7 +31,7 @@ export async function finishSession(s: SessionRow, scope: CallScope, deps: Finis
     try {
       const inCall = transcript.length > MAX_TRANSCRIPT ? transcript.slice(0, MAX_TRANSCRIPT - TRUNCATION_MARKER.length) + TRUNCATION_MARKER : transcript
       res.truncatedInCall = inCall !== transcript
-      const { call } = await saveCall(scope, { title: s.title || "Halyard call", transcript: inCall, crmEntryId: s.crm_entry_id, occurredAt: new Date(s.started_at).toISOString(), externalId: s.id, consent: true }, "halyard-web")
+      const { call } = await saveCall(scope, { title: s.title || "Halyard call", transcript: inCall, crmEntryId: s.crm_entry_id, occurredAt: new Date(s.started_at).toISOString(), externalId: s.id, consent: true }, `halyard-${s.source}`)
       res.callId = call.id; res.session = { ...ended, call_id: call.id }
       await sql`UPDATE halyard_sessions SET call_id = ${call.id} WHERE id = ${s.id}`
     } catch (e: any) { warnings.push(`The call record could not be created: ${e?.message ?? "unknown error"}`) }

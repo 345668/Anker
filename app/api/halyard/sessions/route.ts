@@ -8,7 +8,8 @@ export const runtime = "nodejs"
 export async function POST(req: NextRequest) {
   try {
     const c = await halyardContext(), b = await req.json()
-    const s = await createSession({ orgId: c.orgId, userId: c.userId, mode: b?.mode, title: b?.title, language: b?.language, crmEntryId: b?.crmEntryId, consentAttested: b?.consentAttested, participantsInformed: b?.participantsInformed === true })
+    const device = c.via === "device"   // a paired desktop app: its own source, its own device, and it sends text it has already transcribed locally
+    const s = await createSession({ orgId: c.orgId, userId: c.userId, source: device ? "desktop" : "web", stt: device ? "local" : undefined, deviceId: c.deviceId, mode: b?.mode, title: b?.title, language: b?.language, crmEntryId: b?.crmEntryId, consentAttested: b?.consentAttested, participantsInformed: b?.participantsInformed === true })
     return NextResponse.json({ session: publicSession(s) }, { status: 201 })
   } catch (e) { return halyardFailure(e) }
 }

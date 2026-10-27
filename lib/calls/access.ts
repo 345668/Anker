@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { resolveActiveMembership, type Persona } from "@/lib/org/active"
 import { headers } from "next/headers"
 
-export type CallScope = { userId: string; orgId: string; persona: Persona; writable: boolean; workspace: string }
+export type CallScope = { userId: string; orgId: string; persona: Persona; writable: boolean; workspace: string; /** Set when the caller is a paired desktop device. */ deviceId?: string }
 export class CallError extends Error {
   constructor(message: string, public status = 400) { super(message) }
 }
