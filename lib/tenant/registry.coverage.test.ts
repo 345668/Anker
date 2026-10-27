@@ -8,7 +8,7 @@ import { RULES, EXCLUDED, INVESTOR_OWNED, MEDIA_WORKSPACE_WHERE } from "./regist
 import SNAPSHOT from "./keyed-tables.snapshot.json"
 
 /** Rule tables with no workspace or fund key of their own: they hang off a parent through a join in the rule. */
-const CHILD_TABLES = new Set(["deal_room_documents", "deal_room_access_grants", "deal_room_audit_events", "deal_room_milestones", "deal_room_nda_agreements", "deal_room_notes", "deal_room_questions", "pitch_deck_analyses", "deal_rooms", "lp_portal_access_log", "lp_portal_codes", "lp_portal_sessions", "lp_onboarding_details", "lp_terms_acceptances", "syndicates", "memberships", "organizations", "funds", "workspace_decks"])
+const CHILD_TABLES = new Set(["halyard_segments", "halyard_briefs", "halyard_suggestions", "halyard_notes", "halyard_viewers", "deal_room_documents", "deal_room_access_grants", "deal_room_audit_events", "deal_room_milestones", "deal_room_nda_agreements", "deal_room_notes", "deal_room_questions", "pitch_deck_analyses", "deal_rooms", "lp_portal_access_log", "lp_portal_codes", "lp_portal_sessions", "lp_onboarding_details", "lp_terms_acceptances", "syndicates", "memberships", "organizations", "funds", "workspace_decks"])
 
 const KEYS = ["org_id", "fund_id", "workspace_id", "owner_user_id"]
 const DIR = "scripts/migrations"

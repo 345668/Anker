@@ -1,5 +1,5 @@
 {
-  "takenAt": "2026-10-23",
+  "takenAt": "2026-10-27",
   "baseTables": [
     "accelerated_match_jobs",
     "action_proposals",
@@ -143,6 +143,14 @@
     "fundraising_rounds",
     "funds",
     "grant_exercises",
+    "halyard_briefs",
+    "halyard_notes",
+    "halyard_prep",
+    "halyard_segments",
+    "halyard_sessions",
+    "halyard_settings",
+    "halyard_suggestions",
+    "halyard_viewers",
     "ic_memos",
     "ic_votes",
     "impersonation_grants",
@@ -540,6 +548,15 @@
       "fund_id"
     ],
     "fundraising_rounds": [
+      "org_id"
+    ],
+    "halyard_prep": [
+      "org_id"
+    ],
+    "halyard_sessions": [
+      "org_id"
+    ],
+    "halyard_settings": [
       "org_id"
     ],
     "impersonation_grants": [

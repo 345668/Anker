@@ -128,6 +128,10 @@
     {
       "path": "/api/cron/investor-retention",
       "schedule": "40 3 * * *"
+    },
+    {
+      "path": "/api/cron/halyard-sweep",
+      "schedule": "50 3 * * *"
     }
   ]
 }

@@ -83,6 +83,7 @@ export const TASKS = [
   "agent_plan",         // Subgoal-decomposition planner (reasoning tier)
   "agent_verify",       // Numeric-claim extractor for the engine verifier
   // ─── Assistants (doc 35 #5) ───────────────────────────────────────────
+  "halyard_say", "halyard_assist", "halyard_followup", "halyard_recap", "halyard_ask", "halyard_fold", "halyard_notes", // doc 62: the live call assistant, one tag per action
   "assistant_chat",     // Founder / VC / LP assistant turns and the Anker AI chat.
                         // Its own switch: these used to ride on deep_research, a
                         // data-quality toggle, so turning the dossier off turned
@@ -120,6 +121,7 @@ export const TASK_TIER: Record<TaskTag, ModelTier> = {
   agent_plan:     "reason", // subgoal decomposition before the tool loop
   agent_verify:   "reason", // extract numeric claims for the engine oracle
 
+  halyard_say: "fast", halyard_assist: "balanced", halyard_followup: "fast", halyard_recap: "deep", halyard_ask: "balanced", halyard_fold: "fast", halyard_notes: "deep",
   assistant_chat: "deep",   // same tier the assistants always ran on, now independently switchable
 }
 
