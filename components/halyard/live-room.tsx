@@ -8,6 +8,7 @@ import { createUploadQueue } from "@/lib/halyard/client/upload-queue"
 import { indexedDbStore } from "@/lib/halyard/client/queue-store"
 import { browserFacts, checkBrowser } from "@/lib/halyard/client/browser-check"
 import { createSseParser } from "@/lib/halyard/client/sse"
+import { NotesPanel, type NotesRecord } from "./notes-panel"
 
 type Turn = { seq: number; channel: string; text: string }
 type Sug = { id: string; action: string; text: string; ms?: number }
@@ -21,6 +22,7 @@ export function LiveRoom({ id }: { id: string }) {
   const [state, setState] = useState<string>("loading"), [title, setTitle] = useState(""), [turns, setTurns] = useState<Turn[]>([]), [sugs, setSugs] = useState<Sug[]>([])
   const [listening, setListening] = useState(false), [tabOn, setTabOn] = useState(false), [speaking, setSpeaking] = useState(false), [muted, setMuted] = useState(false), [level, setLevel] = useState(0)
   const [notice, setNotice] = useState<string | null>(null), [pending, setPending] = useState(0), [retrying, setRetrying] = useState(false), [online, setOnline] = useState(true)
+  const [notes, setNotes] = useState<NotesRecord>(null), [endInfo, setEndInfo] = useState<any>(null)
   const [asking, setAsking] = useState(""), [busy, setBusy] = useState<string | null>(null), [win, setWin] = useState<Window | null>(null), [check, setCheck] = useState<ReturnType<typeof checkBrowser> | null>(null)
   const mic = useRef<Capture | null>(null), tab = useRef<Capture | null>(null), tabFlag = useRef(false), seq = useRef(0), t0 = useRef(0), wake = useRef<any>(null)
   const queue = useRef<ReturnType<typeof createUploadQueue> | null>(null), store = useRef<ReturnType<typeof indexedDbStore> | null>(null), endRef = useRef<HTMLDivElement>(null)
@@ -46,7 +48,7 @@ export function LiveRoom({ id }: { id: string }) {
   const load = useCallback(async () => {
     const r = await fetch(`/api/halyard/sessions/${id}`), d = await r.json().catch(() => ({}))
     if (!r.ok) { setNotice(d.error ?? "That session could not be opened."); setState("error"); return }
-    setState(d.session.state); setTitle(d.session.title ?? ""); setTurns(d.turns ?? []); seq.current = (d.lastSeq ?? -1) + 1
+    setState(d.session.state); setTitle(d.session.title ?? ""); setTurns(d.turns ?? []); seq.current = (d.lastSeq ?? -1) + 1; setNotes(d.notes ?? null)
     setSugs((d.suggestions ?? []).map((s: any) => ({ id: s.id, action: s.action, text: s.text, ms: s.ms })))
     if (d.session.state === "live") {   // audio an earlier page left unsent (a reload, a crash) goes up first, and new numbers continue after it
       const left = await ensureQueue().restore()
@@ -106,8 +108,9 @@ export function LiveRoom({ id }: { id: string }) {
   async function end() {
     if (!confirm("End this session? The transcript is kept for your workspace's retention period.")) return
     stopListening(); await queue.current?.flush()
-    const r = await fetch(`/api/halyard/sessions/${id}/end`, { method: "POST" })
-    if (r.ok) { await store.current?.clear(id); win?.close(); setState("ended"); router.refresh() } else setNotice("The session could not be ended. Try again.")
+    setBusy("end"); setNotice("Ending the call and writing it up. This can take a minute for a long call…")
+    const r = await fetch(`/api/halyard/sessions/${id}/end`, { method: "POST" }), d = await r.json().catch(() => ({})); setBusy(null)
+    if (r.ok) { await store.current?.clear(id); win?.close(); setState("ended"); setEndInfo(d); setNotice(null); await load() } else setNotice(d.error ?? "The session could not be ended. Try again.")
   }
   async function remove() {
     if (!confirm("Delete this session and everything in it? This cannot be undone.")) return
@@ -158,6 +161,10 @@ export function LiveRoom({ id }: { id: string }) {
         {win ? <div className="mt-4 rounded-md border border-border p-3 text-sm"><p>The suggestions and buttons are in the panel window.</p><button className={btn + " mt-2"} onClick={() => { win.close(); setWin(null) }}>Bring them back here</button></div> : panel}
       </div>
       {win && createPortal(panel, win.document.body)}
+      {endInfo && <div role="status" className="rounded-md border border-border p-3 text-sm space-y-1"><p><strong>The call is saved.</strong>{endInfo.callId ? <> It is in your <a className="underline" href="/dashboard/calls">call library</a>{endInfo.analysis ? ", analysed" : ""}.</> : null}{endInfo.proposals ? <> {endInfo.proposals} suggested change{endInfo.proposals > 1 ? "s are" : " is"} waiting for you in the <a className="underline" href="/dashboard/actions">actions inbox</a>; nothing has been changed.</> : null}</p>
+        {endInfo.truncatedInCall && <p className="text-muted-foreground">The call was longer than the call library keeps, so the library holds the first part; the whole transcript is here and in the exports.</p>}
+        {endInfo.warnings?.map((w: string) => <p key={w} className="text-destructive">{w}</p>)}</div>}
+      {state !== "abandoned" && <NotesPanel id={id} initial={notes} canDraft={turns.length > 0 && busy !== "end"} />}
       <footer className="flex justify-between border-t border-border pt-3 text-xs text-muted-foreground"><span>Only suggestions are made here; nothing is sent or changed for you.</span><button className="underline" onClick={remove}>Delete this session</button></footer>
     </div>
   )

@@ -11,6 +11,8 @@ import { extractNoteFigures } from "./note-figures"
 import { CALL_MODES } from "./prompts"
 import { parseSkillMarkdown, loadSkillFiles, bodyFor } from "./skill-files"
 import { UtteranceSegmenter } from "./utterance-segmenter"
+import { parseNotes } from "./notes"
+import * as ng from "./note-generation"
 
 /**
  * The differential test (docs/architecture/62 section 16): until the desktop adopts this package, the TypeScript port and the desktop's own JavaScript are run on the same
@@ -96,6 +98,41 @@ describe.skipIf(!present)("the TypeScript core agrees with the desktop's JavaScr
     const run = (Seg: any) => { const out: Array<[string, number]> = []; const s = new Seg({ channel: "them", onUtterance: (_c: string, b: Buffer) => out.push(["u", b.length]), onSpeechState: (_c: string, on: boolean) => out.push([on ? "start" : "end", 0]) }); for (const part of signal) for (let i = 0; i < part.length; i += 960) s.push(part.subarray(i, i + 960)); s.stop(); return out }
     const mine = run(UtteranceSegmenter), theirs = run(Theirs)
     expect(mine).toEqual(theirs); expect(mine.filter((x) => x[0] === "u").length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe.skipIf(!present)("notes and drafts agree with the desktop's JavaScript", () => {
+  const BLOBS = [
+    "Meeting Summary:\nThey closed the seed.\n\nKey Points:\n- Five LOIs\n- Five LOIs\n* 40% growth\n\nDecisions:\n1. Proceed\n\nAction Items:\n- [ ] Send deck\n- [x] Intro\n\nFollow-Up:\n- Pricing?",
+    "## Meeting Summary\nShort.\n**Key Points**:\n- a\n- b\n### Follow up\n- c", "No headings at all, just prose.", "", "   ", "Key Points:\n- only this",
+  ]
+  it("parseNotes", () => { const a = d("notes.js"); for (const b of BLOBS) expect(parseNotes(b), JSON.stringify(b.slice(0, 20))).toEqual(a.parseNotes(b)) })
+  it("splitTranscript and mergeLists", () => {
+    const a = d("note-generation.js")
+    const t = Array.from({ length: 400 }, (_, i) => `[${i}:00] ${i % 2 ? "You" : "Them"}: ${"word ".repeat(40 + (i % 9))}item ${i}.`).join("\n") + "\n" + "monologue ".repeat(9000)
+    for (const max of [500, 5000, 45000]) expect(ng.splitTranscript(t, max)).toEqual(a.splitTranscript(t, max))
+    expect(ng.splitTranscript("short call")).toEqual(a.splitTranscript("short call"))
+    const parts = [parseNotes(BLOBS[0]), parseNotes(BLOBS[1]), { summary: "x", keyPoints: ["Not recorded", "Five LOIs!"], decisions: [], actionItems: ["Send deck"], followUp: [] }]
+    expect(ng.mergeLists(parts as any)).toEqual(a.mergeLists(parts))
+  })
+  it("generateNotes sends the same prompts and returns the same notes, in one pass and in parts", async () => {
+    const a = d("note-generation.js")
+    const reply = (text: string) => (/summaries of consecutive parts/.test(text) ? "The call covered the seed round and next steps." : /part (\d+) of/.test(text) ? `Meeting Summary:\nPart ${/part (\d+) of/.exec(text)![1]} summary.\nKey Points:\n- Shared point\n- Point of part ${/part (\d+) of/.exec(text)![1]}\nDecisions:\nNot recorded\nAction Items:\n- Send deck\nFollow-Up:\n- Pricing?` : BLOBS[0])
+    for (const transcript of ["Them: we closed five million.\nYou: great.", Array.from({ length: 2000 }, (_, i) => `${i % 2 ? "You" : "Them"}: ${"sentence ".repeat(30)}${i}.`).join("\n")]) {
+      const theirs: any[] = [], mine: any[] = []
+      const llm = { ready: true, stream: async ({ system, turns, maxTokens, onToken }: any) => { theirs.push({ system, text: turns[0].text, maxTokens }); onToken(reply(turns[0].text)) } }
+      const r1 = await a.generateNotes(llm, transcript, "Call type: Sales.")
+      const r2 = await ng.generateNotes(async (q) => { mine.push(q); return reply(q.text) }, transcript, "Call type: Sales.")
+      expect(mine).toEqual(theirs); expect(r2).toEqual(r1)
+    }
+  })
+  it("generateEmail sends the same prompt", async () => {
+    const a = d("note-generation.js"); let theirs: any, mine: any
+    const note = { title: "Call", summary: "S", keyPoints: ["k"], decisions: [], actionItems: ["a"], followUp: ["f"] }
+    const r1 = await a.generateEmail({ ready: true, stream: async ({ system, turns, maxTokens, onToken }: any) => { theirs = { system, text: turns[0].text, maxTokens }; onToken("Hi there,\nThanks.") } }, note, "Call type: Sales.")
+    const r2 = await ng.generateEmail(async (q) => { mine = q; return "Hi there,\nThanks." }, note, "Call type: Sales.")
+    expect(mine).toEqual(theirs); expect(r2).toEqual(r1)
+    await expect(ng.generateEmail(async () => "x", { title: "t" })).rejects.toThrow(/notes first/)
   })
 })
 
