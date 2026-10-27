@@ -32,7 +32,8 @@ export const PARTNERS: Partner[] = [
   { slug: "winner-capital", name: "Winner Capital", group: "pilots", kind: "pilot", description: "An investment fund and design partner piloting Anker with its fund team.", url: null, checked: false, listed: true },
   { slug: "thirdworldvc", name: "ThirdWorldVC", group: "pilots", kind: "pilot", description: "A venture firm and design partner piloting Anker with its team.", url: null, checked: false, listed: true },
 
-  { slug: "decile-group", name: "Decile Group and Decile Capital", group: "programmes", kind: "partner", description: "A venture firm for emerging fund managers, with the VC Lab accelerator, Decile Hub software and the Decile Capital fund of funds.", url: "https://decilegroup.com", checked: false, listed: true },
+  { slug: "venture-institute", name: "Venture Institute", group: "programmes", kind: "partner", description: "A VC Lab programme that prepares people for careers in venture capital through study and hands-on experience.", url: null, checked: false, listed: true },
+  { slug: "vc-lab", name: "VC Lab", group: "programmes", kind: "partner", description: "A free online accelerator for new and emerging venture fund managers, from first thesis to first close.", url: "https://govclab.com", checked: false, listed: true },
   { slug: "the-residency", name: "The Residency", group: "programmes", kind: "partner", description: "A cohort-based programme where founders live and build together in houses across the Bay Area, New York, Boston and Europe.", url: "https://livetheresidency.com", checked: false, listed: true },
   { slug: "the-delta", name: "The Delta", group: "programmes", kind: "partner", description: "A venture studio and investment firm based in Berlin that builds and backs early-stage companies.", url: null, checked: false, listed: true },
   { slug: "makershome", name: "Makershome", group: "programmes", kind: "partner", description: null, url: null, checked: false, listed: true },

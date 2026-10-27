@@ -4,7 +4,7 @@ Status: **spec and first build, 2026-10-26.** The founder asked for the partners
 
 ## 1. What goes on the site
 - **A "Partners" section on the homepage** (names only, grouped, linking to the full page) and a **`/partners` page** with one card per partner: name, one-sentence description, an optional link to the partner's own site. Linked from the footer (Company column) and from the About page.
-- **Groups** (the order they are shown): *Design partners and pilots* (Summit Venture Studio, Winner Capital, ThirdWorldVC); *Programmes and communities* (Decile Group and Decile Capital, The Residency, The Delta, Makershome, Pioneerclub, TBDC); *Public programmes* (Women TechEU, Innovate UK); *Investors and capital* (LvlUp Ventures, Clearco).
+- **Groups** (the order they are shown): *Design partners and pilots* (Summit Venture Studio, Winner Capital, ThirdWorldVC); *Programmes and communities* (Venture Institute and VC Lab, The Residency, The Delta, Makershome, Pioneerclub, TBDC); *Public programmes* (Women TechEU, Innovate UK); *Investors and capital* (LvlUp Ventures, Clearco).
 - **The interview** (The Residency's founder with Sam Altman) as an "In conversation" block on `/partners`, directly under The Residency's group, with the video, the transcript and a link out. **Hidden until a source exists**: no link, file or transcript was supplied, and none could be found.
 
 ## 2. One source of truth

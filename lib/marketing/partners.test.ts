@@ -13,13 +13,13 @@ let container: HTMLDivElement, root: Root
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals() })
 
-const ASKED = ["Decile", "The Residency", "The Delta", "Makershome", "Pioneerclub", "Women TechEU", "TBDC", "Innovate UK", "LvlUp Ventures", "Clearco", "Summit Venture Studio", "Winner Capital", "ThirdWorldVC"]
+const ASKED = ["Venture Institute", "VC Lab", "The Residency", "The Delta", "Makershome", "Pioneerclub", "Women TechEU", "TBDC", "Innovate UK", "LvlUp Ventures", "Clearco", "Summit Venture Studio", "Winner Capital", "ThirdWorldVC"]
 
 describe("the partners data", () => {
   it("holds every partner the founder named, once each", () => {
     for (const n of ASKED) expect(PARTNERS.filter((p) => p.name.includes(n)), n).toHaveLength(1)
     expect(new Set(PARTNERS.map((p) => p.slug)).size).toBe(PARTNERS.length)
-    expect(PARTNERS).toHaveLength(13)
+    expect(PARTNERS).toHaveLength(14)
   })
   it("puts every partner in a defined group, and shows the groups in order", () => {
     const keys = GROUPS.map((g) => g.key)
@@ -39,9 +39,9 @@ describe("the partners data", () => {
     for (const p of pilots) { expect(p.url, p.name).toBeNull(); expect(p.description, p.name).toMatch(/piloting Anker/); expect(p.description, p.name).not.toMatch(/fund of|seed|stage|million|sector|consumer|AI\b|biotech|climate|fintech|university|hospital|emerging/i) }
   })
   it("links only to https addresses, each on a domain that belongs to the partner", () => {
-    const expected: Record<string, RegExp> = { "decile-group": /decilegroup\.com$/, "the-residency": /livetheresidency\.com$/, tbdc: /tbdc\.com$/, clearco: /clear\.co$/, "lvlup-ventures": /lvlup\.vc$/, "innovate-uk": /ukri\.org$/, "women-techeu": /europa\.eu$/ }
+    const expected: Record<string, RegExp> = { "vc-lab": /govclab\.com$/, "the-residency": /livetheresidency\.com$/, tbdc: /tbdc\.com$/, clearco: /clear\.co$/, "lvlup-ventures": /lvlup\.vc$/, "innovate-uk": /ukri\.org$/, "women-techeu": /europa\.eu$/ }
     for (const p of PARTNERS) if (p.url) { const u = new URL(p.url); expect(u.protocol, p.name).toBe("https:"); expect(u.hostname, p.name).toMatch(expected[p.slug] ?? /^$/) }
-    expect(PARTNERS.filter((p) => !p.url).map((p) => p.slug).sort()).toEqual(["makershome", "pioneerclub", "summit-venture-studio", "the-delta", "thirdworldvc", "winner-capital"])
+    expect(PARTNERS.filter((p) => !p.url).map((p) => p.slug).sort()).toEqual(["makershome", "pioneerclub", "summit-venture-studio", "the-delta", "thirdworldvc", "venture-institute", "winner-capital"])
   })
   it("leaves a description empty for a partner whose identity could not be confirmed, until the founder supplies one", () => {
     expect(PARTNERS.filter((p) => p.description === null).map((p) => p.slug).sort()).toEqual(["makershome", "pioneerclub"])
