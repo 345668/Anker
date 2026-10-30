@@ -63,7 +63,8 @@ export async function createSession(i: CreateInput, now = new Date()): Promise<S
   const eff = await getEffective(i.orgId)
   if (!(eff.features as any).halyard) throw new HalyardError("Your plan does not include Halyard.", 402, "plan")
   if ((await getSettings(i.orgId)).requireInformed && i.participantsInformed !== true) throw new HalyardError("Your workspace requires you to tell the other participants the call is being transcribed. Confirm that you have.", 400, "inform_required")
-  const mode = (MODES as readonly string[]).includes(String(i.mode)) ? String(i.mode) : "general"
+  const asked = String(i.mode)
+  const mode = (MODES as readonly string[]).includes(asked) ? asked : (await (await import("./playbooks")).modeAllowed(i.orgId, i.userId, asked)) ? asked : "general"
   const stt = i.stt ?? "server"
   // Server transcription sends speech to the transcription provider; a workspace policy that forbids it refuses here with its own words, not later mid-call.
   if (stt === "server") await assertProviderAllowed("qwen", i.orgId).catch((e) => { throw new HalyardError(e.message, 403, "data_policy") })

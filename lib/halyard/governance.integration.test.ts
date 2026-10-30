@@ -36,7 +36,7 @@ beforeAll(async () => {
     CREATE TABLE investor_calls(id text PRIMARY KEY DEFAULT gen_random_uuid()::text, user_id text, org_id text, transcript text, summary text, draft_followup text, deleted_at timestamptz);
     CREATE TABLE outreach_messages(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), call_id text, body text, status text);
     CREATE TABLE action_proposals(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id text, run_id text, status text, input jsonb, diff jsonb, evidence jsonb, summary text);`)
-  await db.exec(readFileSync("scripts/migrations/2026-10-27-halyard-sessions.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-28-halyard-governance.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-27-halyard-sessions.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-28-halyard-governance.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-30-halyard-playbooks.sql", "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => { Object.assign(st, { flag: true, feature: true }); _resetRate(); await db.exec("DELETE FROM halyard_sessions; DELETE FROM halyard_settings; DELETE FROM halyard_uploads; DELETE FROM halyard_prep; DELETE FROM investor_calls; DELETE FROM outreach_messages; DELETE FROM action_proposals; DELETE FROM memberships; DELETE FROM profiles") })

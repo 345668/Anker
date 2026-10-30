@@ -25,5 +25,6 @@ export async function exportPersonalData(orgId: string, userId: string, onlyId?:
     })
   }
   const prep = ((await sql`SELECT mode, context_enc, updated_at FROM halyard_prep WHERE org_id = ${orgId} AND user_id = ${userId}`) as any[]).map((p) => ({ mode: p.mode, text: decryptSecret(p.context_enc), updatedAt: p.updated_at }))
-  return { exportedAt: new Date().toISOString(), note: "Audio is never stored, so there is none to export.", sessions: out, preparation: prep }
+  const playbooks = ((await sql`SELECT slug, label, scope, markdown_enc, updated_at FROM halyard_playbooks WHERE org_id = ${orgId} AND user_id = ${userId} ORDER BY slug`) as any[]).map((p) => ({ name: p.slug, label: p.label, scope: p.scope, text: decryptSecret(p.markdown_enc), updatedAt: p.updated_at }))
+  return { exportedAt: new Date().toISOString(), note: "Audio is never stored, so there is none to export.", sessions: out, preparation: prep, playbooks }
 }

@@ -5,7 +5,7 @@ import { assertCan } from "@/lib/metering/allowance"
 import { generateDetailed } from "@/lib/ai/provider"
 import { extractNoteFigures, generateNotes, generateEmail, splitTranscript, mergeLists, NoteGenerationError, type ModelFn, type Notes } from "./core"
 import { HalyardError, assertOn, listTurns, type SessionRow } from "./sessions"
-import { skillFor, prepFor } from "./brain"
+import { skillForSession, prepFor } from "./brain"
 
 /** Notes and the drafts (docs/architecture/62 section 9). Notes are versioned rows; a person's edit is never overwritten by a later AI draft: the draft is returned beside it. */
 export interface Figure { value: string; context: string; who: string }
@@ -43,14 +43,14 @@ export async function compileTranscript(sessionId: string): Promise<string> {
 
 const GENERAL_NOTES_FOCUS = "decisions, commitments, figures, dates and who owns what"
 const GENERAL_EMAIL_GUIDE = "A short, friendly follow-up from the user to the other side: thank them, restate what was agreed in one or two lines, list the next steps with owners and dates exactly as in the notes, and anything the user promised to send. Under 150 words."
-const sectionFor = (skill: ReturnType<typeof skillFor>, action: string) => (skill?.sections ?? []).filter((x) => x.actions.includes(action) && x.text).map((x) => x.text).join("\n\n")
+const sectionFor = (skill: Awaited<ReturnType<typeof skillForSession>>, action: string) => (skill?.sections ?? []).filter((x) => x.actions.includes(action) && x.text).map((x) => x.text).join("\n\n")
 export async function notesContext(s: SessionRow): Promise<string> {
-  const skill = skillFor(s.mode), label = skill ? skill.mode || skill.title : "General", prep = await prepFor(s), guide = sectionFor(skill, "notes")
+  const skill = await skillForSession(s), label = skill ? skill.mode || skill.title : "General", prep = await prepFor(s), guide = sectionFor(skill, "notes")
   return `Call type: ${label}.\nIn this kind of call, pay particular attention to: ${skill?.notesFocus || GENERAL_NOTES_FOCUS}` + (guide ? `\n\n=== How to take notes on this kind of call ===\n${guide}` : "") +
     (prep ? `\n\n=== Pre-call notes (spelling and name reference only) ===\nUse these only to spell names, companies and terms correctly. Never add a fact, figure or commitment to the notes unless it appears in the transcript.\n${prep}` : "")
 }
 export async function emailContext(s: SessionRow): Promise<string> {
-  const skill = skillFor(s.mode); return `Call type: ${skill ? skill.mode || skill.title : "General"}.\n\n=== The email to write ===\n${sectionFor(skill, "email") || GENERAL_EMAIL_GUIDE}`
+  const skill = await skillForSession(s); return `Call type: ${skill ? skill.mode || skill.title : "General"}.\n\n=== The email to write ===\n${sectionFor(skill, "email") || GENERAL_EMAIL_GUIDE}`
 }
 
 /** The real model, through the workspace's own routing, policy and allowance. */

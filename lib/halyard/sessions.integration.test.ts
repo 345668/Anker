@@ -30,7 +30,7 @@ beforeAll(async () => {
     CREATE TABLE plan_catalog(plan text PRIMARY KEY, features jsonb DEFAULT '{}', limits jsonb DEFAULT '{}');
     CREATE TABLE investor_calls(id text PRIMARY KEY, org_id text, user_id text);`)
   await db.exec(readFileSync("scripts/migrations/2026-10-27-halyard-sessions.sql", "utf8"))
-  await db.exec(readFileSync("scripts/migrations/2026-10-28-halyard-governance.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-28-halyard-governance.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-30-halyard-playbooks.sql", "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => {

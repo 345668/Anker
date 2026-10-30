@@ -44,7 +44,7 @@ beforeAll(async () => {
     CREATE TABLE investor_calls(id text PRIMARY KEY DEFAULT gen_random_uuid()::text, user_id text, org_id text, persona text, title text, investor_name text, transcript text, crm_entry_id text, occurred_at timestamptz,
       external_id text, content_hash text, source text, status text, summary text, deleted_at timestamptz, analysis_error text, updated_at timestamptz DEFAULT now());
     CREATE UNIQUE INDEX ON investor_calls(user_id, org_id, external_id) WHERE external_id IS NOT NULL;`)
-  await db.exec(readFileSync("scripts/migrations/2026-10-27-halyard-sessions.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-28-halyard-governance.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-10-27-halyard-sessions.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-28-halyard-governance.sql", "utf8")); await db.exec(readFileSync("scripts/migrations/2026-10-30-halyard-playbooks.sql", "utf8"))
 })
 afterAll(async () => db.close())
 beforeEach(async () => { Object.assign(st, { flag: true, allowance: null, auth: null, device: null, deviceErr: null, browser: null }); await db.exec("DELETE FROM halyard_sessions; DELETE FROM memberships; DELETE FROM profiles; DELETE FROM investor_calls") })

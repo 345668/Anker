@@ -1,5 +1,5 @@
 {
-  "takenAt": "2026-10-27",
+  "takenAt": "2026-10-30",
   "baseTables": [
     "accelerated_match_jobs",
     "action_proposals",
@@ -145,6 +145,7 @@
     "grant_exercises",
     "halyard_briefs",
     "halyard_notes",
+    "halyard_playbooks",
     "halyard_prep",
     "halyard_segments",
     "halyard_sessions",
@@ -549,6 +550,9 @@
       "fund_id"
     ],
     "fundraising_rounds": [
+      "org_id"
+    ],
+    "halyard_playbooks": [
       "org_id"
     ],
     "halyard_prep": [

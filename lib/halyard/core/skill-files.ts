@@ -118,28 +118,29 @@ export function validateSkill(meta: Record<string, any> | null, body: string): s
 
 const readIfExists = (file: string): string | null => { try { return fs.readFileSync(file, "utf8") } catch { return null } }
 
-/** One skill directory gives a skill record, or { error }, or null when there is no SKILL.md. */
-export function loadSkillDir(dir: string, source: string): SkillRecord | { error: string } | null {
-  const text = readIfExists(path.join(dir, "SKILL.md"))
-  if (text === null) return null
+/** A skill record from SKILL.md text (a file, or a playbook a person wrote). Returns { error } with every problem in plain words. */
+export function skillFromText(text: string, source: string, where = "SKILL.md", extra: { stories?: string | null; notes?: string | null } = {}): SkillRecord | { error: string } {
   const { meta, body, errors: parseErrors } = parseSkillMarkdown(text)
   const errors = parseErrors.concat(validateSkill(meta, body))
-  const where = path.join(dir, "SKILL.md")
   if (errors.length) return { error: `${where}: ${errors.join("; ")}` }
   const h = (meta as Record<string, any>).halyard || {}
-  const stories = readIfExists(path.join(dir, "stories.md"))
-  const notes = readIfExists(path.join(dir, "notes.md"))
   const title = (/^#\s+(.+)$/m.exec(body) || [])[1]
   const split = splitActionSections(body)
   const m = meta as Record<string, any>
   return {
     id: h.replaces || m.name, name: m.name, title: title ? title.trim() : m.name, description: m.description.trim(), body, shared: split.shared, sections: split.sections,
-    stories: stories && stories.trim() ? stories.trim() : null, notes: notes && notes.trim() ? notes.trim() : null,
+    stories: extra.stories && extra.stories.trim() ? extra.stories.trim() : null, notes: extra.notes && extra.notes.trim() ? extra.notes.trim() : null,
     mode: typeof h.mode === "string" && h.mode.trim() ? h.mode.trim() : null, order: Number.isFinite(h.order) ? h.order : 100, answerLength: h.answerLength || null,
     prepHint: typeof h.prepHint === "string" && h.prepHint.trim() ? h.prepHint.trim() : null, notesFocus: typeof h.notesFocus === "string" && h.notesFocus.trim() ? h.notesFocus.trim() : null,
     base: h.base || "call", modes: h.modes ? ([] as string[]).concat(h.modes) : KNOWN_MODES.slice(), context: ([] as string[]).concat(h.context || []),
     maxTokens: h.maxTokens && typeof h.maxTokens === "object" ? h.maxTokens : {}, source, path: where,
   }
+}
+/** One skill directory gives a skill record, or { error }, or null when there is no SKILL.md. */
+export function loadSkillDir(dir: string, source: string): SkillRecord | { error: string } | null {
+  const text = readIfExists(path.join(dir, "SKILL.md"))
+  if (text === null) return null
+  return skillFromText(text, source, path.join(dir, "SKILL.md"), { stories: readIfExists(path.join(dir, "stories.md")), notes: readIfExists(path.join(dir, "notes.md")) })
 }
 /** All skills in the given roots, later roots overriding earlier ones by id. */
 export function loadSkillFiles(roots: Array<{ dir: string; source: string }>): { skills: SkillRecord[]; errors: string[] } {
