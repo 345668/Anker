@@ -1,0 +1,26 @@
+{
+  "takenAt": "2026-10-31",
+  "refs": [
+    "archived_investors.firm_id",
+    "calendar_meetings.related_firm_id",
+    "campaign_crm_entries.firm_id",
+    "contacts.source_firm_id",
+    "crm_companies.firm_id",
+    "crm_entries.firm_id",
+    "deal_room_access_grants.firm_id",
+    "deals.firm_id",
+    "founder_match_results.firm_id",
+    "fund_profiles.fund_i_prior_lp_firm_ids",
+    "interaction_logs.firm_id",
+    "introductions.target_firm_id",
+    "investment_firms.parent_firm_id",
+    "investor_company_links.company_id",
+    "investor_matches.firm_id",
+    "investors.firm_id",
+    "lp_entities.firm_id",
+    "lp_firm_matches.firm_id",
+    "match_outcome_events.firm_id",
+    "matches.firm_id",
+    "outreaches.firm_id"
+  ]
+}

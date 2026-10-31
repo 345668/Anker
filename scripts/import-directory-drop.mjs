@@ -300,8 +300,38 @@ async function loadDirectory() {
       if (!firmByLoose.has(key)) firmByLoose.set(key, f)
     }
   }
-  console.log(`  ${people.length} people, ${firms.length} firms indexed`)
-  return { people, firms, byEmail, bySlug, byNameFirm, byNamePlace, firmByHost, firmByName, firmByLoose, firmByKeys, firmByAcronym, firmByInitials }
+  // Merged records (docs/architecture/55 E4): what was matched on the folded-in record now matches the survivor, so a row for it lands on the survivor and no second record is made.
+  // People are keyed by the same keyed hashes as the tombstones; no address is stored. A table that is not there yet, or a key that does not match production, simply adds nothing.
+  let aliasRows = []
+  try { aliasRows = await q(`SELECT kind, key_type, key, target_id FROM directory_alias_keys`) } catch { /* nothing has been merged, or the table is not there */ }
+  const { aliasEmail, aliasLi, count: aliasCount } = applyAliasKeys({ firms, people, firmByHost, firmByKeys }, aliasRows)
+  console.log(`  ${people.length} people, ${firms.length} firms indexed${aliasCount ? `, ${aliasCount} keys of merged records point at their survivors` : ""}`)
+  return { people, firms, byEmail, bySlug, byNameFirm, byNamePlace, firmByHost, firmByName, firmByLoose, firmByKeys, firmByAcronym, firmByInitials, aliasEmail, aliasLi }
+}
+
+/**
+ * Seeds the importer's lookup maps from the keys of merged records (docs/architecture/55 E4): a firm's name keys and website host, and a person's keyed hashes, now point at the SURVIVOR,
+ * so a row for a folded-in record lands on it. Never overrides a key a live record already holds. Pure; exported for the test.
+ */
+export function applyAliasKeys({ firms, people, firmByHost, firmByKeys }, aliasRows) {
+  const firmById = new Map(firms.map((f) => [f.id, f])), personById = new Map(people.map((p) => [p.id, p]))
+  const aliasEmail = new Map(), aliasLi = new Map(); let count = 0
+  for (const a of aliasRows) {
+    if (a.kind === "firm") {
+      const f = firmById.get(a.target_id); if (!f) continue
+      const map = a.key_type === "firm_host" ? firmByHost : firmByKeys
+      if (!map.has(a.key)) { map.set(a.key, f); count++ }
+    } else {
+      const p = personById.get(a.target_id); if (!p) continue
+      const map = a.key_type === "email_hash" ? aliasEmail : aliasLi
+      if (!map.has(a.key)) { map.set(a.key, p); count++ }
+    }
+  }
+  return { aliasEmail, aliasLi, count }
+}
+/** The survivor a person's keyed hashes point at, or null. */
+export function personViaAlias(dir, hashes) {
+  return (hashes.emailHash && dir.aliasEmail.get(hashes.emailHash)) || hashes.linkedinHashes.map((x) => dir.aliasLi.get(x)).find(Boolean) || null
 }
 
 /**
@@ -491,7 +521,7 @@ async function main() {
       if (seenPerson.has(batchKey)) { stats.personDupInBatch++; f.dup++; continue }
       seenPerson.set(batchKey, true)
 
-      const hit = (email && dir.byEmail.get(email))
+      let hit = (email && dir.byEmail.get(email))
         || (slug && dir.bySlug.get(slug))
         || (full && row.firm && firmId ? dir.byNameFirm.get(`${full}|${firmId}`) : null)
         // No email, no LinkedIn, no firm: a full name AND the same place is the only identity there is. A bare
@@ -500,11 +530,19 @@ async function main() {
         || (!email && !slug && !row.firm && full.includes(" ") && normPhrase(row.location)
             ? dir.byNamePlace.get(`${full}|${normPhrase(row.location)}`) : null)
 
+      // A row for a person who was folded into another record lands on the survivor (docs/architecture/55 E4).
+      let viaAlias = null
+      if (!hit && (dir.aliasEmail.size || dir.aliasLi.size) && (await guardReady())) {
+        const hs = identityHashes({ email, linkedinUrl: row.linkedin, personLinkedinUrl: row.linkedin }, (await guardReady()).key)
+        viaAlias = personViaAlias(dir, hs)
+        if (viaAlias) stats.personViaAlias = (stats.personViaAlias ?? 0) + 1
+      }
       const incoming = {
         email, title: row.title, linkedin_url: row.linkedin,
         location: row.location, investor_type: row.type, website: row.website,
       }
 
+      if (!hit && viaAlias) hit = viaAlias
       if (hit) {
         stats.personMatched++
         const { fills, conflicts } = diff(hit, incoming)
@@ -546,7 +584,7 @@ async function main() {
     console.log(`${f.file.slice(0, 47).padEnd(49)}${String(f.rows).padStart(5)}${String(f.people).padStart(8)}${String(f.firms).padStart(7)}${String(f.newPeople).padStart(9)}${String(f.newFirms).padStart(8)}${String(f.filled).padStart(8)}${String(f.dup).padStart(6)}${String(f.conflicts).padStart(10)}`)
   }
   console.log(`
-${stats.personTombstoned ? `left out: ${stats.personTombstoned} person row(s) erased or withdrawn earlier (tombstone)\n` : ""}people   matched ${stats.personMatched}   new ${stats.personNew}   filled ${stats.personFilled}   duplicate-in-batch ${stats.personDupInBatch}   conflicts ${stats.personConflicts}
+${stats.personViaAlias ? `landed on a merged record's survivor: ${stats.personViaAlias} person row(s) (docs/architecture/55 E4)\n` : ""}${stats.personTombstoned ? `left out: ${stats.personTombstoned} person row(s) erased or withdrawn earlier (tombstone)\n` : ""}people   matched ${stats.personMatched}   new ${stats.personNew}   filled ${stats.personFilled}   duplicate-in-batch ${stats.personDupInBatch}   conflicts ${stats.personConflicts}
 firms    matched ${stats.firmMatched}   new ${stats.firmNew}   filled ${stats.firmFilled}   duplicate-in-batch ${stats.firmDupInBatch}   conflicts ${stats.firmConflicts}
 rows read ${stats.rows} from ${stats.files} files` + `${stats.firmNameCollision ? `\nname collisions kept apart: ${stats.firmNameCollision} (same name, different site and country)` : ""}` + `${stats.notes ? `\nleft out: ${stats.notes} banner/footer row(s)` : ""}${stats.unidentifiable ? `\nleft out: ${stats.unidentifiable} person row(s) with nothing to recognise them by (no email, LinkedIn, firm, or name with place)` : ""}`)
 

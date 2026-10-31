@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest"
 import {
-  classifySheet, countryTail, findHeaderRow, hostOf, linkedinSlug, looksLikeNote, samePlausibly,
+  applyAliasKeys, personViaAlias, classifySheet, countryTail, findHeaderRow, hostOf, linkedinSlug, looksLikeNote, samePlausibly,
 } from "../scripts/import-directory-drop.mjs"
 
 describe("findHeaderRow", () => {
@@ -119,4 +119,21 @@ describe("samePlausibly", () => {
     expect(samePlausibly({ website: "https://acme.vc", hq_location: "Paris, France" }, { website: "", place: "New York, USA" })).toBe(true)
     expect(samePlausibly({ website: "https://acme.vc", hq_location: "Paris, France" }, { website: "acme.io", place: "Lyon, France" })).toBe(true)
   })
+})
+
+describe("keys of merged records (docs/architecture/55 E4)", () => {
+  const firms = [{ id: "f1", name: "Kindred Capital" }, { id: "f9", name: "Other" }], people = [{ id: "p1" }]
+  const maps = () => ({ firms, people, firmByHost: new Map([["other.example", firms[1]]]), firmByKeys: new Map([["kindredcapital", firms[0]]]) })
+  it("a folded-in firm's name key and host now point at the survivor, without ever overriding a key a live record holds", () => {
+    const m = maps(), r = applyAliasKeys(m, [
+      { kind: "firm", key_type: "firm_key", key: "kindredcapitalvc", target_id: "f1" }, { kind: "firm", key_type: "firm_host", key: "kindred.example", target_id: "f1" },
+      { kind: "firm", key_type: "firm_host", key: "other.example", target_id: "f1" },                 // a live firm already owns this host
+      { kind: "firm", key_type: "firm_key", key: "gone", target_id: "no-such-firm" }])               // the survivor is not in the directory (erased): nothing is added
+    expect(m.firmByKeys.get("kindredcapitalvc")).toBe(firms[0]); expect(m.firmByHost.get("kindred.example")).toBe(firms[0]); expect(m.firmByHost.get("other.example")).toBe(firms[1]); expect(m.firmByKeys.has("gone")).toBe(false); expect(r.count).toBe(2)
+  })
+  it("a folded-in person's keyed hashes resolve to the survivor: by email first, then by any profile", () => {
+    const r = applyAliasKeys(maps(), [{ kind: "person", key_type: "email_hash", key: "H-EMAIL", target_id: "p1" }, { kind: "person", key_type: "linkedin_hash", key: "H-LI", target_id: "p1" }])
+    expect(personViaAlias(r, { emailHash: "H-EMAIL", linkedinHashes: [] })).toEqual({ id: "p1" }); expect(personViaAlias(r, { emailHash: null, linkedinHashes: ["x", "H-LI"] })).toEqual({ id: "p1" }); expect(personViaAlias(r, { emailHash: "nope", linkedinHashes: [] })).toBeNull(); expect(r.count).toBe(2)
+  })
+  it("nothing merged means nothing changes", () => { const m = maps(), r = applyAliasKeys(m, []); expect(r.count).toBe(0); expect(m.firmByKeys.size).toBe(1) })
 })

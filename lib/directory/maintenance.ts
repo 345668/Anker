@@ -72,6 +72,14 @@ export async function deleteDerived(ids: string[]): Promise<number> {
   }
   // Candidate duplicate pairs name people by id only; they go with the person (docs/architecture/55).
   n += ((await sql`DELETE FROM directory_candidates WHERE kind = 'person' AND (a_id = ANY(${ids}::text[]) OR b_id = ANY(${ids}::text[])) RETURNING 1`) as any[]).length
+  // A merge keeps the whole folded-in row so it can be undone for 90 days (docs/architecture/55). An erased person must not live on in it: the snapshot is scrubbed and the merge can no longer be undone,
+  // and the importer keys (keyed hashes of the person's identifiers) are removed, so the person cannot be matched again either.
+  try {
+    const merges = (await sql`UPDATE directory_merges SET loser_row = '{"erased":true}'::jsonb, before = '{}'::jsonb, undo_until = LEAST(undo_until, now())
+        WHERE kind = 'person' AND (loser_id = ANY(${ids}::text[]) OR survivor_id = ANY(${ids}::text[])) AND COALESCE(loser_row->>'erased', '') <> 'true' RETURNING id`) as any[]
+    n += merges.length
+    n += ((await sql`DELETE FROM directory_alias_keys WHERE kind = 'person' AND (target_id = ANY(${ids}::text[]) OR merge_id IN (SELECT id FROM directory_merges WHERE kind = 'person' AND (loser_id = ANY(${ids}::text[]) OR survivor_id = ANY(${ids}::text[])))) RETURNING 1`) as any[]).length
+  } catch (e) { if (!/does not exist/i.test(String((e as Error)?.message))) throw e }      // no merge tables yet means nothing was ever merged: nothing to scrub
   return n
 }
 

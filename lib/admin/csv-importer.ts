@@ -126,7 +126,8 @@ export async function importCsv(input: ImportInput): Promise<ImportReport> {
         if (!out) { rowsSkipped++; continue }
         rowsParsed++
         if (input.dryRun) continue
-        const id = stableId("ifm", out.dedupKey)
+        const rawId = stableId("ifm", out.dedupKey)
+        const id = await aliasOf("firm", rawId)       // a firm that was folded into another lands on the survivor (docs/architecture/55 E4)
         const result = await upsertFirm(id, out, input.source)
         if (result === "inserted") firmsInserted++
         else firmsAlreadyPresent++
@@ -136,7 +137,7 @@ export async function importCsv(input: ImportInput): Promise<ImportReport> {
           for (const fullName of out.founders) {
             const inv = parseFounderToInvestor(fullName, out, detected, r)
             if (!inv) continue
-            const invId = stableId("inv", `${slug(fullName)}@${id}`)
+            const invId = await aliasOf("person", stableId("inv", `${slug(fullName)}@${rawId}`))
             const r2 = await upsertInvestor(invId, inv, id, input.source)
             if (r2 === "inserted") investorsInserted++
             else if (r2 === "tombstoned") investorsTombstoned++
@@ -148,7 +149,7 @@ export async function importCsv(input: ImportInput): Promise<ImportReport> {
         if (!out) { rowsSkipped++; continue }
         rowsParsed++
         if (input.dryRun) continue
-        const invId = stableId("inv", out.dedupKey)
+        const invId = await aliasOf("person", stableId("inv", out.dedupKey))
         const result = await upsertInvestor(invId, out, null, input.source)
         if (result === "inserted") investorsInserted++
         else if (result === "tombstoned") investorsTombstoned++
@@ -296,6 +297,11 @@ function parseFounderToInvestor(fullName: string, firm: ParsedFirm, _cols: any, 
     type: firm.type,
     dedupKey: `${slug(trimmed)}@${firm.dedupKey}`,
   }
+}
+
+/** An id that was merged into another record resolves to the survivor; any other id is returned as it is. A missing table (nothing merged yet) changes nothing. */
+async function aliasOf(kind: "firm" | "person", id: string): Promise<string> {
+  try { const [a] = (await sql`SELECT new_id FROM directory_aliases WHERE kind = ${kind} AND old_id = ${id}`) as any[]; return a ? String(a.new_id) : id } catch { return id }
 }
 
 // ─── DB writers ───────────────────────────────────────────────────────

@@ -31,11 +31,12 @@ beforeAll(async () => {
   await db.exec(readFileSync("scripts/migrations/2026-10-16-directory-sources.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16b-directory-tombstones.sql", "utf8"))
   await db.exec(readFileSync("scripts/migrations/2026-10-16f-directory-candidates.sql", "utf8"))
+  await db.exec(readFileSync("scripts/migrations/2026-11-01-directory-merges.sql", "utf8"))
 }, 30000)
 afterAll(async () => db.close())
 beforeEach(async () => {
   process.env.DIRECTORY_HASH_KEY = K
-  await db.exec("DELETE FROM investors; DELETE FROM directory_candidates; DELETE FROM directory_tombstones; DELETE FROM directory_hash_meta; UPDATE directory_sources SET purged_at = NULL")
+  await db.exec("DELETE FROM directory_alias_keys; DELETE FROM directory_aliases; DELETE FROM directory_merges; DELETE FROM investors; DELETE FROM directory_candidates; DELETE FROM directory_tombstones; DELETE FROM directory_hash_meta; UPDATE directory_sources SET purged_at = NULL")
   for (const [t] of INVESTOR_REFS) await db.exec(`DELETE FROM ${t}`)
 })
 
@@ -135,6 +136,17 @@ describe("eraseRows", () => {
     await db.exec("INSERT INTO directory_candidates (kind, a_id, b_id, tier) VALUES ('person', 'x', 'y', 'certain'), ('person', 'y', 'z', 'probable'), ('firm', 'x', 'z', 'probable')")
     await eraseRows(["x"])
     expect((await rows("SELECT a_id, b_id, kind FROM directory_candidates ORDER BY a_id")).map((r) => `${r.kind}:${r.a_id}-${r.b_id}`)).toEqual(["firm:x-z", "person:y-z"])
+  })
+  it("an erased person does not live on in a merge snapshot or an importer key: the snapshot is scrubbed, the merge can no longer be undone, the keys are gone; other merges are untouched", async () => {
+    await ins("s1", "s@x.com", null, "s3", "Sam"); await ins("l1", "dana@x.com", null, "s3", "Dana"); await ins("s2", "t@x.com", null, "s3", "Tia"); await ins("l2", "u@x.com", null, "s3", "Uma")
+    const mk = async (s: string, l: string, email: string) => { const m = (await rows(`INSERT INTO directory_merges (kind, survivor_id, loser_id, by_staff, filled, before, loser_row, undo_until) VALUES ('person', $1, $2, 'a@x', ARRAY['email'], '{"email":null}', $3::jsonb, now() + interval '90 days') RETURNING id`, [s, l, JSON.stringify({ id: l, email, first_name: "Dana" })]))[0].id
+      await db.query("INSERT INTO directory_aliases (kind, old_id, new_id, merge_id) VALUES ('person', $1, $2, $3)", [l, s, m]); await db.query("INSERT INTO directory_alias_keys (kind, key_type, key, target_id, merge_id) VALUES ('person', 'email_hash', $1, $2, $3)", [`h-${l}`, s, m]); return m }
+    const a = await mk("s1", "l1", "dana@x.com"), b = await mk("s2", "l2", "u@x.com")
+    await eraseRows(["l1"])
+    expect((await rows("SELECT loser_row, before, undo_until <= now() AS closed FROM directory_merges WHERE id = $1", [a]))[0]).toEqual({ loser_row: { erased: true }, before: {}, closed: true })
+    expect(JSON.stringify(await rows("SELECT * FROM directory_merges"))).not.toContain("dana@x.com"); expect((await rows("SELECT key FROM directory_alias_keys")).map((r) => r.key)).toEqual(["h-l2"])
+    expect((await rows("SELECT loser_row FROM directory_merges WHERE id = $1", [b]))[0].loser_row.email).toBe("u@x.com")
+    await eraseRows(["s2"]); expect((await rows("SELECT loser_row FROM directory_merges WHERE id = $1", [b]))[0].loser_row).toEqual({ erased: true }); expect(await rows("SELECT * FROM directory_alias_keys")).toEqual([])      // erasing the SURVIVOR closes its merge too
   })
   it("anonymises rather than deletes when the reference check cannot run (a missing table)", async () => {
     await ins("x", "x@x.com", null, "s3")
