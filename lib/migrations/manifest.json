@@ -182,6 +182,7 @@
     "2026-10-27-halyard-sessions.sql",
     "2026-10-28-halyard-governance.sql",
     "2026-10-30-halyard-playbooks.sql",
+    "2026-10-31-restore-drills.sql",
     "2026_06_02_email_oauth_accounts.sql"
   ]
 }

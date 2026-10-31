@@ -146,7 +146,7 @@ describe("settings", () => {
 describe("heartbeat and watchdog", () => {
   it("each evaluation writes the heartbeat with the rules evaluated and the open count; a failure records the error", async () => {
     await run(stuckSev1(T0))
-    expect((await rows("SELECT * FROM alert_heartbeat"))[0]).toMatchObject({ rules_evaluated: 15, open_incidents: 1, error: null }); expect((await rows("SELECT last_ok_at FROM alert_heartbeat"))[0].last_ok_at).not.toBeNull()
+    expect((await rows("SELECT * FROM alert_heartbeat"))[0]).toMatchObject({ rules_evaluated: 16, open_incidents: 1, error: null }); expect((await rows("SELECT last_ok_at FROM alert_heartbeat"))[0].last_ok_at).not.toBeNull()
     await expect(runEvaluation({ now: T0 + 5 * M, deliver, snapshot: { get latest(): any { throw new Error("db down") } } as any })).rejects.toThrow("db down")
     expect((await rows("SELECT error FROM alert_heartbeat"))[0].error).toBe("db down")
   })

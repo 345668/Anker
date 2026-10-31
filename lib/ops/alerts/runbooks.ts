@@ -63,6 +63,11 @@ export const RUNBOOKS: Record<RuleKey, Runbook> = {
     check: "The file names in this alert. `pnpm migrate:verify` lists every migration against the database, so you can see whether the file is really missing or only unrecorded.",
     fix: "Apply the named file: `node scripts/oneshot/run-migration.mjs scripts/migrations/<file> --yes-production`. If `migrate:verify` says the objects already exist, run `pnpm migrate:verify --record`. The incident clears by itself once the ledger has the file.",
   },
+  restore_drill_overdue: {
+    means: "Nobody has shown lately that production's data can be restored from Neon's history. Until a drill has passed, how long recovery takes and whether it works are guesses.",
+    check: "SAIL, Restore drill: the date, the result and the time of the last drill. docs/runbooks/restore.md.",
+    fix: "Run the drill (about fifteen minutes, read-only, deletes its own branch): follow docs/runbooks/restore.md. A pass clears this. If it failed, the page says which table was off or what Neon answered; fix that and run it again.",
+  },
   halyard_latency: {
     means: "People using Halyard on a live call are waiting too long for suggestions (the slowest 5% took over four seconds).",
     check: "SAIL, Halyard: the 95th percentile and the suggestion count for the last 15 minutes. SAIL, AI usage: whether the model provider is slow or failing (the AI failure rule may also be open). Vercel function logs for the act route.",

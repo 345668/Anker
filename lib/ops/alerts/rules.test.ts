@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { halyardLatency, halyardSttFailing, telegramQueue, evaluate, cronStale, cronStuck, cronFailing, dependencyDown, dependencyDegraded, aiFailureRate, privacyRequestDue, alerterStale, SEV1_JOBS, RULE_KEYS, RULE_INFO, type Snapshot } from "./rules"
+import { restoreDrillOverdue, halyardLatency, halyardSttFailing, telegramQueue, evaluate, cronStale, cronStuck, cronFailing, dependencyDown, dependencyDegraded, aiFailureRate, privacyRequestDue, alerterStale, SEV1_JOBS, RULE_KEYS, RULE_INFO, type Snapshot } from "./rules"
 import { RUNBOOKS } from "./runbooks"
 import { CRON_MAX_AGE_MIN } from "@/lib/ops/dependencies"
 
@@ -135,4 +135,15 @@ describe("Halyard rules (docs/architecture/62 section 15)", () => {
     expect(halyardSttFailing(snap({ suggestions: 0, p95Ms: null, uploads: 20, failed: 2 }))).toEqual([]); expect(halyardSttFailing(snap({ suggestions: 0, p95Ms: null, uploads: 9, failed: 9 }))).toEqual([])
   })
   it("both are part of the evaluation", () => { expect(evaluate(snap({ suggestions: 30, p95Ms: 6000, uploads: 30, failed: 30 })).map((f) => f.rule)).toEqual(expect.arrayContaining(["halyard_latency", "halyard_stt_failing"])) })
+})
+
+describe("restore drill rule (docs/architecture/59 R4)", () => {
+  const D = 86_400_000, snap = (d: any, now = 200 * D) => ({ now, latest: {}, lastOk: {}, recent: {}, deps: [], restoreDrill: d }) as any
+  it("quiet within 100 days of a pass, and when the table could not be read", () => {
+    expect(restoreDrillOverdue(snap({ lastPassedAt: 150 * D, lastFailedAfter: false }))).toEqual([]); expect(restoreDrillOverdue(snap({ lastPassedAt: 100 * D, lastFailedAfter: false }))).toEqual([]); expect(restoreDrillOverdue({ now: 0 } as any)).toEqual([])
+  })
+  it("raised after 100 days, and when none has ever passed, with the facts only", () => {
+    expect(restoreDrillOverdue(snap({ lastPassedAt: 99 * D, lastFailedAfter: false }))).toMatchObject([{ rule: "restore_drill_overdue", severity: 3, evidence: { daysSincePass: 101, neverPassed: false, laterFailure: false } }])
+    const never = restoreDrillOverdue(snap({ lastPassedAt: null, lastFailedAfter: true }))[0]; expect(never.summary).toMatch(/ever passed.*last one failed/); expect(never.evidence).toEqual({ daysSincePass: null, neverPassed: true, laterFailure: true })
+  })
 })
