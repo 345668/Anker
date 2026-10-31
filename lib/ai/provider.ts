@@ -1,4 +1,4 @@
-import { filterChainForPolicy } from "@/lib/ai/data-policy"
+import { filterChainForPolicy, presetFor } from "@/lib/ai/data-policy"
 import { checkAiBudget, currentAiContext, chargeAiBudget, runBatch } from "@/lib/assistant/context"
 import { costOf } from "./model-catalog"
 /**
@@ -46,7 +46,7 @@ function callSignal(): AbortSignal {
   return ctx?.signal ? AbortSignal.any([ctx.signal, timeout]) : timeout
 }
 
-export type AiProvider = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "qwen" | "none"
+export type AiProvider = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "qwen" | "openweights" | "none"
 
 export interface GenerateOpts {
   maxTokens?: number
@@ -480,6 +480,8 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
   let chain = surfaceProviderChain(cfg, (surfaceEntry?.provider ?? null) as AiProvider | null)
   if (opts.noFailover && chain.length > 1) chain = [chain[0]]
   if (opts.provider && opts.provider !== "none") chain = [opts.provider]
+  // The open-weights lane (docs/architecture/53): placed by the routing policy BEFORE the data policy filters, so a workspace on `no_external` is left with the lane alone and fails closed when it is down.
+  { const preset = await presetFor(currentAiContext()?.principal?.orgId); chain = (await (await import("./openweights/lane")).applyLane(chain, opts.task, preset)) as AiProvider[] }
   // The workspace's data policy (docs/architecture/54 D6): providers it forbids are removed, and a policy that leaves none fails closed with nothing sent.
   { const pol = await filterChainForPolicy(chain); if (pol.refusal) return withFailure({ text: "", error: pol.refusal, provider: "none" as AiProvider, model: null }); chain = pol.chain }
 
@@ -663,7 +665,7 @@ export function surfaceProviderChain(
   cfg: AiRouterConfig | null,
   pin: AiProvider | null,
 ): AiProvider[] {
-  if (!pin || pin === "none") return providerChain(cfg)
+  if (!pin || pin === "none" || pin === "openweights") return providerChain(cfg)     // the open-weights lane is placed by the routing policy, never pinned by config
   return providerChain({ ...(cfg ?? ({} as AiRouterConfig)), providerOverride: pin })
 }
 
@@ -750,6 +752,7 @@ async function runProvider(
     return last
   }
   if (p === "ollama") return runOllama(prompt, opts, max, temp)
+  if (p === "openweights") return runOpenWeightsProvider(prompt, opts, max, temp)
   return { text: "", error: "no AI provider active (set a Qwen/Claude/OpenAI/Mistral/Gemini key, or enable local models)", provider: "none", model: null }
 }
 
@@ -921,6 +924,14 @@ async function runAnthropic(
     console.error("[ai/anthropic] error:", error)
     return { text: "", error: String(error).slice(0, 300), status: e?.status, provider, model }
   }
+}
+
+/** The open-weights lane (docs/architecture/53): the lane's own call, with the model chosen by the task's tier and nothing else changed about the result's shape. */
+async function runOpenWeightsProvider(prompt: string, opts: GenerateOpts, max: number, temp: number): Promise<GenerateResult> {
+  const lane = await import("./openweights/lane")
+  const c = lane.laneConfig(), tier = opts.task ? TASK_TIER[opts.task] : "balanced"
+  const r = await lane.runLane({ prompt, model: lane.modelFor(c, tier), max, temp, json: opts.json, signal: currentAiContext()?.signal }, c)
+  return { text: r.text, error: r.error, status: r.status, provider: "openweights", model: r.model, usage: r.usage }
 }
 
 async function runOllama(
@@ -1133,6 +1144,7 @@ export const PROVIDER_LABEL: Record<AiProvider, string> = {
   ollama: "Local (Ollama)",
   none: "Heuristic fallback",
   qwen: "Qwen (Alibaba)",
+  openweights: "Open weights (self-hosted)",
 }
 
 export interface AiStatus {

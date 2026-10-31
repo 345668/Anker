@@ -1,0 +1,10 @@
+{
+  "name": "anker-openweights-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Authenticated, allow-listed front door for a private vLLM engine (docs/architecture/53)",
+  "main": "server.mjs",
+  "scripts": { "start": "node server.mjs", "test": "node --test --test-force-exit server.test.mjs" },
+  "engines": { "node": ">=20" }
+}

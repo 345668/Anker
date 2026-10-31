@@ -161,6 +161,9 @@ export async function classifyAndDraftReply(
 }
 
 // ─── prompt + parser ──────────────────────────────────────────────────────
+/** The production prompt, exported so the open-weights evaluation (docs/architecture/53 section 8) runs exactly what runs in production. */
+export function buildReplyPrompt(ctx: ReplyContext): string { return buildPrompt(ctx) }
+export const parseReplyJson = (raw: string) => parseJson(raw)
 function buildPrompt(ctx: ReplyContext): string {
   const cal = ctx.founder.calendarUrl ?? "[CAL_LINK]"
   const facts = ctx.founder.facts.length

@@ -23,8 +23,9 @@ export const REFUSAL: Record<Exclude<Preset, "standard">, string> = {
 }
 
 /** Maps the router's provider names to register slugs. */
-const SLUG: Record<string, string> = { anthropic: "anthropic", gemini: "gemini", openai: "openai", mistral: "mistral", qwen: "qwen", ollama: "ollama" }
-const FALLBACK_REGION: Record<string, Region> = { anthropic: "us", gemini: "us", openai: "us", mistral: "eu", qwen: "sg", ollama: "self" }
+const SLUG: Record<string, string> = { openweights: "openweights", anthropic: "anthropic", gemini: "gemini", openai: "openai", mistral: "mistral", qwen: "qwen", ollama: "ollama" }
+// The open-weights host is a processor until a data-processing agreement says otherwise: unknown, so every restrictive preset refuses it until the register records its region (docs/architecture/53 section 7).
+const FALLBACK_REGION: Record<string, Region> = { openweights: "unknown", anthropic: "us", gemini: "us", openai: "us", mistral: "eu", qwen: "sg", ollama: "self" }
 
 let regions: { at: number; map: Map<string, Region> } | null = null
 let policies = new Map<string, { at: number; preset: Preset }>()
