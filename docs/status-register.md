@@ -31,10 +31,10 @@ Built: a schema baseline from production (361 tables), a from-scratch build comp
 ## 3. Release safety (doc 59)
 | | State |
 | --- | --- |
-| Built | R1 (`migrate:verify`, dry-run runner, destructive-header rule), R3 (manifest, `/api/health`, `schema_behind` alert), R6 (post-deploy smoke) |
+| Built | R1 (`migrate:verify`, dry-run runner, destructive-header rule), R2 (baseline and from-scratch build, doc 75), R3 (manifest, `/api/health`, `schema_behind` alert), R5 (nightly scale budget, 2026-10-31: 10 budgets at production size, the all-pairs regression is caught; the GitHub workflow has not run yet), R6 (post-deploy smoke) |
 | Verified live | The ledger reconciled (156 of 156); `/api/health` answers `schemaBehind: 0`; the 7 public checks of the smoke script pass |
 | Built, not tried live | The `schema_behind` and `smoke_failed` alerts firing; the GitHub workflow running after a real deploy; the deep checks and the report (no `SMOKE_TOKEN` yet) |
-| Not built | R2 (schema baseline and from-scratch build), R4 (restore drill), R5 (nightly scale budget) |
+| Not built | R4 (restore drill) |
 | Known drift | 6 older migration files whose objects differ from production (`scripts/migrations-known-drift.json`); 3 files the checker cannot read; no code was found to need the missing objects |
 | Open founder steps | `SMOKE_TOKEN` in Vercel and in GitHub; a Neon API key for the restore drill; check the Neon history window of the plan |
 

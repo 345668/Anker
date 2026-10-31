@@ -1,0 +1,58 @@
+name: Nightly scale budget
+
+# docs/architecture/59 R5. Production-size fixtures (21,000 firms, 50,000 people, a year of AI calls, a workspace with 100,000 contacts) and a time limit on each real code path that
+# touches them. Runs every night and on demand, not on every push: it builds large fixtures and takes a few minutes. A failure opens (or comments on) one issue called
+# "Scale budget exceeded" with the measurements; the budgets live in lib/perf and are raised only by a commit that says why.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly-budget
+  cancel-in-progress: false
+
+jobs:
+  budget:
+    name: Scale budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Run the budgets
+        id: run
+        run: pnpm budget 2>&1 | tee budget-output.txt
+        continue-on-error: true
+      - name: Report
+        run: |
+          echo "### Scale budget" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f budget-report.jsonl ]; then
+            echo '| Path | Took (ms) | Budget (ms) |' >> "$GITHUB_STEP_SUMMARY"; echo '| --- | ---: | ---: |' >> "$GITHUB_STEP_SUMMARY"
+            node -e 'for (const l of require("fs").readFileSync("budget-report.jsonl","utf8").trim().split("\n")) { const t = JSON.parse(l); console.log(`| ${t.label} | ${t.ms} | ${t.limitMs} |`) }' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Open an issue when a budget is exceeded
+        if: steps.run.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="A scale budget failed on $(git rev-parse --short HEAD). Something got slower at production size.\n\n$(grep -E 'BUDGET EXCEEDED|Error|FAIL' budget-output.txt | head -20)\n\nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          existing=$(gh issue list --state open --search '"Scale budget exceeded" in:title' --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then printf "$body" | gh issue comment "$existing" --body-file -; else printf "$body" | gh issue create --title "Scale budget exceeded" --body-file -; fi
+      - name: Fail the job
+        if: steps.run.outcome == 'failure'
+        run: exit 1

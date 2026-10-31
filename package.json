@@ -6,6 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
+    "budget": "RUN_BUDGET=1 BUDGET_REPORT=budget-report.jsonl vitest run lib/perf",
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
