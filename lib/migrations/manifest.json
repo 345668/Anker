@@ -184,6 +184,7 @@
     "2026-10-30-halyard-playbooks.sql",
     "2026-10-31-openweights-flag.sql",
     "2026-10-31-restore-drills.sql",
+    "2026-11-01-ai-credit-ledger.sql",
     "2026_06_02_email_oauth_accounts.sql"
   ]
 }

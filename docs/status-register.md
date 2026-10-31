@@ -25,7 +25,7 @@ Built: a schema baseline from production (361 tables), a from-scratch build comp
 | Built | M1 (editable model prices, cost state and owner on every AI call, estimates, two alerts), M2 (one meter for speech, search, documents, media), M3 (estimate-based check, 80% and 100% warnings, usage page, SAIL unit economics, provider bills, at-limit alert) |
 | Verified live | The `usage-warnings` cron has run 79 times without failure; migrations applied; the M1 backfill ran on 3,290 calls |
 | Built, not tried live | The usage page and the SAIL Model prices and Unit economics pages (not opened by me); a warning actually being sent (no workspace has a limit and spend); the estimate check refusing a job; a metered unit event from real traffic (no AI calls in the last 24 hours) |
-| Gaps | The 7 unit prices and 2 model prices are **unverified placeholders**; history without token counts cannot be priced; when the allowance runs out chat is refused (no free-lane fallback); free-lane share not shown; M4 credit ledger deliberately not built |
+| Gaps | The 7 unit prices and 2 model prices are **unverified placeholders**; history without token counts cannot be priced; when the allowance runs out chat is refused (no free-lane fallback); free-lane share not shown. **M4 (prepaid credit ledger) built 2026-11-01**, no pack can be bought yet (no checkout), grants are made by hand in SAIL, nothing real has been spent from it |
 | Open founder steps | Check the placeholder prices in SAIL; enter the provider bills monthly |
 
 ## 3. Release safety (doc 59)

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { requireAiPrincipal } from "@/lib/assistant/principal"
 import { workspaceError } from "@/lib/auth/workspace-context"
 import { allowanceOf, usageByArea } from "@/lib/metering/allowance"
+import { nextExpiry } from "@/lib/metering/credits"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -10,8 +11,8 @@ export const dynamic = "force-dynamic"
 export async function GET() {
   try {
     const p = await requireAiPrincipal()
-    if (!p.orgId) return NextResponse.json({ limit: null, used: 0, remaining: null, pct: null, areas: [], resetsOn: null }, { headers: { "Cache-Control": "private, no-store" } })
+    if (!p.orgId) return NextResponse.json({ limit: null, used: 0, remaining: null, pct: null, prepaidUsd: 0, areas: [], resetsOn: null }, { headers: { "Cache-Control": "private, no-store" } })
     const now = new Date(), resets = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
-    return NextResponse.json({ ...(await allowanceOf(p.orgId)), areas: await usageByArea(p.orgId), resetsOn: resets.toISOString().slice(0, 10) }, { headers: { "Cache-Control": "private, no-store" } })
+    return NextResponse.json({ ...(await allowanceOf(p.orgId)), areas: await usageByArea(p.orgId), prepaidExpiresOn: await nextExpiry(p.orgId).catch(() => null), resetsOn: resets.toISOString().slice(0, 10) }, { headers: { "Cache-Control": "private, no-store" } })
   } catch (e) { return workspaceError(e) }
 }

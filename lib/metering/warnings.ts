@@ -21,6 +21,7 @@ export async function sweepAllowanceWarnings(now = new Date()): Promise<{ checke
     if (a.limit === null || a.limit <= 0 || a.pct === null) continue
     for (const t of THRESHOLDS) {
       if (a.pct * 100 < t) continue
+      if (t >= 100 && a.remaining !== null && a.remaining > 0) continue       // prepaid credit still covers the overage: nothing is paused, so the warning would be false; it is sent if the credit runs out
       const fresh = (await sql`INSERT INTO usage_warnings (org_id, month, threshold, used_usd, limit_usd) VALUES (${orgId}, ${month}::date, ${t}, ${a.used}, ${a.limit}) ON CONFLICT DO NOTHING RETURNING threshold`) as any[]
       if (!fresh.length) continue
       warned++

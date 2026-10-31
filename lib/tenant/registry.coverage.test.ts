@@ -78,7 +78,7 @@ describe("the erasure registry covers every workspace-keyed table", () => {
     expect(order.indexOf("journal_entries")).toBeLessThan(order.indexOf("funds"))
   })
   it("retained and anonymised rules say why and how, and never retain a customer's content", () => {
-    for (const r of RULES.filter((x) => x.retain)) { expect(r.retain!.length).toBeGreaterThan(20); expect(r.table).toMatch(/^billing_/) }
+    for (const r of RULES.filter((x) => x.retain)) { expect(r.retain!.length).toBeGreaterThan(20); expect(r.table).toMatch(/^(billing_|ai_credit_ledger$)/) }      // money records only: the prepaid credit ledger holds amounts, dates and staff reasons, never a customer's content
     for (const r of RULES.filter((x) => x.anonymize)) expect(r.anonymize).toMatch(/(workspace_id|org_id) = NULL/)
   })
   it("the shared directory and the do-not-contact lists can never be erased", () => {

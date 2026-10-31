@@ -90,6 +90,10 @@ export async function assertWithinLimit(orgId: string, key: "ai_spend_usd_month"
   if (limit === null) return
   const u = await usageThisMonth(orgId)
   const used = key === "ai_spend_usd_month" ? u.aiSpendUsd : u.intakeSubmissions
+  if (used >= limit) {
+    // Prepaid credit covers spend beyond the plan's allowance (docs/architecture/58 section 8); only asked once the allowance is spent, so the common path costs nothing.
+    if (key === "ai_spend_usd_month" && used < limit + (await (await import("@/lib/metering/credits")).capacityBonus(orgId).catch(() => 0))) return
+  }
   if (used >= limit) throw toRefusal(new EntitlementError("limit", key === "ai_spend_usd_month" ? "Your plan's AI allowance for this month is used up. It resets next month, or contact support to raise it." : "Your plan's allowance of applications for this month is used up."))
 }
 

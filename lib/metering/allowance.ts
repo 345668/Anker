@@ -2,6 +2,7 @@ import "server-only"
 import { sql } from "@/lib/db"
 import { EntitlementRefusal, getEffective, usageThisMonth } from "@/lib/entitlements"
 import { UNITS, unitPrice } from "./index"
+import { capacityBonus, prepaidOf } from "./credits"
 
 /**
  * One check in front of every metered capability (docs/architecture/58 section 5): is there room left in this month's AI allowance for what is about to run?
@@ -21,13 +22,15 @@ export async function estimateUsd(cap: Capability, qty = 1): Promise<number> {
   return (await unitPrice(CAPABILITY_UNIT[cap]) ?? 0) * Math.max(0, qty)
 }
 
-export interface Allowance { limit: number | null; used: number; remaining: number | null; pct: number | null }
+/** `limit`, `used` and `pct` are the plan's monthly allowance as before. `prepaidUsd` is unexpired prepaid credit (docs/architecture/58 section 8); `remaining` counts it, because it covers spend beyond the limit. */
+export interface Allowance { limit: number | null; used: number; remaining: number | null; pct: number | null; prepaidUsd: number; /** limit + prepaid headroom: what the gate compares spend with (null = unlimited). */ capacityUsd: number | null }
 export async function allowanceOf(orgId: string): Promise<Allowance> {
   const e = await getEffective(orgId)
   const raw = e.limits.ai_spend_usd_month
   const limit = raw === null || raw === undefined || raw < 0 ? null : Number(raw)
   const used = (await usageThisMonth(orgId)).aiSpendUsd
-  return { limit, used, remaining: limit === null ? null : Math.max(0, limit - used), pct: limit === null || limit === 0 ? null : used / limit }
+  const bonus = limit === null ? 0 : await capacityBonus(orgId).catch(() => 0), prepaid = limit === null ? 0 : (await prepaidOf(orgId).catch(() => ({ balanceUsd: 0 }))).balanceUsd
+  return { limit, used, remaining: limit === null ? null : Math.max(0, limit + bonus - used), pct: limit === null || limit === 0 ? null : used / limit, prepaidUsd: prepaid, capacityUsd: limit === null ? null : limit + bonus }
 }
 
 /** Says why not, in plain words, or null when there is room. Never throws. */
@@ -36,8 +39,8 @@ export async function whyNot(orgId: string, cap: Capability, qty = 1): Promise<s
     const a = await allowanceOf(orgId)
     if (a.limit === null) return null
     const est = await estimateUsd(cap, qty)
-    if (a.used + est <= a.limit) return null
-    return a.used >= a.limit
+    if (a.capacityUsd === null || a.used + est <= a.capacityUsd) return null          // the plan's allowance plus any prepaid credit that covers the overage
+    return a.used >= a.capacityUsd
       ? `Your workspace has used this month's AI allowance, so ${WHAT[cap]} is paused until it resets next month. An owner can ask support to raise it.`
       : `This would use more than what is left of this month's AI allowance, so ${WHAT[cap]} is paused for now. A shorter request may still fit.`
   } catch { return null }      // a failed check must not stop the work; the monthly limit still applies elsewhere
@@ -59,4 +62,10 @@ export async function usageByArea(orgId: string): Promise<Array<{ area: string; 
     ...chat.map((r) => ({ area: `AI: ${String(r.task).replace(/_/g, " ")}`, usd: Number(r.usd), detail: `${r.n} calls` })),
     ...events.map((r) => ({ area: LABEL[r.unit] ?? r.unit, usd: Number(r.usd), detail: `${Math.round(Number(r.qty)).toLocaleString("en")} ${QTY[r.unit] ?? "units"}` })),
   ].sort((a, b) => b.usd - a.usd)
+}
+
+/** What the settlement job needs for one workspace: the plan's monthly limit (null = unlimited) and this month's spend. */
+export async function spendAndLimit(orgId: string): Promise<{ limit: number | null; spent: number }> {
+  const e = await getEffective(orgId), raw = e.limits.ai_spend_usd_month
+  return { limit: raw === null || raw === undefined || raw < 0 ? null : Number(raw), spent: (await usageThisMonth(orgId)).aiSpendUsd }
 }

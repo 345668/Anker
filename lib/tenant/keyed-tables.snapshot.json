@@ -1,5 +1,5 @@
 {
-  "takenAt": "2026-10-30",
+  "takenAt": "2026-10-31",
   "baseTables": [
     "accelerated_match_jobs",
     "action_proposals",
@@ -10,6 +10,7 @@
     "agent_runs",
     "agent_settings",
     "ai_calls",
+    "ai_credit_ledger",
     "ai_media_tasks",
     "ai_processing_logs",
     "ai_studio_artifacts",
@@ -307,6 +308,7 @@
     "research_crawl_logs",
     "research_documents",
     "research_organizations",
+    "restore_drills",
     "roles",
     "saved_templates",
     "schema_migrations",
@@ -389,6 +391,9 @@
     ],
     "ai_calls": [
       "workspace_id"
+    ],
+    "ai_credit_ledger": [
+      "org_id"
     ],
     "ai_studio_consents": [
       "org_id"
