@@ -1,0 +1,783 @@
+{
+ "articles": [
+  {
+   "slug": "actions-inbox",
+   "title": "The actions inbox",
+   "summary": "Every change the assistant proposes waits here until you approve or reject it.",
+   "personas": [
+    "everyone"
+   ],
+   "area": "Assistant",
+   "routes": [
+    "/dashboard/actions"
+   ],
+   "feature": null,
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "assistant"
+   ],
+   "keywords": [
+    "approve",
+    "reject",
+    "undo",
+    "proposal",
+    "inbox",
+    "actions"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "The actions inbox lists proposals made by the assistant and by automated helpers. Each shows what it would change and why."
+    },
+    {
+     "t": "h2",
+     "text": "Deciding",
+     "id": "deciding"
+    },
+    {
+     "t": "p",
+     "text": "For each proposal you can **approve**, **reject**, or, after approving, **undo** where the change can be reversed. Nothing happens until you approve."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "Some changes cannot be undone, such as a message that has already been sent. Those are labelled before you approve."
+    }
+   ],
+   "text": "The actions inbox lists proposals made by the assistant and by automated helpers. Each shows what it would change and why. Deciding For each proposal you can **approve**, **reject**, or, after approving, **undo** where the change can be reversed. Nothing happens until you approve. What it cannot do Some changes cannot be undone, such as a message that has already been sent. Those are labelled before you approve."
+  },
+  {
+   "slug": "assistant",
+   "title": "The assistant",
+   "summary": "Ask questions about your own data; anything that changes something is proposed first.",
+   "personas": [
+    "everyone"
+   ],
+   "area": "Assistant",
+   "routes": [
+    "/dashboard/assistant"
+   ],
+   "feature": "assistant",
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "actions-inbox",
+    "privacy"
+   ],
+   "keywords": [
+    "ai",
+    "chat",
+    "ask",
+    "question",
+    "propose",
+    "agent"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "The assistant answers questions using the data in the workspace you are in: your pipeline, contacts, calls and documents."
+    },
+    {
+     "t": "h2",
+     "text": "Reading and proposing",
+     "id": "reading-and-proposing"
+    },
+    {
+     "t": "p",
+     "text": "Reading is immediate. When an answer would **change** something, such as moving an investor to a new stage or creating a follow-up task, the assistant does not do it. It adds a proposal to the [actions inbox](/dashboard/help/actions-inbox), where you approve or reject it."
+    },
+    {
+     "t": "h2",
+     "text": "Good questions",
+     "id": "good-questions"
+    },
+    {
+     "t": "ul",
+     "items": [
+      "Which investors have not replied in two weeks?",
+      "Summarise my last call with this investor.",
+      "What is missing from my data room?"
+     ]
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "The assistant can be wrong. Check names, numbers and dates before you rely on them. It cannot send email or messages by itself and it does not see other workspaces. Use of it counts against your workspace's monthly allowance on the **Usage** page."
+    }
+   ],
+   "text": "The assistant answers questions using the data in the workspace you are in: your pipeline, contacts, calls and documents. Reading and proposing Reading is immediate. When an answer would **change** something, such as moving an investor to a new stage or creating a follow-up task, the assistant does not do it. It adds a proposal to the [actions inbox](/dashboard/help/actions-inbox), where you approve or reject it. Good questions Which investors have not replied in two weeks? Summarise my last call with this investor. What is missing from my data room? What it cannot do The assistant can be wrong. Check names, numbers and dates before you rely on them. It cannot send email or messages by itself and it does not see other workspaces. Use of it counts against your workspace's monthly allowance on the **Usage** page."
+  },
+  {
+   "slug": "command-palette",
+   "title": "Command palette and shortcuts",
+   "summary": "Jump to any page from the keyboard.",
+   "personas": [
+    "everyone"
+   ],
+   "area": "Start here",
+   "routes": [
+    "/dashboard"
+   ],
+   "feature": null,
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "welcome"
+   ],
+   "keywords": [
+    "search",
+    "shortcut",
+    "keyboard",
+    "cmd k",
+    "ctrl k",
+    "go to"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "Press **Ctrl K** (Windows, Linux) or **Cmd K** (Mac) anywhere in the app to open the command palette. Type part of a page name and press Enter."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "It lists pages your role and plan can open. A page that is missing from it is not available to your workspace; see [Workspaces, roles and switching](/dashboard/help/workspaces-and-roles)."
+    }
+   ],
+   "text": "Press **Ctrl K** (Windows, Linux) or **Cmd K** (Mac) anywhere in the app to open the command palette. Type part of a page name and press Enter. What it cannot do It lists pages your role and plan can open. A page that is missing from it is not available to your workspace; see [Workspaces, roles and switching](/dashboard/help/workspaces-and-roles)."
+  },
+  {
+   "slug": "data-room",
+   "title": "The data room",
+   "summary": "Share diligence documents with investors through a tracked link.",
+   "personas": [
+    "founder"
+   ],
+   "area": "Documents",
+   "routes": [
+    "/dashboard/data-room"
+   ],
+   "feature": null,
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "decks"
+   ],
+   "keywords": [
+    "data room",
+    "diligence",
+    "documents",
+    "share",
+    "link",
+    "upload"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "The data room is organised into the sections investors expect. Upload into each section, then share a tracked link with investors."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "A link shares what is in the room at that moment; remove a document from the room before you share if it should not be seen."
+    }
+   ],
+   "text": "The data room is organised into the sections investors expect. Upload into each section, then share a tracked link with investors. What it cannot do A link shares what is in the room at that moment; remove a document from the room before you share if it should not be seen."
+  },
+  {
+   "slug": "decks",
+   "title": "Deck Studio",
+   "summary": "Build and edit your pitch deck inside Anker.",
+   "personas": [
+    "founder",
+    "vc"
+   ],
+   "area": "Documents",
+   "routes": [
+    "/dashboard/decks"
+   ],
+   "feature": null,
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "data-room"
+   ],
+   "keywords": [
+    "deck",
+    "pitch",
+    "slides",
+    "presentation",
+    "studio"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "Deck Studio is where you write and edit pitch decks. Open a deck to edit its slides."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "A deck is only as accurate as what you write; check figures against your own records before sharing."
+    }
+   ],
+   "text": "Deck Studio is where you write and edit pitch decks. Open a deck to edit its slides. What it cannot do A deck is only as accurate as what you write; check figures against your own records before sharing."
+  },
+  {
+   "slug": "find-investors",
+   "title": "Find investors and what the score means",
+   "summary": "How matching ranks investors for your round, and how to read the tiers.",
+   "personas": [
+    "founder"
+   ],
+   "area": "Fundraising",
+   "routes": [
+    "/dashboard/find-investors",
+    "/dashboard/discover"
+   ],
+   "feature": "matchmaking",
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "pipeline",
+    "outreach"
+   ],
+   "keywords": [
+    "match",
+    "score",
+    "tier",
+    "investors",
+    "fit",
+    "rank",
+    "champion"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "Find investors ranks investors against your company profile. Each result has a score from 0 to 100, built from six factors: investor type, cheque size, sector, geography, thesis and whether a contact is known."
+    },
+    {
+     "t": "h2",
+     "text": "Tiers",
+     "id": "tiers"
+    },
+    {
+     "t": "ul",
+     "items": [
+      "**Champion**: 80 or above",
+      "**Priority A**: 60 or above",
+      "**Priority B**: 40 or above",
+      "**Prospect C**: 20 or above"
+     ]
+    },
+    {
+     "t": "h2",
+     "text": "Using it",
+     "id": "using-it"
+    },
+    {
+     "t": "p",
+     "text": "Open a result to see why it ranked where it did, then save it to your [pipeline](/dashboard/help/pipeline)."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "A score is a ranking aid, not a prediction that an investor will invest. Where a fact is unknown the score says so rather than guessing. Complete your company profile first, because the ranking can only be as good as what it knows about you."
+    }
+   ],
+   "text": "Find investors ranks investors against your company profile. Each result has a score from 0 to 100, built from six factors: investor type, cheque size, sector, geography, thesis and whether a contact is known. Tiers **Champion**: 80 or above **Priority A**: 60 or above **Priority B**: 40 or above **Prospect C**: 20 or above Using it Open a result to see why it ranked where it did, then save it to your [pipeline](/dashboard/help/pipeline). What it cannot do A score is a ranking aid, not a prediction that an investor will invest. Where a fact is unknown the score says so rather than guessing. Complete your company profile first, because the ranking can only be as good as what it knows about you."
+  },
+  {
+   "slug": "investor-requests",
+   "title": "Investor requests",
+   "summary": "The inbox for investors who ask to talk to your fund.",
+   "personas": [
+    "vc"
+   ],
+   "area": "Investors",
+   "routes": [
+    "/dashboard/investor-requests"
+   ],
+   "feature": null,
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "matchmaking"
+   ],
+   "keywords": [
+    "investor",
+    "requests",
+    "inbox",
+    "lp",
+    "interest"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "Investor requests lists people who have asked to talk to your fund. Open one to read it and decide what to do."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "A request is not a commitment. Nothing is sent to the investor until you act."
+    }
+   ],
+   "text": "Investor requests lists people who have asked to talk to your fund. Open one to read it and decide what to do. What it cannot do A request is not a commitment. Nothing is sent to the investor until you act."
+  },
+  {
+   "slug": "linkedin-outreach",
+   "title": "LinkedIn outreach (assisted sending)",
+   "summary": "Messages are written in Anker and sent by you from your own LinkedIn.",
+   "personas": [
+    "founder"
+   ],
+   "area": "Outreach",
+   "routes": [
+    "/dashboard/linkedin/campaigns",
+    "/dashboard/linkedin/leads"
+   ],
+   "feature": "linkedin",
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "outreach"
+   ],
+   "keywords": [
+    "linkedin",
+    "extension",
+    "connect",
+    "message",
+    "sender"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "LinkedIn outreach is **assisted**: Anker prepares the message and the browser extension shows it in a panel, but you send it yourself."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "It does not send from your account on its own. Sending is limited by LinkedIn's own rules, which Anker does not control."
+    }
+   ],
+   "text": "LinkedIn outreach is **assisted**: Anker prepares the message and the browser extension shows it in a panel, but you send it yourself. What it cannot do It does not send from your account on its own. Sending is limited by LinkedIn's own rules, which Anker does not control."
+  },
+  {
+   "slug": "lp-documents",
+   "title": "Your documents",
+   "summary": "Where limited partners find the documents shared with them.",
+   "personas": [
+    "lp"
+   ],
+   "area": "Documents",
+   "routes": [
+    "/lp/documents"
+   ],
+   "feature": null,
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "welcome"
+   ],
+   "keywords": [
+    "lp",
+    "documents",
+    "statements",
+    "notices"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "Documents lists what a fund has shared with you, grouped into sections. Open one to read it."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "You see only documents shared with you, and you cannot change them."
+    }
+   ],
+   "text": "Documents lists what a fund has shared with you, grouped into sections. Open one to read it. What it cannot do You see only documents shared with you, and you cannot change them."
+  },
+  {
+   "slug": "matchmaking",
+   "title": "Investor matchmaking for funds",
+   "summary": "Find limited partners that fit your fund.",
+   "personas": [
+    "vc"
+   ],
+   "area": "Investors",
+   "routes": [
+    "/dashboard/matchmaking"
+   ],
+   "feature": "matchmaking",
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "investor-requests"
+   ],
+   "keywords": [
+    "lp",
+    "matchmaking",
+    "match",
+    "fund",
+    "investors"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "Matchmaking ranks limited partners against your fund profile. Keep the profile complete, because it is what the ranking reads."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "It ranks, it does not predict. Where a fact is unknown the result says so."
+    }
+   ],
+   "text": "Matchmaking ranks limited partners against your fund profile. Keep the profile complete, because it is what the ranking reads. What it cannot do It ranks, it does not predict. Where a fact is unknown the result says so."
+  },
+  {
+   "slug": "outreach",
+   "title": "Outreach: drafts, approval and limits",
+   "summary": "How messages to investors are drafted, approved and sent.",
+   "personas": [
+    "founder"
+   ],
+   "area": "Outreach",
+   "routes": [
+    "/dashboard/outreach"
+   ],
+   "feature": "outreach",
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "pipeline",
+    "linkedin-outreach"
+   ],
+   "keywords": [
+    "email",
+    "draft",
+    "send",
+    "approve",
+    "limit",
+    "campaign",
+    "deliverability"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "Outreach drafts messages for investors in your pipeline. You review each draft before anything is sent."
+    },
+    {
+     "t": "h2",
+     "text": "The flow",
+     "id": "the-flow"
+    },
+    {
+     "t": "ol",
+     "items": [
+      "Pick investors and a campaign.",
+      "Review the drafts and edit them.",
+      "Approve. Only approved messages are sent."
+     ]
+    },
+    {
+     "t": "h2",
+     "text": "Limits",
+     "id": "limits"
+    },
+    {
+     "t": "p",
+     "text": "Your plan sets a daily sending limit. When you reach it, further messages wait for the next day."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "Whether a message reaches an inbox, and whether anyone replies, is outside Anker's control."
+    }
+   ],
+   "text": "Outreach drafts messages for investors in your pipeline. You review each draft before anything is sent. The flow Pick investors and a campaign. Review the drafts and edit them. Approve. Only approved messages are sent. Limits Your plan sets a daily sending limit. When you reach it, further messages wait for the next day. What it cannot do Whether a message reaches an inbox, and whether anyone replies, is outside Anker's control."
+  },
+  {
+   "slug": "pipeline",
+   "title": "Your fundraising pipeline",
+   "summary": "Track each investor from first contact to a decision.",
+   "personas": [
+    "founder"
+   ],
+   "area": "Fundraising",
+   "routes": [
+    "/dashboard/fundraising/pipeline"
+   ],
+   "feature": null,
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "find-investors",
+    "outreach"
+   ],
+   "keywords": [
+    "pipeline",
+    "stage",
+    "crm",
+    "track",
+    "investors",
+    "round"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "The pipeline shows every investor you are talking to, grouped by stage. Move an investor between stages as the conversation progresses."
+    },
+    {
+     "t": "h2",
+     "text": "Stages",
+     "id": "stages"
+    },
+    {
+     "t": "p",
+     "text": "Stages run in order from the first, queued, to a final decision. The underlying order is: queued, identified, researched, contacted, responded, meeting, diligence, soft_circle, term_sheet, committed, wired, passed, declined, lost. Your workspace may show friendlier names for the same steps."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "Moving a card does not email anyone. If the assistant suggests a stage change, it appears in the [actions inbox](/dashboard/help/actions-inbox) for you to approve."
+    }
+   ],
+   "text": "The pipeline shows every investor you are talking to, grouped by stage. Move an investor between stages as the conversation progresses. Stages Stages run in order from the first, queued, to a final decision. The underlying order is: queued, identified, researched, contacted, responded, meeting, diligence, soft_circle, term_sheet, committed, wired, passed, declined, lost. Your workspace may show friendlier names for the same steps. What it cannot do Moving a card does not email anyone. If the assistant suggests a stage change, it appears in the [actions inbox](/dashboard/help/actions-inbox) for you to approve."
+  },
+  {
+   "slug": "privacy",
+   "title": "Privacy in plain words",
+   "summary": "Who can see what in your workspace.",
+   "personas": [
+    "everyone"
+   ],
+   "area": "Start here",
+   "routes": [
+    "/dashboard/settings"
+   ],
+   "feature": null,
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "workspaces-and-roles",
+    "assistant"
+   ],
+   "keywords": [
+    "privacy",
+    "data",
+    "security",
+    "who can see",
+    "operators",
+    "owner"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "Your workspace's records are visible to the people you invite to it. They are kept apart from every other workspace."
+    },
+    {
+     "t": "h2",
+     "text": "Platform operators",
+     "id": "platform-operators"
+    },
+    {
+     "t": "p",
+     "text": "The people who run Anker can see how the platform is used, such as counts and errors. They are firewalled from the private records of a workspace."
+    },
+    {
+     "t": "h2",
+     "text": "The assistant",
+     "id": "the-assistant"
+    },
+    {
+     "t": "p",
+     "text": "The assistant reads your workspace data to answer you. Your records are not shared with other workspaces."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "This page is a summary, not a contract. Your agreement and privacy policy are the binding terms."
+    }
+   ],
+   "text": "Your workspace's records are visible to the people you invite to it. They are kept apart from every other workspace. Platform operators The people who run Anker can see how the platform is used, such as counts and errors. They are firewalled from the private records of a workspace. The assistant The assistant reads your workspace data to answer you. Your records are not shared with other workspaces. What it cannot do This page is a summary, not a contract. Your agreement and privacy policy are the binding terms."
+  },
+  {
+   "slug": "welcome",
+   "title": "Welcome to Anker",
+   "summary": "What Anker is, how it is organised, and where to start.",
+   "personas": [
+    "everyone"
+   ],
+   "area": "Start here",
+   "routes": [
+    "/dashboard"
+   ],
+   "feature": null,
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "workspaces-and-roles",
+    "assistant",
+    "command-palette"
+   ],
+   "keywords": [
+    "start",
+    "overview",
+    "introduction",
+    "getting started"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "Anker is a workspace for raising and managing capital. What you see depends on your role: founders get fundraising tools, funds get deal and investor tools, and limited partners get a read-only view of their own holdings."
+    },
+    {
+     "t": "h2",
+     "text": "How the menu is organised",
+     "id": "how-the-menu-is-organised"
+    },
+    {
+     "t": "p",
+     "text": "The menu groups pages by the work you do, not by feature name. Founders see areas such as Fundraising, Relationships, Outreach, Company, Documents and Assistant. Funds see Deals, Portfolio, Investors, Fund operations, Reporting and Assistant. Limited partners see Assistant, Capital activity and Documents."
+    },
+    {
+     "t": "h2",
+     "text": "Where to start",
+     "id": "where-to-start"
+    },
+    {
+     "t": "ol",
+     "items": [
+      "Open the **Assistant** and ask a question about your own data.",
+      "Use the **command palette** (Ctrl K, or Cmd K on a Mac) to jump to any page by name.",
+      "Read [Workspaces, roles and switching](/dashboard/help/workspaces-and-roles) so you know whose data you are looking at."
+     ]
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "Anker does not move money, and it does not send messages or change records without you approving them. Some pages only appear when your workspace's plan includes them."
+    }
+   ],
+   "text": "Anker is a workspace for raising and managing capital. What you see depends on your role: founders get fundraising tools, funds get deal and investor tools, and limited partners get a read-only view of their own holdings. How the menu is organised The menu groups pages by the work you do, not by feature name. Founders see areas such as Fundraising, Relationships, Outreach, Company, Documents and Assistant. Funds see Deals, Portfolio, Investors, Fund operations, Reporting and Assistant. Limited partners see Assistant, Capital activity and Documents. Where to start Open the **Assistant** and ask a question about your own data. Use the **command palette** (Ctrl K, or Cmd K on a Mac) to jump to any page by name. Read [Workspaces, roles and switching](/dashboard/help/workspaces-and-roles) so you know whose data you are looking at. What it cannot do Anker does not move money, and it does not send messages or change records without you approving them. Some pages only appear when your workspace's plan includes them."
+  },
+  {
+   "slug": "workspaces-and-roles",
+   "title": "Workspaces, roles and switching",
+   "summary": "A workspace holds one organisation's data; your role decides what you see in it.",
+   "personas": [
+    "everyone"
+   ],
+   "area": "Start here",
+   "routes": [
+    "/dashboard/settings"
+   ],
+   "feature": null,
+   "flag": null,
+   "updated": "2026-11-01",
+   "related": [
+    "welcome",
+    "privacy"
+   ],
+   "keywords": [
+    "workspace",
+    "role",
+    "switch",
+    "invite",
+    "member",
+    "team",
+    "seat"
+   ],
+   "blocks": [
+    {
+     "t": "p",
+     "text": "A **workspace** is one organisation's space: its profile, contacts, documents and history. Everything you create belongs to the workspace, not to you personally, so a colleague you invite sees the same records."
+    },
+    {
+     "t": "h2",
+     "text": "Roles",
+     "id": "roles"
+    },
+    {
+     "t": "p",
+     "text": "Your role in a workspace sets the menu you see. A person can belong to more than one workspace and switch between them. When you switch, the menu, the assistant and every number on screen change to that workspace."
+    },
+    {
+     "t": "h2",
+     "text": "Inviting people",
+     "id": "inviting-people"
+    },
+    {
+     "t": "p",
+     "text": "Open **Settings** to invite a colleague. The number of seats is set by your workspace's plan."
+    },
+    {
+     "t": "h2",
+     "text": "What it cannot do",
+     "id": "what-it-cannot-do"
+    },
+    {
+     "t": "p",
+     "text": "Switching workspace does not copy data between them. A workspace owner's private records are not visible to the platform's operators."
+    }
+   ],
+   "text": "A **workspace** is one organisation's space: its profile, contacts, documents and history. Everything you create belongs to the workspace, not to you personally, so a colleague you invite sees the same records. Roles Your role in a workspace sets the menu you see. A person can belong to more than one workspace and switch between them. When you switch, the menu, the assistant and every number on screen change to that workspace. Inviting people Open **Settings** to invite a colleague. The number of seats is set by your workspace's plan. What it cannot do Switching workspace does not copy data between them. A workspace owner's private records are not visible to the platform's operators."
+  }
+ ]
+}

@@ -27,7 +27,8 @@
     "db:baseline": "node scripts/db/make-baseline.mjs",
     "db:build-local": "node scripts/db/build-local.mjs",
     "db:seed-demo": "node scripts/db/seed-demo.mjs",
-    "dev:local": "node scripts/dev-local.mjs"
+    "dev:local": "node scripts/dev-local.mjs",
+    "build:help": "node scripts/build-help.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

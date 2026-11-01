@@ -1,14 +1,9 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
-import { HelpContent } from "@/components/tesseract/help-content"
+import { helpFor } from "@/lib/help/articles"
+import { HelpHome } from "@/components/help/help-home"
+
+export const metadata = { title: "Help | Anker" }
 
 export default async function HelpPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/auth/login")
-  }
-
-  return <HelpContent user={user} />
+  const { articles, persona } = await helpFor()
+  return <HelpHome articles={articles} persona={persona} />
 }

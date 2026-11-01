@@ -138,3 +138,6 @@ About 20 working days; O0 and O1 alone make the Help tab trustworthy in about fo
 
 ## 11. Not in scope
 Video or screen recordings (they go stale and cannot be checked by a test); in-app chat support staffed by people; a community forum; a public documentation site (the articles could be published later, the format allows it); product analytics beyond the counts above; A/B testing of the tour; email drip campaigns; onboarding for the investor-side accounts (`/investor`, doc 64), which have their own journey and get their own pass after this one.
+
+## 12. Build status
+O0 and O1 built 2026-11-01 (see docs/status-register.md section 4d). Tokens available to articles today: `{{tier:<id>}}`, `{{tier:<id>.min}}`, `{{stages:list}}`. Articles are in `content/help/*.md` (flat, `personas` in front matter, not per-persona folders). Not built: O2 to O7.

@@ -57,6 +57,8 @@ Counsel review of the privacy notice and the legitimate-interest assessment (doc
 ## 4d. First-run tour and Help (doc 78)
 Spec only (2026-11-01). Measured today: the Help tab is static, its topic titles lead nowhere, two of its buttons do nothing, and several claims in it (a "Pro" plan, "9 key factors", CSV export from Analytics) are not checked against the code. Nothing built; build order in doc 78 section 9 starts with the accuracy guard and a rebuilt Help (O0, O1).
 
+**O0 and O1 built (2026-11-01).** Built: article format with checked front matter, generator (`pnpm build:help` writes `lib/help/generated.json`), accuracy guard tests (real routes, entitlement keys, known flags, tokens resolved from code, banned phrases, "What it cannot do" required, links, coverage against `WORK_AREAS` with a shrink-only debt register in `content/help/_debt.json`, generated-file freshness), client-side search with a 22-query ranking test, Help v2 (home, search, "For your role", topics, article pages), 15 drafted articles, the old static Help removed (dead buttons and stale claims gone). Built, not tried: viewed once in the local sandbox as the demo founder (home and one article render, tokens resolve); not seen as a fund or LP user, not on production, search not typed through in a browser. Not built: O2 to O7 (checklist, tour, other tours, contextual drawer, assistant `help_search`, funnel and German). **Open:** the 15 articles are drafts for the founder to read and correct; 40 work-area routes still have no article (the debt list); the support contact is a plain "Contact us" link to /contact until you give an address.
+
 ## 4c. Directory identity merges (doc 55 E2 to E4)
 | | State |
 | --- | --- |
